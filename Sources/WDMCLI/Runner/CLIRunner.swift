@@ -62,6 +62,7 @@ public enum CLIRunner {
             virtualDisplayManager: virtualDisplayManager,
             screenshotter: screenshotter,
             recorder: recorder,
+            processEnv: env,
             stdout: stdout, stderr: stderr
         )
 

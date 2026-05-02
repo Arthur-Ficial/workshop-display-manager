@@ -17,17 +17,140 @@ public enum VirtualCommand {
             return try list(args: args, deps: deps)
         case "remove":
             return try remove(args: args, deps: deps)
+        case "save":
+            return try save(args: args, deps: deps)
+        case "restore":
+            return try restore(args: args, deps: deps)
         case nil:
             deps.stdout.writeLine("usage: wdm virtual <subcommand>")
             deps.stdout.writeLine("subcommands:")
-            deps.stdout.writeLine("  create --name <s> [--mode WxH@Hz] [--hidpi] [--duration-ms N]")
+            deps.stdout.writeLine("  create --name <s> [--mode WxH@Hz] [--hidpi] [--mirror-on <id>] [--duration-ms N]")
             deps.stdout.writeLine("                            create a virtual display (blocks until SIGTERM)")
             deps.stdout.writeLine("  list                      list virtual displays currently registered")
-            deps.stdout.writeLine("  remove <id>               remove a virtual display (process-scoped)")
+            deps.stdout.writeLine("  remove <id|name|--all>    SIGTERM the owning create process(es)")
+            deps.stdout.writeLine("  save <name> [--at-login]  snapshot current running virtuals to JSON")
+            deps.stdout.writeLine("  restore <name> [--dry-run] re-spawn each spec; --dry-run prints w/o spawning")
             return ExitCodes.success
         default:
             throw CLIError.usage("wdm virtual: unknown subcommand '\(pos[0])'")
         }
+    }
+
+    // MARK: - save / restore (scenes)
+
+    private static func save(args: [String], deps: CLIDeps) throws -> Int32 {
+        let pos = Args.positional(args)
+        guard pos.count >= 2 else {
+            throw CLIError.usage("usage: wdm virtual save <name> [--at-login]")
+        }
+        let name = pos[1]
+        let store = VirtualSceneStore.resolve(env: deps.processEnv)
+
+        // Walk running `wdm virtual create` command lines via pgrep (same
+        // pattern as `wdm virtual remove`). Parse out --name / --mode / --hidpi.
+        let pgrepProc = Process()
+        pgrepProc.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        pgrepProc.arguments = ["-fl", "wdm virtual create"]
+        let pipe = Pipe()
+        pgrepProc.standardOutput = pipe
+        try? pgrepProc.run()
+        pgrepProc.waitUntilExit()
+        let raw = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        var specs: [VirtualDisplaySpec] = []
+        for line in raw.split(separator: "\n").map(String.init) {
+            // line: "<pid> <full command>"
+            let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard parts.count == 2 else { continue }
+            let cmd = String(parts[1])
+            if let spec = parseSpecFromCommand(cmd) {
+                specs.append(spec)
+            }
+        }
+        try store.save(name: name, specs: specs)
+        deps.stderr.writeLine("wdm virtual save: wrote \(specs.count) spec(s) to \(store.directory.appendingPathComponent("\(name).json").path)")
+
+        if args.contains("--at-login") {
+            let label = "com.fullstackoptimization.wdm.virtual-\(name)"
+            let plist = LaunchAgentInstaller.defaultPlistURL(forLabel: label, env: deps.processEnv)
+            let exec = ProcessInfo.processInfo.arguments.first ?? "/usr/local/bin/wdm"
+            try LaunchAgentInstaller.write(
+                to: plist,
+                label: label,
+                executablePath: exec,
+                args: ["virtual", "restore", name]
+            )
+            deps.stderr.writeLine("wdm virtual save: installed LaunchAgent at \(plist.path)")
+            deps.stderr.writeLine("  load with: launchctl bootstrap gui/$UID \(plist.path)")
+        }
+        return ExitCodes.success
+    }
+
+    private static func restore(args: [String], deps: CLIDeps) throws -> Int32 {
+        let pos = Args.positional(args)
+        guard pos.count >= 2 else {
+            throw CLIError.usage("usage: wdm virtual restore <name> [--dry-run]")
+        }
+        let name = pos[1]
+        let store = VirtualSceneStore.resolve(env: deps.processEnv)
+        let specs = try store.load(name: name)
+
+        let dryRun = args.contains("--dry-run")
+        for spec in specs {
+            let line = "\(spec.name): \(spec.width)x\(spec.height)@\(spec.refreshHz) hiDPI=\(spec.hiDPI)"
+            deps.stdout.writeLine(line)
+            if !dryRun {
+                // Spawn `wdm virtual create` per spec as a child process so
+                // the OS treats each as an independent owner of its virtual
+                // display. The current process blocks until SIGTERM, then
+                // forwards SIGTERM to every child.
+                let exec = ProcessInfo.processInfo.arguments.first ?? "/usr/local/bin/wdm"
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: exec)
+                var spawnArgs = [
+                    "virtual", "create",
+                    "--name", spec.name,
+                    "--mode", "\(spec.width)x\(spec.height)@\(spec.refreshHz)",
+                ]
+                if spec.hiDPI { spawnArgs.append("--hidpi") }
+                proc.arguments = spawnArgs
+                try? proc.run()
+            }
+        }
+        return ExitCodes.success
+    }
+
+    /// Parse a `wdm virtual create --name ... --mode WxH@Hz [--hidpi]`
+    /// command line into a `VirtualDisplaySpec`.
+    static func parseSpecFromCommand(_ cmd: String) -> VirtualDisplaySpec? {
+        let tokens = tokenize(cmd)
+        guard let nameIdx = tokens.firstIndex(of: "--name"), tokens.count > nameIdx + 1 else { return nil }
+        let name = tokens[nameIdx + 1]
+        var width = 1920, height = 1080, refresh = 60
+        if let modeIdx = tokens.firstIndex(of: "--mode"), tokens.count > modeIdx + 1,
+           let parsed = VirtualDisplaySpec.parseMode(tokens[modeIdx + 1]) {
+            width = parsed.width; height = parsed.height; refresh = parsed.refreshHz
+        }
+        let hiDPI = tokens.contains("--hidpi")
+        return VirtualDisplaySpec(
+            name: name, width: width, height: height, refreshHz: refresh,
+            hiDPI: hiDPI, widthMM: 600, heightMM: 340
+        )
+    }
+
+    /// Naive shell tokenizer: splits on whitespace, keeps quoted "names with spaces"
+    /// intact. Sufficient for our own command lines which never include shell metas.
+    static func tokenize(_ s: String) -> [String] {
+        var out: [String] = []
+        var cur = ""
+        var inQuote = false
+        for c in s {
+            if c == "\"" { inQuote.toggle(); continue }
+            if c == " " && !inQuote {
+                if !cur.isEmpty { out.append(cur); cur = "" }
+            } else { cur.append(c) }
+        }
+        if !cur.isEmpty { out.append(cur) }
+        return out
     }
 
     // MARK: - create

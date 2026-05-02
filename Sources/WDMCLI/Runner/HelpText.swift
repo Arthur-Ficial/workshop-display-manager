@@ -35,7 +35,9 @@ public enum HelpText {
       virtual create --name <s> [--mode WxH@Hz] [--hidpi] [--mirror-on <id>] [--duration-ms N]
                                           create a virtual display; --mirror-on auto-spawns a PIP
       virtual list                        list connected displays (incl. virtual)
-      virtual remove <id>                 hint: kill the `wdm virtual create` process
+      virtual remove <id|name|--all>      SIGTERM the owning create process(es)
+      virtual save <name> [--at-login]    snapshot running virtuals; --at-login installs a LaunchAgent
+      virtual restore <name> [--dry-run]  re-spawn each saved spec
       screenshot <id|main> --out <path>   capture display framebuffer to PNG
       shot-all --dir <path>               capture every active display to <dir>/display-<id>.png
       record <id|main> --out <path> --duration <sec>  record display to .mov (H.264)
