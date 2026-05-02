@@ -13,12 +13,12 @@ enum DisplayServicesBridge {
         RTLD_LAZY
     )
 
-    nonisolated(unsafe) private static let getFn: GetFn? = {
+    private static let getFn: GetFn? = {
         guard let h = handle, let s = dlsym(h, "DisplayServicesGetBrightness") else { return nil }
         return unsafeBitCast(s, to: GetFn.self)
     }()
 
-    nonisolated(unsafe) private static let setFn: SetFn? = {
+    private static let setFn: SetFn? = {
         guard let h = handle, let s = dlsym(h, "DisplayServicesSetBrightness") else { return nil }
         return unsafeBitCast(s, to: SetFn.self)
     }()
