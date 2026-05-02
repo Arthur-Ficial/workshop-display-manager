@@ -42,14 +42,19 @@ public final class RecordingPipFlipper: PipFlipper, @unchecked Sendable {
     private func stopFlagged() -> Bool { lock.withLock { stopRequested } }
 
     private func append(_ line: String) throws {
-        let data = Data(line.utf8)
-        if FileManager.default.fileExists(atPath: url.path) {
-            let h = try FileHandle(forWritingTo: url)
-            defer { try? h.close() }
-            try h.seekToEnd()
-            try h.write(contentsOf: data)
-        } else {
-            try data.write(to: url)
+        // Serialize append across concurrent callers — pip-grid + Task.detached
+        // produces N parallel writers to the same log file; without the lock,
+        // both can take the "file doesn't exist" branch and overwrite.
+        try lock.withLock {
+            let data = Data(line.utf8)
+            if FileManager.default.fileExists(atPath: url.path) {
+                let h = try FileHandle(forWritingTo: url)
+                defer { try? h.close() }
+                try h.seekToEnd()
+                try h.write(contentsOf: data)
+            } else {
+                try data.write(to: url)
+            }
         }
     }
 }

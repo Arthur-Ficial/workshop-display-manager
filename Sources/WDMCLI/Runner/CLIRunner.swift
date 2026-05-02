@@ -97,6 +97,7 @@ public enum CLIRunner {
             case "move-window": return try MoveWindowCommand.run(args: rest, deps: deps)
             case "focus":    return try FocusCommand.run(args: rest, deps: deps)
             case "stream":   return try StreamCommand.run(args: rest, deps: deps)
+            case "pip-grid": return try PipGridCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)
