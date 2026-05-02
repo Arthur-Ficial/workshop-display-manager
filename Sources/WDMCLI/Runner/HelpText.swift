@@ -38,6 +38,8 @@ public enum HelpText {
       virtual remove <id|name|--all>      SIGTERM the owning create process(es)
       virtual save <name> [--at-login]    snapshot running virtuals; --at-login installs a LaunchAgent
       virtual restore <name> [--dry-run]  re-spawn each saved spec
+      scene <name> [--dry-run]            multi-display scene orchestrator (JSON)
+      move-window <pattern> --to <id|main>  AX-place frontmost window onto display
       screenshot <id|main> --out <path>   capture display framebuffer to PNG
       shot-all --dir <path>               capture every active display to <dir>/display-<id>.png
       record <id|main> --out <path> --duration <sec>  record display to .mov (H.264)

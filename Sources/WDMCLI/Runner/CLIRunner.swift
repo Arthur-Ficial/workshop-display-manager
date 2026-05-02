@@ -50,6 +50,7 @@ public enum CLIRunner {
         let virtualDisplayManager = VirtualDisplayManagerFactory.make(env: env)
         let screenshotter = ScreenshotterFactory.make(env: env)
         let recorder = RecorderFactory.make(env: env)
+        let windowMover = WindowMoverFactory.make(env: env)
         let deps = CLIDeps(
             provider: provider, profileStore: profileStore,
             confirmer: confirmer,
@@ -62,6 +63,7 @@ public enum CLIRunner {
             virtualDisplayManager: virtualDisplayManager,
             screenshotter: screenshotter,
             recorder: recorder,
+            windowMover: windowMover,
             processEnv: env,
             stdout: stdout, stderr: stderr
         )
@@ -90,6 +92,7 @@ public enum CLIRunner {
             case "shot-all": return try ShotAllCommand.run(args: rest, deps: deps)
             case "record":   return try RecordCommand.run(args: rest, deps: deps)
             case "scene":    return try SceneCommand.run(args: rest, deps: deps)
+            case "move-window": return try MoveWindowCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)
