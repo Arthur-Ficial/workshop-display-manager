@@ -11,7 +11,11 @@ public enum RotateCommand {
         }
         let snap = try deps.provider.snapshot()
         let id = try DisplayResolver.resolve(pos[0], in: snap)
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let label = snap.display(id: id)?.name ?? "display \(id)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Rotated \(label) to \(deg)°"
+        ) {
             try deps.provider.rotate(displayID: id, degrees: deg, options: .noConfirm)
         }
     }

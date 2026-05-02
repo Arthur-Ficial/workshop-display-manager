@@ -11,7 +11,8 @@ public struct StdinConfirmer: Confirmer {
         self.stderr = stderr
     }
 
-    public func confirm(timeoutSeconds: Int) -> Bool {
+    public func confirm(message: String, timeoutSeconds: Int) -> Bool {
+        if !message.isEmpty { stderr.writeLine(message) }
         stderr.write(prompt + " (y/N, \(timeoutSeconds)s) ")
 
         let stdin = FileHandle.standardInput

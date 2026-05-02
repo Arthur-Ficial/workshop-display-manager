@@ -9,7 +9,12 @@ public enum MirrorCommand {
         let snap = try deps.provider.snapshot()
         let src = try DisplayResolver.resolve(pos[0], in: snap)
         let dst = try DisplayResolver.resolve(pos[1], in: snap)
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let srcLabel = snap.display(id: src)?.name ?? "display \(src)"
+        let dstLabel = snap.display(id: dst)?.name ?? "display \(dst)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Mirroring \(dstLabel) → \(srcLabel)"
+        ) {
             try deps.provider.mirror(source: src, mirror: dst, options: .noConfirm)
         }
     }
@@ -23,7 +28,11 @@ public enum UnmirrorCommand {
         }
         let snap = try deps.provider.snapshot()
         let id = try DisplayResolver.resolve(alias, in: snap)
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let label = snap.display(id: id)?.name ?? "display \(id)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Stopped mirroring \(label)"
+        ) {
             try deps.provider.unmirror(displayID: id, options: .noConfirm)
         }
     }

@@ -10,7 +10,11 @@ public enum ModeCommand {
         let snap = try deps.provider.snapshot()
         let id = try DisplayResolver.resolve(pos[0], in: snap)
         let mode = try Mode.parse(pos[1])
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let label = snap.display(id: id)?.name ?? "display \(id)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Set \(label) to \(mode.description)"
+        ) {
             try deps.provider.setMode(displayID: id, mode: mode, options: .noConfirm)
         }
     }

@@ -1,9 +1,9 @@
 public struct AutoYesConfirmer: Confirmer {
     public init() {}
-    public func confirm(timeoutSeconds: Int) -> Bool { true }
+    public func confirm(message: String, timeoutSeconds: Int) -> Bool { true }
 }
 
 public struct AutoNoConfirmer: Confirmer {
     public init() {}
-    public func confirm(timeoutSeconds: Int) -> Bool { false }
+    public func confirm(message: String, timeoutSeconds: Int) -> Bool { false }
 }

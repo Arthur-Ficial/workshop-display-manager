@@ -8,7 +8,11 @@ public enum CycleCommand {
             throw CLIError.usage("cycle requires at least two online displays with a main")
         }
         let next = online[(mainIdx + 1) % online.count]
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let label = next.name ?? "display \(next.id)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Cycled main to \(label)"
+        ) {
             try deps.provider.setMain(displayID: next.id, options: .noConfirm)
         }
     }

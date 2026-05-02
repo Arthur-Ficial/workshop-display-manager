@@ -21,23 +21,27 @@ import AppKit
 public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
     public init() {}
 
-    public func confirm(timeoutSeconds: Int) -> Bool {
+    public func confirm(message: String, timeoutSeconds: Int) -> Bool {
         if Thread.isMainThread {
-            return MainActor.assumeIsolated { self.runOnMain(timeout: timeoutSeconds) }
+            return MainActor.assumeIsolated {
+                self.runOnMain(message: message, timeout: timeoutSeconds)
+            }
         }
         return DispatchQueue.main.sync {
-            MainActor.assumeIsolated { self.runOnMain(timeout: timeoutSeconds) }
+            MainActor.assumeIsolated {
+                self.runOnMain(message: message, timeout: timeoutSeconds)
+            }
         }
     }
 
     @MainActor
-    private func runOnMain(timeout: Int) -> Bool {
+    private func runOnMain(message: String, timeout: Int) -> Bool {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
         let panel = HUDPanel.make()
         let bounds = panel.contentView!.bounds
-        let content = HUDContent(frame: bounds, total: timeout)
+        let content = HUDContent(frame: bounds, total: timeout, message: message)
         content.autoresizingMask = [.width, .height]
         panel.installContent(content)
 
@@ -122,7 +126,7 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
 @MainActor
 final class HUDPanel: NSPanel {
     static func make() -> HUDPanel {
-        let frame = NSRect(x: 0, y: 0, width: 280, height: 120)
+        let frame = NSRect(x: 0, y: 0, width: 420, height: 180)
         let p = HUDPanel(
             contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel, .hudWindow, .utilityWindow, .fullSizeContentView],
@@ -161,25 +165,35 @@ final class HUDPanel: NSPanel {
 
 @MainActor
 final class HUDContent: NSView {
-    private let countdown = NSTextField(labelWithString: "")
+    private let title = NSTextField(labelWithString: "")
+    private let status = NSTextField(labelWithString: "")
     private let bar = ProgressBar()
     private let hint = NSTextField(labelWithString: "")
+    private var lastSeconds = -1
 
-    init(frame: NSRect, total: Int) {
+    init(frame: NSRect, total: Int, message: String) {
         super.init(frame: frame)
         wantsLayer = true
 
-        countdown.stringValue = "\(total)s"
-        countdown.alignment = .center
-        countdown.font = .monospacedDigitSystemFont(ofSize: 38, weight: .bold)
-        countdown.textColor = .labelColor
-        addSubview(countdown)
+        title.stringValue = message.isEmpty ? "Display change applied" : message
+        title.alignment = .center
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        title.textColor = .labelColor
+        title.maximumNumberOfLines = 2
+        title.lineBreakMode = .byTruncatingTail
+        addSubview(title)
+
+        status.stringValue = "Reverting in \(total)s…"
+        status.alignment = .center
+        status.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        status.textColor = .labelColor
+        addSubview(status)
 
         addSubview(bar)
 
-        hint.stringValue = "space  keep    ·    any key  cancel"
+        hint.stringValue = "Press SPACE to keep   ·   any other key reverts"
         hint.alignment = .center
-        hint.font = .systemFont(ofSize: 11, weight: .medium)
+        hint.font = .systemFont(ofSize: 11, weight: .regular)
         hint.textColor = .secondaryLabelColor
         addSubview(hint)
     }
@@ -189,13 +203,16 @@ final class HUDContent: NSView {
     override func layout() {
         super.layout()
         let w = bounds.width
-        countdown.frame = NSRect(x: 0, y: bounds.height - 60, width: w, height: 44)
-        bar.frame       = NSRect(x: 24, y: 32, width: w - 48, height: 4)
-        hint.frame      = NSRect(x: 0, y: 10, width: w, height: 16)
+        title.frame  = NSRect(x: 16, y: bounds.height - 50, width: w - 32, height: 36)
+        status.frame = NSRect(x: 16, y: 78, width: w - 32, height: 18)
+        bar.frame    = NSRect(x: 28, y: 64, width: w - 56, height: 4)
+        hint.frame   = NSRect(x: 16, y: 22, width: w - 32, height: 16)
     }
 
     func updateNumber(_ remaining: Int) {
-        countdown.stringValue = "\(remaining)s"
+        if remaining == lastSeconds { return }
+        lastSeconds = remaining
+        status.stringValue = "Reverting in \(remaining)s…"
     }
 
     func beginBarAnimation(duration: TimeInterval) {

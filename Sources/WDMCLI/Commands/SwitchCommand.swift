@@ -10,7 +10,11 @@ public enum SwitchCommand {
         guard let target = other else {
             throw CLIError.usage("no second display available to switch to")
         }
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let label = target.name ?? "display \(target.id)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Switched main to \(label)"
+        ) {
             try deps.provider.setMain(displayID: target.id, options: .noConfirm)
         }
     }

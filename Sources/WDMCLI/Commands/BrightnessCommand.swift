@@ -13,7 +13,11 @@ public enum BrightnessCommand {
             guard let value = Float(pos[1]) else {
                 throw CLIError.usage("brightness value must be a number 0…1")
             }
-            return try MutationDispatch.dispatch(deps: deps, args: args) {
+            let label = snap.display(id: id)?.name ?? "display \(id)"
+            return try MutationDispatch.dispatch(
+                deps: deps, args: args,
+                description: "Set \(label) brightness to \(Int((value * 100).rounded()))%"
+            ) {
                 try deps.provider.setBrightness(displayID: id, value: value, options: .noConfirm)
             }
         }

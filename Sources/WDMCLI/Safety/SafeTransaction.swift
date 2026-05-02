@@ -10,13 +10,14 @@ public enum SafeTransaction {
     public static func run(
         provider: DisplayProvider,
         confirmer: Confirmer,
+        message: String = "",
         timeoutSeconds: Int,
         apply: () throws -> ApplyResult
     ) throws -> ApplyResult {
         let before = try provider.snapshot()
         let result = try apply()
         guard result == .applied else { return result }
-        if confirmer.confirm(timeoutSeconds: timeoutSeconds) {
+        if confirmer.confirm(message: message, timeoutSeconds: timeoutSeconds) {
             return .applied
         }
         try ProfileApplier.apply(target: before, using: provider, options: .noConfirm)

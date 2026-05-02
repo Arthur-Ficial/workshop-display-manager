@@ -7,6 +7,7 @@ public enum MutationDispatch {
     public static func dispatch(
         deps: CLIDeps,
         args: [String],
+        description: String = "",
         apply: () throws -> ApplyResult
     ) throws -> Int32 {
         // Crash recovery: persist current state to profile 'last' before any mutation.
@@ -27,6 +28,7 @@ public enum MutationDispatch {
         let result = try SafeTransaction.run(
             provider: deps.provider,
             confirmer: confirmer,
+            message: description,
             timeoutSeconds: 15,
             apply: apply
         )

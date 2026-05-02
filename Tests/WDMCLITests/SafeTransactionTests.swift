@@ -8,9 +8,11 @@ import Foundation
 final class StubConfirmer: Confirmer, @unchecked Sendable {
     var answer: Bool
     var calls = 0
+    var lastMessage: String = ""
     init(answer: Bool) { self.answer = answer }
-    func confirm(timeoutSeconds: Int) -> Bool {
+    func confirm(message: String, timeoutSeconds: Int) -> Bool {
         calls += 1
+        lastMessage = message
         return answer
     }
 }

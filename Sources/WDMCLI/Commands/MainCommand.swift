@@ -8,7 +8,11 @@ public enum MainCommand {
         }
         let snap = try deps.provider.snapshot()
         let id = try DisplayResolver.resolve(alias, in: snap)
-        return try MutationDispatch.dispatch(deps: deps, args: args) {
+        let label = snap.display(id: id)?.name ?? "display \(id)"
+        return try MutationDispatch.dispatch(
+            deps: deps, args: args,
+            description: "Set main to \(label)"
+        ) {
             try deps.provider.setMain(displayID: id, options: .noConfirm)
         }
     }
