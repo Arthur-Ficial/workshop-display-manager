@@ -11,7 +11,7 @@ let package = Package(
         .library(name: "WDMCLI", targets: ["WDMCLI"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6"),
     ],
     targets: [
         .target(
@@ -25,11 +25,7 @@ let package = Package(
         ),
         .target(
             name: "WDMCLI",
-            dependencies: [
-                "WDMCore",
-                "WDMSystem",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ],
+            dependencies: ["WDMCore", "WDMSystem"],
             path: "Sources/WDMCLI"
         ),
         .executableTarget(

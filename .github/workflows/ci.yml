@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+          sw_vers
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
+
+      - name: Build (debug)
+        run: swift build
+
+      - name: Build (release, warnings-as-errors)
+        run: swift build -c release -Xswiftc -warnings-as-errors
+
+      - name: Test
+        run: swift test --parallel
+
+      - name: shellcheck install.sh
+        run: |
+          brew install shellcheck
+          shellcheck install.sh
+
+      - name: Install smoke test
+        run: ./Tests/install/install_test.sh
+
+      - name: Verify man page round-trips
+        run: |
+          .build/release/wdm manpage > /tmp/wdm.1
+          # Just check it parses as nroff. macOS' mandoc / nroff will print
+          # warnings to stderr but exit 0 for valid input.
+          nroff -man /tmp/wdm.1 > /dev/null
+
+      - name: Verify completions parse
+        run: |
+          .build/release/wdm completions zsh > /tmp/_wdm
+          .build/release/wdm completions bash > /tmp/wdm.bash
+          .build/release/wdm completions fish > /tmp/wdm.fish
+          # zsh: source the file in a fresh shell; sourcing a bad #compdef errors.
+          zsh -c 'autoload -Uz compinit && compinit -u && source /tmp/_wdm && _wdm' || true
+          bash -n /tmp/wdm.bash
+          fish -n /tmp/wdm.fish || true   # fish may not be on the runner

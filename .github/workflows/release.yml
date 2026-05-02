@@ -1,0 +1,111 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign, notarize, publish
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF##refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Test (hermetic)
+        run: swift test --parallel
+
+      - name: Build release (warnings-as-errors)
+        run: swift build -c release -Xswiftc -warnings-as-errors
+
+      - name: Generate man page
+        run: |
+          .build/release/wdm manpage > .build/release/wdm.1
+
+      - name: Import code-signing identity
+        env:
+          DEVID_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_CERT_P12_BASE64 }}
+          DEVID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PWD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          echo "$DEVID_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/devid.p12"
+          security import "$RUNNER_TEMP/devid.p12" -k "$KEYCHAIN_PATH" \
+            -P "$DEVID_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+      - name: Sign binary
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --force --options runtime --timestamp \
+            --sign "Developer ID Application: Franz Enzenhofer ($APPLE_TEAM_ID)" \
+            .build/release/wdm
+          codesign --verify --strict --verbose=4 .build/release/wdm
+
+      - name: Notarize
+        env:
+          APPLE_ID_USERNAME: ${{ secrets.APPLE_ID_USERNAME }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          ditto -c -k --keepParent .build/release/wdm "$RUNNER_TEMP/wdm-notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/wdm-notarize.zip" \
+            --apple-id "$APPLE_ID_USERNAME" \
+            --password "$APPLE_ID_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple .build/release/wdm
+          spctl --assess --type install --verbose .build/release/wdm
+
+      - name: Package
+        id: package
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          NAME="wdm-${VERSION}-arm64-macos"
+          mkdir -p "$RUNNER_TEMP/dist/$NAME"
+          cp .build/release/wdm "$RUNNER_TEMP/dist/$NAME/wdm"
+          cp .build/release/wdm.1 "$RUNNER_TEMP/dist/$NAME/wdm.1"
+          cp README.md LICENSE "$RUNNER_TEMP/dist/$NAME/"
+          tar -czf "$RUNNER_TEMP/dist/$NAME.tar.gz" -C "$RUNNER_TEMP/dist" "$NAME"
+          ( cd "$RUNNER_TEMP/dist" && shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256" )
+          echo "tarball=$RUNNER_TEMP/dist/$NAME.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "checksum=$RUNNER_TEMP/dist/$NAME.tar.gz.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.version }}" \
+            "${{ steps.package.outputs.tarball }}" \
+            "${{ steps.package.outputs.checksum }}" \
+            --generate-notes \
+            --title "${{ steps.ver.outputs.version }}"
+
+      - name: Bump Homebrew formula
+        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Compute the artifact URL + checksum and dispatch to the tap repo.
+          CHECKSUM=$(awk '{print $1}' "${{ steps.package.outputs.checksum }}")
+          gh api repos/Arthur-Ficial/homebrew-wdm/dispatches \
+            -f event_type=wdm-release \
+            -f client_payload[version]="$VERSION" \
+            -f client_payload[checksum]="$CHECKSUM" \
+            --silent
