@@ -42,10 +42,14 @@ public enum CLIRunner {
             default:    return NativePopupConfirmer()
             }
         }()
+        let eventsFileURL = (env["WDM_TEST_EVENTS_FILE"]).flatMap { p in
+            p.isEmpty ? nil : URL(fileURLWithPath: p)
+        }
         let deps = CLIDeps(
             provider: provider, profileStore: profileStore,
             confirmer: confirmer,
             nativeConfirmer: nativeConfirmer,
+            eventsFileURL: eventsFileURL,
             stdout: stdout, stderr: stderr
         )
 
@@ -68,6 +72,9 @@ public enum CLIRunner {
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)
             case "completions": return try CompletionsCommand.run(args: rest, deps: deps)
             case "manpage":  return try ManpageCommand.run(args: rest, deps: deps)
+            case "watch":    return try WatchCommand.run(args: rest, deps: deps)
+            case "workshop": return try WorkshopCommand.run(args: rest, deps: deps)
+            case "daemon":   return try DaemonCommand.run(args: rest, deps: deps)
             default:
                 stderr.writeLine("unknown command: \(sub)")
                 return ExitCodes.usage

@@ -1,0 +1,52 @@
+import Foundation
+import WDMCore
+import WDMSystem
+
+public enum WatchCommand {
+    public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
+        let useJSON = args.contains("--json")
+        let max = parseMaxEvents(args)
+
+        guard let url = deps.eventsFileURL else {
+            throw CLIError.usage(
+                "wdm watch is not yet implemented for the real backend in this version. " +
+                "Set WDM_TEST_EVENTS_FILE to a JSONL path for hermetic tests."
+            )
+        }
+
+        let stream = EventStreamFile(url: url, pollIntervalMs: 25)
+        var seen = 0
+        let semaphore = DispatchSemaphore(value: 0)
+
+        let task = Task {
+            do {
+                for try await event in stream.events {
+                    if useJSON {
+                        let data = try JSONEncoder().encode(event)
+                        if let line = String(data: data, encoding: .utf8) {
+                            deps.stdout.writeLine(line)
+                        }
+                    } else {
+                        deps.stdout.writeLine("\(event.timestamp)  \(event.kind.rawValue)  display=\(event.displayID)")
+                    }
+                    seen += 1
+                    if let max, seen >= max { break }
+                }
+            } catch {
+                deps.stderr.writeLine("error: \(error)")
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+        _ = task
+        return ExitCodes.success
+    }
+
+    private static func parseMaxEvents(_ args: [String]) -> Int? {
+        guard let idx = args.firstIndex(of: "--max-events"),
+              args.count > idx + 1,
+              let n = Int(args[idx + 1]) else { return nil }
+        return n
+    }
+}

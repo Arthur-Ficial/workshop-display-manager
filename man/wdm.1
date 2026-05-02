@@ -70,6 +70,31 @@ Print the version.
 .TP
 .B help
 Print the inline help.
+.TP
+.B watch [\-\-json] [\-\-max-events N]
+Stream display reconfiguration events to stdout.
+.TP
+.B workshop start \-\-audience <id|main>
+Save the current arrangement to profile 'last-workshop' and switch
+main to the audience display. Pair with `wdm workshop stop` to revert.
+.TP
+.B workshop stop
+Restore the 'last-workshop' profile.
+.TP
+.B daemon
+Run the watcher loop. On a display reconfiguration event, look up the
+auto-profile matching the current EDID set in
+~/.config/wdm/profiles/auto/ and restore it.
+.TP
+.B daemon install [\-\-to <plist>] [\-\-exec <path>]
+Install a LaunchAgent plist (default
+~/Library/LaunchAgents/com.fullstackoptimization.wdm.plist) so the
+daemon runs automatically at login.
+.TP
+.B save \-\-auto
+Save the current arrangement under
+~/.config/wdm/profiles/auto/<edid-hash>.json so the daemon can
+recognise this display set later.
 .SH "CONFIRMATION FLAGS"
 Every mutating command goes through a confirmer:
 .TP

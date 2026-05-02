@@ -9,6 +9,7 @@ public enum CompletionsFormatter {
         "mode", "main", "mirror", "unmirror", "move", "rotate",
         "switch", "cycle", "brightness",
         "save", "restore", "profiles",
+        "watch", "workshop", "daemon",
         "completions", "manpage",
         "version", "help",
     ]
