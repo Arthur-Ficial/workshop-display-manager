@@ -122,7 +122,10 @@ Every mutating command (`mode`, `main`, `mirror`, `move`, `rotate`, `switch`, `c
 `.forSession` means: **if the user logs out or reboots, the change is gone.** Plus, before complete:
 
 1. We snapshot the current configuration to `~/.config/wdm/snapshots/last.json` so `wdm restore last` always works.
-2. After complete, we prompt on stderr: `Press y in 15s to keep, anything else reverts:` (default 15s, override with `--auto-revert-seconds N`, disable with `--no-confirm`).
+2. After complete, we prompt according to the confirmation flag:
+   - default → terminal prompt on stderr: `Press y in 15s to keep, anything else reverts:`
+   - `--confirm` → native Mac popup with a live countdown (SPACE to keep, any other key to cancel, auto-revert at 0)
+   - `--no-confirm` → no prompt, change kept
 3. On timeout / `n` / Ctrl-C, we call `CGRestorePermanentDisplayConfiguration()` (which restores the persistent config) and exit `5`.
 4. If the process is killed before confirmation, `.forSession` ensures the OS reverts on logout.
 
@@ -136,16 +139,16 @@ This is the macOS-native equivalent of the "your screen will revert in 15 second
 wdm list [--json]                       enumerate displays
 wdm get <id|main> [field] [--json]      read one field
 wdm modes <id> [--json]                 list available resolutions/refresh rates
-wdm mode <id> <WxH@Hz> [--no-confirm]   set display mode (safe-tx)
-wdm main <id> [--no-confirm]            set primary display (safe-tx)
-wdm switch [--no-confirm]               swap main between two displays (fast)
-wdm cycle [--no-confirm]                rotate main forward through all displays
-wdm mirror <src> <dst> [--no-confirm]   mirror src→dst (safe-tx)
-wdm unmirror <id> [--no-confirm]        break mirror (safe-tx)
-wdm move <id> <x> <y> [--no-confirm]    set arrangement origin (safe-tx)
+wdm mode <id> <WxH@Hz> [--no-confirm|--confirm]   set display mode (safe-tx)
+wdm main <id> [--no-confirm|--confirm]            set primary display (safe-tx)
+wdm switch [--no-confirm|--confirm]               swap main between two displays (fast)
+wdm cycle [--no-confirm|--confirm]                rotate main forward through all displays
+wdm mirror <src> <dst> [--no-confirm|--confirm]   mirror src→dst (safe-tx)
+wdm unmirror <id> [--no-confirm|--confirm]        break mirror (safe-tx)
+wdm move <id> <x> <y> [--no-confirm|--confirm]    set arrangement origin (safe-tx)
 wdm rotate <id> <0|90|180|270>          physical rotation
 wdm save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
-wdm restore <name> [--no-confirm]       apply named profile (safe-tx)
+wdm restore <name> [--no-confirm|--confirm]       apply named profile (safe-tx)
 wdm profiles [--json]                   list saved profiles
 wdm brightness <id> [0.0..1.0]          read or set brightness (built-in only)
 wdm watch [--json]                      stream display reconfiguration events

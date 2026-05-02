@@ -24,8 +24,18 @@ public enum HelpText {
       version                             print version
       help                                show this text
 
+    CONFIRMATION FLAGS (apply to all mutating commands)
+      (default)        terminal prompt on stderr (`y` within 15s to keep)
+      --confirm        native Mac popup with countdown (SPACE to keep, any other
+                       key to cancel, auto-revert at 0)
+      --no-confirm     skip confirmation entirely
+
     ENVIRONMENT
-      WDM_TEST_FIXTURE   path to a JSON fixture; switches to hermetic test backend.
+      WDM_TEST_FIXTURE              hermetic test backend; path to JSON fixture.
+      WDM_PROFILES_DIR              override default ~/.config/wdm/profiles
+      WDM_NATIVE_CONFIRMER_STUB     "yes"|"no" — replaces popup with stub (tests).
+      WDM_AUTO_CONFIRM=1            replaces stdin prompt with auto-yes.
+      WDM_REAL_HARDWARE=1           opt-in for real-hardware smoke tests.
 
     """
 }
