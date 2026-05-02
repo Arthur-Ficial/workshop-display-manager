@@ -17,7 +17,10 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
     nonisolated(unsafe) private var stream: SCStream?
     nonisolated(unsafe) private var window: NSWindow?
     nonisolated(unsafe) private var frameSink: NSObject?
+    nonisolated(unsafe) private var captureTimer: DispatchSourceTimer?
+    private let pollerStopBox = PollerStopBox()
     nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
+    nonisolated(unsafe) private var requestedPosition: PipPosition?
 
     public init() {}
 
@@ -25,18 +28,22 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         sourceID: UInt32,
         destinationID: UInt32,
         size: PipSize,
+        position: PipPosition?,
         flip: Flip,
         durationMs: Int?
     ) throws {
+        self.requestedPosition = position
         if !CGPreflightScreenCaptureAccess() {
             _ = CGRequestScreenCaptureAccess()
             throw ProviderError.configurationFailed(
                 "pip: Screen Recording permission not granted for `wdm`. " +
-                "Open System Settings → Privacy & Security → Screen Recording, " +
-                "enable `wdm`, then re-run. (A prompt was just requested.)"
+                "Open System Settings → Privacy & Security → Screen Recording → enable `wdm`."
             )
         }
-        runOnMainSetActivationPolicy(.regular)
+        // .accessory: window visible, no dock icon, no menu bar pollution.
+        // Workshop spawns dozens of virtual+pip processes; .regular gives every
+        // one a generic "exec" tile in the dock, which is unusable.
+        runOnMainSetActivationPolicy(.accessory)
         installSignalHandlers()
 
         let errBox = ErrorBoxPip()
@@ -88,8 +95,12 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         size: PipSize,
         flip: Flip
     ) async throws {
-        let content = try await SCShareableContent.current
-        guard let scDisplay = content.displays.first(where: { $0.displayID == CGDirectDisplayID(sourceID) }) else {
+        // Validate the source display id is something macOS actually has
+        // active. Avoid SCShareableContent here — it skips virtual displays.
+        guard NSScreen.screens.contains(where: {
+            ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID)
+                == CGDirectDisplayID(sourceID)
+        }) else {
             throw ProviderError.displayNotFound(sourceID)
         }
         guard let dstScreen = NSScreen.screens.first(where: {
@@ -99,10 +110,18 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
             throw ProviderError.displayNotFound(destinationID)
         }
 
-        // Center the PIP window on the destination display.
+        // Position: explicit (--x/--y, top-left origin from dst) or centered.
         let dstFrame = dstScreen.frame
-        let originX = dstFrame.origin.x + (dstFrame.width  - CGFloat(size.width))  / 2
-        let originY = dstFrame.origin.y + (dstFrame.height - CGFloat(size.height)) / 2
+        let originX: CGFloat
+        let originY: CGFloat
+        if let pos = self.requestedPosition {
+            // Convert top-left origin to AppKit's bottom-left origin.
+            originX = dstFrame.origin.x + CGFloat(pos.x)
+            originY = dstFrame.origin.y + dstFrame.height - CGFloat(pos.y) - CGFloat(size.height)
+        } else {
+            originX = dstFrame.origin.x + (dstFrame.width  - CGFloat(size.width))  / 2
+            originY = dstFrame.origin.y + (dstFrame.height - CGFloat(size.height)) / 2
+        }
         let frame = NSRect(x: originX, y: originY,
                            width: CGFloat(size.width), height: CGFloat(size.height))
 
@@ -129,24 +148,25 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         win.makeKeyAndOrderFront(nil)
         self.window = win
 
-        let cfg = SCStreamConfiguration()
-        cfg.width = Int(scDisplay.width)
-        cfg.height = Int(scDisplay.height)
-        cfg.minimumFrameInterval = CMTime(value: 1, timescale: 30)
-        cfg.queueDepth = 5
-        cfg.showsCursor = true
-        let filter = SCContentFilter(display: scDisplay, excludingWindows: [])
-
-        let output = PipFrameSink(layer: imageLayer)
-        let captureQ = DispatchQueue(label: "wdm.pip.capture", qos: .userInteractive)
-        let s = SCStream(filter: filter, configuration: cfg, delegate: nil)
-        try s.addStreamOutput(output, type: .screen, sampleHandlerQueue: captureQ)
-        try await s.startCapture()
-        self.stream = s
-        self.frameSink = output
+        // Poll CGDisplayCreateImage at 30 Hz: SCStream returns empty frames on
+        // idle virtual displays; the legacy CGDisplayCreateImage path reads
+        // the framebuffer directly and works for every display.
+        let dID = CGDirectDisplayID(sourceID)
+        let sink = PipPollingSink(layer: imageLayer)
+        self.frameSink = sink
+        let stopBox = self.pollerStopBox
+        Task.detached(priority: .userInitiated) {
+            while !stopBox.flagged() {
+                await sink.tick(displayID: dID)
+                try? await Task.sleep(nanoseconds: 100_000_000)  // 10 Hz
+            }
+        }
     }
 
     private func teardown() {
+        pollerStopBox.set()
+        captureTimer?.cancel()
+        captureTimer = nil
         if let s = stream {
             Task { try? await s.stopCapture() }
         }
@@ -197,6 +217,43 @@ private final class ErrorBoxPip: @unchecked Sendable {
     private var err: Error?
     func set(_ e: Error) { lock.withLock { err = e } }
     func get() -> Error? { lock.withLock { err } }
+}
+
+private final class PollerStopBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stopped = false
+    func set() { lock.withLock { stopped = true } }
+    func flagged() -> Bool { lock.withLock { stopped } }
+}
+
+private final class PipPollingSink: NSObject, @unchecked Sendable {
+    nonisolated(unsafe) let layer: CALayer
+    init(layer: CALayer) { self.layer = layer }
+    func tick(displayID: CGDirectDisplayID) async {
+        guard #available(macOS 14.0, *) else { return }
+        do {
+            let content = try await SCShareableContent.current
+            guard let scDisplay = content.displays.first(where: { $0.displayID == displayID }) else { return }
+            let filter = SCContentFilter(display: scDisplay, excludingWindows: [])
+            let cfg = SCStreamConfiguration()
+            cfg.width = Int(scDisplay.width)
+            cfg.height = Int(scDisplay.height)
+            cfg.showsCursor = true
+            let cg = try await SCScreenshotManager.captureImage(
+                contentFilter: filter,
+                configuration: cfg
+            )
+            let l = self.layer
+            DispatchQueue.main.async {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                l.contents = cg
+                CATransaction.commit()
+            }
+        } catch {
+            // Silent — next tick retries.
+        }
+    }
 }
 
 @objc private final class PipFrameSink: NSObject, SCStreamOutput, @unchecked Sendable {

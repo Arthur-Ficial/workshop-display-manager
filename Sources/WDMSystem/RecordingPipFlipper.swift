@@ -15,12 +15,16 @@ public final class RecordingPipFlipper: PipFlipper, @unchecked Sendable {
         sourceID: UInt32,
         destinationID: UInt32,
         size: PipSize,
+        position: PipPosition?,
         flip: Flip,
         durationMs: Int?
     ) throws {
+        let posTag = position.map { "\($0.x),\($0.y)" } ?? "centered"
         let line =
             "run source=\(sourceID) destination=\(destinationID) " +
-            "size=\(size.width)x\(size.height) flip=\(flip.rawValue) " +
+            "size=\(size.width)x\(size.height) " +
+            "position=\(posTag) " +
+            "flip=\(flip.rawValue) " +
             "durationMs=\(durationMs.map(String.init) ?? "nil")\n"
         try append(line)
         if let ms = durationMs {

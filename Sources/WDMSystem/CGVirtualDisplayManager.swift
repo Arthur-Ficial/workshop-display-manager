@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import CGVirtualDisplaySPI
 import CoreGraphics
 import ObjectiveC
@@ -49,6 +50,9 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
         }
 
         installSignalHandlers()
+        // Suppress dock icon — workshops spawn many virtual displays and a
+        // "exec" tile per process is noise.
+        setAccessoryActivationPolicy()
 
         let descriptor = CGVirtualDisplayDescriptor()
         descriptor.name = spec.name
@@ -56,9 +60,13 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
         descriptor.maxPixelsHigh = UInt32(spec.height)
         descriptor.sizeInMillimeters = CGSize(width: Double(spec.widthMM),
                                               height: Double(spec.heightMM))
-        descriptor.serialNum = 0x57444D31     // 'WDM1'
+        // WindowServer rejects subsequent virtual displays that reuse a vendor /
+        // product / serial triple — derive a unique serial from the spec name +
+        // pid so spinning up multiple virtual monitors works in the same login
+        // session.
+        descriptor.vendorID = 0x76646D00      // 'vdm\0' — wdm vendor
         descriptor.productID = 0x1234
-        descriptor.vendorID = 0x76646D00      // 'vdm\0'
+        descriptor.serialNum = Self.uniqueSerial(for: spec.name)
         descriptor.queue = DispatchQueue(label: "wdm.virtual.\(spec.name)")
 
         let display = CGVirtualDisplay(descriptor: descriptor)
@@ -95,6 +103,32 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
     public func stop() { lock.withLock { stopRequested = true } }
 
     private func flagged() -> Bool { lock.withLock { stopRequested } }
+
+    private func setAccessoryActivationPolicy() {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                _ = NSApplication.shared.setActivationPolicy(.accessory)
+            }
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    _ = NSApplication.shared.setActivationPolicy(.accessory)
+                }
+            }
+        }
+    }
+
+    /// Hash the spec name + pid into a non-zero UInt32 serial unique within
+    /// the login session. Plain FNV-1a is overkill but cheap and stable.
+    static func uniqueSerial(for name: String) -> UInt32 {
+        var hash: UInt32 = 2166136261
+        for byte in name.utf8 {
+            hash ^= UInt32(byte)
+            hash = hash &* 16777619
+        }
+        let pid = UInt32(truncatingIfNeeded: ProcessInfo.processInfo.processIdentifier)
+        return (hash ^ pid) | 0x1     // never zero
+    }
 
     private func installSignalHandlers() {
         signal(SIGINT, SIG_IGN)

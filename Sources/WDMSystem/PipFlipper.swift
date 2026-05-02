@@ -14,15 +14,27 @@ import WDMCore
 public protocol PipFlipper: Sendable {
     /// Open the PIP window. Blocks until `stop()` or `durationMs` elapses.
     /// Throws `displayNotFound` if either id is unknown.
+    /// `position` is in destination-screen coordinates (top-left origin from
+    /// the dst frame). When nil the window is centered on the destination.
     func run(
         sourceID: UInt32,
         destinationID: UInt32,
         size: PipSize,
+        position: PipPosition?,
         flip: Flip,
         durationMs: Int?
     ) throws
 
     func stop()
+}
+
+public struct PipPosition: Equatable, Sendable {
+    public let x: Int
+    public let y: Int
+    public init(x: Int, y: Int) {
+        self.x = x
+        self.y = y
+    }
 }
 
 public struct PipSize: Equatable, Sendable {

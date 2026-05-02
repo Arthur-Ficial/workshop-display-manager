@@ -40,10 +40,18 @@ public enum PipCommand {
             flip = .none
         }
         let durationMs = parseFlagInt(args, name: "--duration-ms")
+        let position: PipPosition?
+        if let xs = parseFlagString(args, name: "--x"),
+           let ys = parseFlagString(args, name: "--y"),
+           let xi = Int(xs), let yi = Int(ys) {
+            position = PipPosition(x: xi, y: yi)
+        } else {
+            position = nil
+        }
 
         try deps.pipFlipper.run(
             sourceID: srcID, destinationID: dstID,
-            size: size, flip: flip, durationMs: durationMs
+            size: size, position: position, flip: flip, durationMs: durationMs
         )
         return ExitCodes.success
     }
