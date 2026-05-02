@@ -14,15 +14,9 @@ public enum DaemonCommand {
     // MARK: - watch loop
 
     private static func watchAndRestore(args: [String], deps: CLIDeps) throws -> Int32 {
-        guard let url = deps.eventsFileURL else {
-            throw CLIError.usage(
-                "wdm daemon: real-backend event watching is not yet wired in this version. " +
-                "Set WDM_TEST_EVENTS_FILE to a JSONL path for hermetic tests."
-            )
-        }
         let max = parseFlagInt(args, name: "--max-events")
 
-        let stream = EventStreamFile(url: url, pollIntervalMs: 25)
+        let stream = deps.eventStream
         let auto = AutoProfileStore.resolve(from: deps.profileStore)
 
         var seen = 0

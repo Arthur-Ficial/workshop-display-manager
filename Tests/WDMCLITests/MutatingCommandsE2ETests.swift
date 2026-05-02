@@ -74,6 +74,39 @@ struct MutatingCommandsE2ETests {
         #expect(r.exitCode == 2)
     }
 
+    @Test("flip <id> vertical sets vertical flip")
+    func flipVertical() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let r = CLITestHarness.run(["flip", "2", "vertical", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+    }
+
+    @Test("flip <id> horizontal sets horizontal flip; off clears it; idempotent")
+    func flipHorizontalAndOff() throws {
+        let fx = try CLITestHarness.makeFixture()
+        var r = CLITestHarness.run(["flip", "2", "horizontal", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+        // Setting again is idempotent at the provider level — CLI still exits 0.
+        r = CLITestHarness.run(["flip", "2", "h", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+        r = CLITestHarness.run(["flip", "2", "off", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+    }
+
+    @Test("flip rejects unknown axis token with usage exit code")
+    func flipInvalid() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let r = CLITestHarness.run(["flip", "2", "diagonal", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 2)
+    }
+
+    @Test("flip on unknown display exits 3 (display-not-found)")
+    func flipUnknownDisplay() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let r = CLITestHarness.run(["flip", "999", "vertical", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 3)
+    }
+
     @Test("switch swaps main between two displays")
     func switchMain() throws {
         let fx = try CLITestHarness.makeFixture()

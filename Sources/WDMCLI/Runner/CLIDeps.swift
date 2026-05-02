@@ -6,7 +6,11 @@ public struct CLIDeps: Sendable {
     public let profileStore: ProfileStore
     public let confirmer: Confirmer
     public let nativeConfirmer: Confirmer
-    public let eventsFileURL: URL?
+    public let eventStream: DisplayEventStream
+    public let overlayFlipper: OverlayFlipper
+    public let pipFlipper: PipFlipper
+    public let sleeper: Sleeper
+    public let displayCapturer: DisplayCapturer
     public let stdout: OutputWriter
     public let stderr: OutputWriter
 
@@ -15,7 +19,11 @@ public struct CLIDeps: Sendable {
         profileStore: ProfileStore,
         confirmer: Confirmer,
         nativeConfirmer: Confirmer,
-        eventsFileURL: URL? = nil,
+        eventStream: DisplayEventStream,
+        overlayFlipper: OverlayFlipper,
+        pipFlipper: PipFlipper,
+        sleeper: Sleeper,
+        displayCapturer: DisplayCapturer,
         stdout: OutputWriter,
         stderr: OutputWriter
     ) {
@@ -23,7 +31,11 @@ public struct CLIDeps: Sendable {
         self.profileStore = profileStore
         self.confirmer = confirmer
         self.nativeConfirmer = nativeConfirmer
-        self.eventsFileURL = eventsFileURL
+        self.eventStream = eventStream
+        self.overlayFlipper = overlayFlipper
+        self.pipFlipper = pipFlipper
+        self.sleeper = sleeper
+        self.displayCapturer = displayCapturer
         self.stdout = stdout
         self.stderr = stderr
     }

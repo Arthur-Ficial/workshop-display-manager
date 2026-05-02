@@ -17,10 +17,24 @@ public enum HelpText {
       unmirror <id> [--no-confirm]        break mirror
       move <id> <x> <y> [--no-confirm]    set arrangement origin
       rotate <id> <0|90|180|270>          physical rotation
+      flip <id> <none|h|v|hv|off> [--no-confirm]  framebuffer flip (IOKit)
+      flip-overlay <id> <axis> [--duration-ms N]  software overlay flip (any Mac)
+      pip <src> [--on <dst>] [--size WxH] [--flip <axis>] [--duration-ms N]
+                                          movable picture-in-picture mirror
       brightness <id> [0.0..1.0]          read or set brightness (built-in)
       save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
       restore <name> [--no-confirm]       apply named profile
       profiles [--json]                   list saved profiles
+      profiles remove <name>              delete a saved profile
+      watch [--json] [--max-events N]     stream display reconfiguration events
+      workshop start --audience <id>      switch main to audience, save pre-state
+      workshop stop                       restore the pre-workshop arrangement
+      daemon [install] [--max-events N]   run / install the auto-restore daemon
+      doctor probe [<id>] [--json]        diagnose what wdm sees per display
+      doctor disconnect <id> [--duration-ms N]  soft-disconnect (CGDisplayCapture; release on SIGTERM)
+      sleep                               sleep the Mac (drains AppleHPM — issue #1)
+      completions <bash|zsh|fish>         shell completion script
+      manpage                             groff source for wdm(1)
       version                             print version
       help                                show this text
 
@@ -36,6 +50,11 @@ public enum HelpText {
       WDM_NATIVE_CONFIRMER_STUB     "yes"|"no" — replaces popup with stub (tests).
       WDM_AUTO_CONFIRM=1            replaces stdin prompt with auto-yes.
       WDM_REAL_HARDWARE=1           opt-in for real-hardware smoke tests.
+      WDM_TEST_EVENTS_FILE          file-backed event stream for `watch` tests.
+      WDM_TEST_OVERLAY_LOG          recording flipper for `flip-overlay` tests.
+      WDM_TEST_PIP_LOG              recording flipper for `pip` tests.
+      WDM_TEST_SLEEP_LOG            recording sleeper for `sleep` tests.
+      WDM_FIXTURE_FAIL_ROTATE=1     simulate hot-unplug mid-mutation (tests).
 
     """
 }

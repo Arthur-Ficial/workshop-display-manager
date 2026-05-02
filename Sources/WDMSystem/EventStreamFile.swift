@@ -42,7 +42,10 @@ public struct EventStreamFile: Sendable {
                                 let event = try decoder.decode(DisplayEvent.self, from: Data(line.utf8))
                                 continuation.yield(event)
                             } catch {
-                                // Bad line — skip rather than fail the stream.
+                                continuation.finish(throwing: ProviderError.ioError(
+                                    "EventStreamFile: malformed line in \(self.url.lastPathComponent): \(error)"
+                                ))
+                                return
                             }
                         }
                     }

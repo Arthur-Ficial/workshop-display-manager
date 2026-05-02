@@ -56,4 +56,14 @@ public final class ProfileStore: @unchecked Sendable {
             .map { String($0.dropLast(".json".count)) }
             .sorted()
     }
+
+    /// Delete a profile by name. Throws `profileNotFound` if it doesn't exist
+    /// (single source of truth — never lies about success).
+    public func remove(name: String) throws {
+        let path = url(for: name)
+        guard FileManager.default.fileExists(atPath: path.path) else {
+            throw CLIError.profileNotFound(name)
+        }
+        try FileManager.default.removeItem(at: path)
+    }
 }

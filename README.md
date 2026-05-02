@@ -4,9 +4,9 @@
 
 **The native macOS CLI for people who actually use multiple displays.**
 
-`switch · cycle · mirror · save · restore · brightness · rotate` — atomically, with auto-revert if the projector goes black.
+`switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · doctor · sleep` — atomically, with auto-revert if the projector goes black.
 
-[![Tests](https://img.shields.io/badge/tests-80%2F80%20green-brightgreen)](#tests)
+[![Tests](https://img.shields.io/badge/tests-170%2F40%20green-brightgreen)](#tests)
 [![Build](https://img.shields.io/badge/build-warnings--as--errors%20clean-brightgreen)](#building)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue)](#install)
 [![Swift](https://img.shields.io/badge/Swift-6-orange)](https://swift.org)
@@ -21,15 +21,19 @@ You're a workshop teacher, conference speaker, hot-desking remote, or just someo
 
 `wdm` exists because that whole sequence should be one keystroke. It is the **smallest possible** correct way to drive every aspect of every attached display from a UNIX shell, with safety nets that make destructive changes painless to try.
 
-|                                       | wdm | displayplacer | BetterDisplay | System Settings |
-|---------------------------------------|:---:|:-------------:|:-------------:|:---------------:|
-| Pure CLI, scriptable, JSON output     | ✅  | ✅            | partial       | ❌              |
-| Atomic safe-transaction with auto-revert | ✅ | ❌          | ❌            | partial         |
-| Save / restore named profiles         | ✅  | ❌            | ✅            | ❌              |
-| Native HUD confirm overlay (Tahoe)    | ✅  | ❌            | ❌            | ❌              |
-| Brightness control (built-in)         | ✅  | ❌            | ✅            | ✅              |
-| Crash-recovery `wdm restore last`     | ✅  | ❌            | ❌            | ❌              |
-| 100% e2e tested, hermetic suite       | ✅  | ❌            | ❌            | n/a             |
+|                                              | wdm | displayplacer | BetterDisplay | System Settings |
+|----------------------------------------------|:---:|:-------------:|:-------------:|:---------------:|
+| Pure CLI, scriptable, JSON output            | ✅  | ✅            | partial       | ❌              |
+| Atomic safe-transaction with auto-revert     | ✅  | ❌            | ❌            | partial         |
+| Save / restore named profiles                | ✅  | ❌            | ✅            | ❌              |
+| Native HUD confirm overlay (Tahoe)           | ✅  | ❌            | ❌            | ❌              |
+| Brightness control (built-in)                | ✅  | ❌            | ✅            | ✅              |
+| Software overlay flip (any Mac, incl. AirPlay) | ✅ | ❌           | partial       | ❌              |
+| Picture-in-picture display mirror            | ✅  | ❌            | partial       | ❌              |
+| `wdm doctor` per-display diagnostics         | ✅  | ❌            | ❌            | ❌              |
+| Issue-#1 (`AppleHPM` panic) `wdm sleep` workaround | ✅ | ❌       | ❌            | ❌              |
+| Crash-recovery `wdm restore last`            | ✅  | ❌            | ❌            | ❌              |
+| 100% e2e tested, hermetic suite              | ✅  | ❌            | ❌            | n/a             |
 
 ---
 
@@ -66,17 +70,22 @@ Requires Swift 6, macOS 13+. See [`docs/contributing.md`](docs/contributing.md).
 
 ```sh
 wdm list                                     # see every display
+wdm doctor probe                             # full diagnostic per display (mode, origin, rotation, mirror)
 wdm switch                                   # swap main between two displays
 wdm cycle                                    # rotate main forward through all displays
 wdm mode 2 1920x1080@60                      # set resolution+refresh, with safe revert
 wdm mirror 1 2                               # mirror display 1 onto display 2
+wdm flip-overlay 2 vertical                  # software flip (any Mac, incl. AirPlay) — Ctrl+C to stop
+wdm pip 2 --on 1 --size 800x450              # picture-in-picture: BenQ in a window on built-in
 wdm brightness main 0.5                      # 50% brightness on the built-in
 wdm save desk-A                              # snapshot current arrangement
 wdm save --auto                              # snapshot keyed by EDID set (auto-recognised by daemon)
 wdm restore desk-A                           # apply it back later
+wdm profiles remove desk-A                   # delete a saved profile
 wdm watch --json                             # stream display reconfig events
 wdm workshop start --audience 2              # one-step "main → projector, save the rest"
 wdm workshop stop                            # restore the pre-workshop arrangement
+wdm sleep                                    # drain AppleHPM before unplug (issue #1 workaround)
 wdm daemon install                           # auto-restore arrangements at login
 ```
 
@@ -84,14 +93,22 @@ wdm daemon install                           # auto-restore arrangements at logi
 |---|---|
 | `wdm list [--json]` | Enumerate every connected display: ID, name, current mode, origin, rotation, main flag, mirror source. |
 | `wdm get <id\|main> [field]` | Read one field of one display. Pipe-friendly. |
+| `wdm doctor probe [<id>] [--json]` | Full diagnostic per display — what wdm sees, side-by-side with what you expected. |
+| `wdm doctor disconnect <id> [--duration-ms N]` | Soft-disconnect via `CGDisplayCapture` (public API). Display blanks, other apps stop drawing to it. Release: SIGTERM, or `--duration-ms` elapses. |
 | `wdm switch` | Swap which of two displays is main. <1 second. |
 | `wdm cycle` | Rotate "main" forward across N displays. |
 | `wdm mode <id> <WxH@Hz>` | Set resolution + refresh. Safe-tx wrapped. |
+| `wdm rotate <id> <0\|90\|180\|270>` | Physical framebuffer rotation (IOKit). |
+| `wdm flip <id> <none\|h\|v\|hv\|off>` | Framebuffer flip (IOKit) — same Apple-Silicon caveat as rotate. |
+| `wdm flip-overlay <id> <axis>` | Software overlay flip via ScreenCaptureKit + CALayer. Works on every Mac including AirPlay & Sidecar. |
+| `wdm pip <src> [--on <dst>] [--size WxH] [--flip <axis>]` | Movable / resizable picture-in-picture mirror window. |
 | `wdm save <name>` / `wdm restore <name>` | Named profiles in `~/.config/wdm/profiles/`. |
+| `wdm profiles remove <name>` | Delete a saved profile. Exits 6 if it doesn't exist (never silent). |
 | `wdm restore last` | Recover the last pre-mutation snapshot, even after a crash. |
 | `wdm brightness <id> [0..1]` | Read or set brightness on the built-in display. |
 | `wdm watch [--json]` | Stream display reconfiguration events (added/removed/mode/move/mirror/main). |
 | `wdm workshop start --audience <id>` / `wdm workshop stop` | One-step presentation toggle with auto-revert. |
+| `wdm sleep` | Sleep the Mac via IOPMSleepSystem. Drains the AppleHPM PD/DP-AltMode queue before you unplug a projector — workaround for the macOS kernel-panic bug filed in [issue #1](docs/known-issue-applehpm-panic.md). |
 | `wdm daemon install` | Install a LaunchAgent so the daemon auto-restores per-EDID profiles at login. |
 
 ---
@@ -126,6 +143,36 @@ wdm watch --json | jq -r 'select(.kind=="added")' | xargs -n1 wdm restore desk -
 wdm mirror 1 3               # iPad sidecar mirrors built-in
 wdm main 2 --confirm         # projector becomes main, with auto-revert if mistaken
 wdm save talk-twin
+```
+
+### Rear-projection / mirrored stage (flip the projector)
+
+```sh
+# IOKit framebuffer flip — Intel Macs and Apple-Silicon externals
+# that expose IODisplayConnect:
+wdm flip 2 horizontal --no-confirm
+
+# Software overlay flip — every Mac, including AirPlay / Sidecar.
+# Press Ctrl+C (or `pkill -f 'wdm flip-overlay'`) to stop.
+wdm flip-overlay 2 horizontal
+```
+
+### Picture-in-picture preview (presenter sees the audience view)
+
+```sh
+# Live mirror of the projector in a draggable window on your built-in:
+wdm pip 2 --on 1 --size 1280x720
+# Same idea but flipped, e.g. for a teleprompter:
+wdm pip 2 --on 1 --flip horizontal
+```
+
+### Safe unplug (avoid the AppleHPM kernel panic — issue #1)
+
+```sh
+wdm save desk-A                  # snapshot first
+wdm sleep                        # drains AppleHPM, then macOS sleeps
+# … unplug the projector cable while the lid / display is asleep …
+# wake the Mac → `wdm restore desk-A` if needed
 ```
 
 ---
@@ -192,13 +239,16 @@ Full breakdown in [`docs/architecture.md`](docs/architecture.md).
 ## Tests
 
 ```sh
-make test                    # 80+ tests in 21 suites, hermetic, ~0.02s
+make test                    # 170+ tests in 40 suites, hermetic, ~0.2s
 make smoke                   # opt-in: runs read-only ops against your real displays
 WDM_REAL_HARDWARE=1 swift test            # hardware-gated read smoke
-WDM_REAL_HARDWARE_MUTATE=1 swift test     # actually swaps your main display, then restores
+WDM_REAL_HARDWARE_FLIP=1 swift test       # actually flips your external display, then restores
+WDM_REAL_HARDWARE_ROTATE=1 swift test     # actually rotates, then restores
 ```
 
 Every user-facing command has an end-to-end test that spawns through the actual `CLIRunner` against a JSON-fixture display provider. Hermetic, fast, no real hardware needed in CI.
+
+The full **50-scenario workshop checklist** lives in `Tests/WDMCLITests/WorkshopScenariosE2ETests.swift` — each scenario is either covered by an existing test (referenced inline) or a `RED` `.disabled` stub that's the prioritized backlog.
 
 ---
 

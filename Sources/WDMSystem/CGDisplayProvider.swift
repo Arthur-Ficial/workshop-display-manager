@@ -112,6 +112,22 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
         return .applied
     }
 
+    public func flip(for displayID: UInt32) throws -> Flip {
+        try assertExists(displayID)
+        return IOKitFlip.read(displayID)
+    }
+
+    public func setFlip(
+        displayID: UInt32, flip: Flip, options: ApplyOptions
+    ) throws -> ApplyResult {
+        try assertExists(displayID)
+        let current = IOKitFlip.read(displayID)
+        if current == flip { return .noChange }
+        let rotation = Int(CGDisplayRotation(displayID).rounded())
+        try IOKitFlip.write(displayID, flip: flip, rotationDegrees: rotation)
+        return .applied
+    }
+
     // MARK: - apply with auto-revert on CG-side failure
 
     private func applyConfig(_ block: (CGDisplayConfigRef) throws -> Void) throws -> ApplyResult {

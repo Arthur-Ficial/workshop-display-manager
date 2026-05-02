@@ -7,9 +7,11 @@ public enum CompletionsFormatter {
     public static let commands: [String] = [
         "list", "get", "modes",
         "mode", "main", "mirror", "unmirror", "move", "rotate",
+        "flip", "flip-overlay", "pip",
         "switch", "cycle", "brightness",
         "save", "restore", "profiles",
         "watch", "workshop", "daemon",
+        "doctor", "sleep",
         "completions", "manpage",
         "version", "help",
     ]

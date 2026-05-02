@@ -153,4 +153,45 @@ struct FixtureDisplayProviderTests {
             _ = try provider.rotate(displayID: 2, degrees: 45, options: .noConfirm)
         }
     }
+
+    @Test("flip defaults to .none for newly loaded fixtures")
+    func flipDefault() throws {
+        let url = try makeFixtureFile()
+        let provider = try FixtureDisplayProvider(fixtureURL: url)
+        #expect(try provider.flip(for: 1) == Flip.none)
+        #expect(try provider.flip(for: 2) == Flip.none)
+    }
+
+    @Test("setFlip persists vertical / horizontal / both / none and is idempotent")
+    func setFlipPersists() throws {
+        let url = try makeFixtureFile()
+        let provider = try FixtureDisplayProvider(fixtureURL: url)
+
+        _ = try provider.setFlip(displayID: 2, flip: .vertical, options: .noConfirm)
+        #expect(try provider.flip(for: 2) == .vertical)
+
+        let reloaded = try FixtureDisplayProvider(fixtureURL: url)
+        #expect(try reloaded.flip(for: 2) == .vertical)
+
+        let r1 = try reloaded.setFlip(displayID: 2, flip: .vertical, options: .noConfirm)
+        #expect(r1 == .noChange)
+
+        _ = try reloaded.setFlip(displayID: 2, flip: .horizontal, options: .noConfirm)
+        #expect(try reloaded.flip(for: 2) == .horizontal)
+
+        _ = try reloaded.setFlip(displayID: 2, flip: .both, options: .noConfirm)
+        #expect(try reloaded.flip(for: 2) == .both)
+
+        _ = try reloaded.setFlip(displayID: 2, flip: .none, options: .noConfirm)
+        #expect(try reloaded.flip(for: 2) == Flip.none)
+    }
+
+    @Test("setFlip on unknown display throws displayNotFound")
+    func setFlipUnknownThrows() throws {
+        let url = try makeFixtureFile()
+        let provider = try FixtureDisplayProvider(fixtureURL: url)
+        #expect(throws: ProviderError.displayNotFound(999)) {
+            _ = try provider.setFlip(displayID: 999, flip: .vertical, options: .noConfirm)
+        }
+    }
 }

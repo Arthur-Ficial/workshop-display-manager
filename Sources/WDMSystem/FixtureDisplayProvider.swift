@@ -5,11 +5,13 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
     private let fixtureURL: URL
     private let lock = NSLock()
     private var state: FixtureFile
+    private let failOnRotate: Bool
 
-    public init(fixtureURL: URL) throws {
+    public init(fixtureURL: URL, failOnRotate: Bool = false) throws {
         self.fixtureURL = fixtureURL
         let data = try Data(contentsOf: fixtureURL)
         self.state = try JSONDecoder().decode(FixtureFile.self, from: data)
+        self.failOnRotate = failOnRotate
     }
 
     public func snapshot() throws -> Snapshot {
@@ -119,6 +121,15 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
 
     public func rotate(displayID: UInt32, degrees: Int, options: ApplyOptions) throws -> ApplyResult {
         guard [0, 90, 180, 270].contains(degrees) else { throw ProviderError.invalidRotation(degrees) }
+        if failOnRotate {
+            // Fault-injection for hot-unplug mid-mutation tests (workshop scenario #50):
+            // simulate the cable yanking out after CGBeginDisplayConfiguration but before
+            // CGCompleteDisplayConfiguration. The fixture surfaces a typed error and
+            // does NOT persist any change, mirroring the safe-tx contract.
+            throw ProviderError.configurationFailed(
+                "fixture: hot-unplug mid-mutation (WDM_FIXTURE_FAIL_ROTATE=1)"
+            )
+        }
         return try mutate { snap in
             guard let d = snap.display(id: displayID) else { throw ProviderError.displayNotFound(displayID) }
             if d.rotationDegrees == degrees { return .noChange }
@@ -160,7 +171,42 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
             state = FixtureFile(
                 snapshot: state.snapshot,
                 availableModes: state.availableModes,
-                brightness: newTable
+                brightness: newTable,
+                flip: state.flip
+            )
+            try persist()
+            return .applied
+        }
+    }
+
+    public func flip(for displayID: UInt32) throws -> Flip {
+        try lock.withLock {
+            guard state.snapshot.display(id: displayID) != nil else {
+                throw ProviderError.displayNotFound(displayID)
+            }
+            return state.flip?[String(displayID)] ?? .none
+        }
+    }
+
+    public func setFlip(displayID: UInt32, flip: Flip, options: ApplyOptions) throws -> ApplyResult {
+        try lock.withLock {
+            guard state.snapshot.display(id: displayID) != nil else {
+                throw ProviderError.displayNotFound(displayID)
+            }
+            let key = String(displayID)
+            let current = state.flip?[key] ?? .none
+            if current == flip { return .noChange }
+            var table = state.flip ?? [:]
+            if flip == .none {
+                table.removeValue(forKey: key)
+            } else {
+                table[key] = flip
+            }
+            state = FixtureFile(
+                snapshot: state.snapshot,
+                availableModes: state.availableModes,
+                brightness: state.brightness,
+                flip: table.isEmpty ? nil : table
             )
             try persist()
             return .applied
@@ -174,7 +220,12 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
             var snap = state.snapshot
             let result = try block(&snap)
             if result == .applied {
-                state = FixtureFile(snapshot: snap, availableModes: state.availableModes)
+                state = FixtureFile(
+                    snapshot: snap,
+                    availableModes: state.availableModes,
+                    brightness: state.brightness,
+                    flip: state.flip
+                )
                 try persist()
             }
             return result
@@ -200,4 +251,5 @@ struct FixtureFile: Codable, Sendable {
     var snapshot: Snapshot
     var availableModes: [String: [Mode]]
     var brightness: [String: Float?]?
+    var flip: [String: Flip]?
 }

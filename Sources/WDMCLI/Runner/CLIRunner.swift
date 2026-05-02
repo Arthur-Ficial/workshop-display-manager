@@ -42,14 +42,20 @@ public enum CLIRunner {
             default:    return NativePopupConfirmer()
             }
         }()
-        let eventsFileURL = (env["WDM_TEST_EVENTS_FILE"]).flatMap { p in
-            p.isEmpty ? nil : URL(fileURLWithPath: p)
-        }
+        let eventStream = EventStreamFactory.make(env: env)
+        let overlayFlipper = OverlayFlipperFactory.make(env: env)
+        let pipFlipper = PipFlipperFactory.make(env: env)
+        let sleeper = SleeperFactory.make(env: env)
+        let displayCapturer = DisplayCapturerFactory.make(env: env)
         let deps = CLIDeps(
             provider: provider, profileStore: profileStore,
             confirmer: confirmer,
             nativeConfirmer: nativeConfirmer,
-            eventsFileURL: eventsFileURL,
+            eventStream: eventStream,
+            overlayFlipper: overlayFlipper,
+            pipFlipper: pipFlipper,
+            sleeper: sleeper,
+            displayCapturer: displayCapturer,
             stdout: stdout, stderr: stderr
         )
 
@@ -67,6 +73,11 @@ public enum CLIRunner {
             case "unmirror": return try UnmirrorCommand.run(args: rest, deps: deps)
             case "move":     return try MoveCommand.run(args: rest, deps: deps)
             case "rotate":   return try RotateCommand.run(args: rest, deps: deps)
+            case "flip":     return try FlipCommand.run(args: rest, deps: deps)
+            case "flip-overlay": return try FlipOverlayCommand.run(args: rest, deps: deps)
+            case "sleep":    return try SleepCommand.run(args: rest, deps: deps)
+            case "pip":      return try PipCommand.run(args: rest, deps: deps)
+            case "doctor":   return try DoctorCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)

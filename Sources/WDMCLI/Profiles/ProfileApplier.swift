@@ -10,6 +10,17 @@ public enum ProfileApplier {
         options: ApplyOptions
     ) throws {
         let current = try provider.snapshot()
+        // Refuse partial application: every display in the target profile must be
+        // present in the current snapshot. Silently skipping missing ones would
+        // be a fallback that hides "you plugged in the wrong displays" failures.
+        // See workshop-scenarios test #13.
+        let missing = target.displays
+            .map(\.id)
+            .filter { current.display(id: $0) == nil }
+        if let first = missing.first {
+            throw ProviderError.displayNotFound(first)
+        }
+
         for desired in target.displays {
             guard let now = current.display(id: desired.id) else { continue }
 

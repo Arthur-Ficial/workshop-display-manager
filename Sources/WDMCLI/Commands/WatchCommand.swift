@@ -7,14 +7,7 @@ public enum WatchCommand {
         let useJSON = args.contains("--json")
         let max = parseMaxEvents(args)
 
-        guard let url = deps.eventsFileURL else {
-            throw CLIError.usage(
-                "wdm watch is not yet implemented for the real backend in this version. " +
-                "Set WDM_TEST_EVENTS_FILE to a JSONL path for hermetic tests."
-            )
-        }
-
-        let stream = EventStreamFile(url: url, pollIntervalMs: 25)
+        let stream = deps.eventStream
         var seen = 0
         let semaphore = DispatchSemaphore(value: 0)
 
@@ -27,7 +20,9 @@ public enum WatchCommand {
                             deps.stdout.writeLine(line)
                         }
                     } else {
-                        deps.stdout.writeLine("\(event.timestamp)  \(event.kind.rawValue)  display=\(event.displayID)")
+                        deps.stdout.writeLine(
+                            "\(event.timestamp)  \(event.kind.rawValue)  display=\(event.displayID)"
+                        )
                     }
                     seen += 1
                     if let max, seen >= max { break }

@@ -61,4 +61,22 @@ struct EventStreamTests {
         #expect(collected[1].kind == .removed)
         #expect(collected[1].displayID == 2)
     }
+
+    @Test("EventStreamFile fails the stream on a malformed JSONL line — no silent fallback")
+    func malformedLineFailsStream() async throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-evt-bad-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("events.jsonl")
+        try Data("not-valid-json\n".utf8).write(to: url)
+
+        let reader = EventStreamFile(url: url, pollIntervalMs: 25)
+        var threw = false
+        do {
+            for try await _ in reader.events { /* should not yield */ }
+        } catch let error as ProviderError {
+            if case .ioError(let msg) = error, msg.contains("malformed line") { threw = true }
+        }
+        #expect(threw, "EventStreamFile must surface malformed JSONL as a stream error")
+    }
 }

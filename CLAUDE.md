@@ -40,6 +40,51 @@ Read-only operations against real CoreGraphics also have a smoke test gated by e
 
 ---
 
+## NO FAKE OR FALLBACK FUNCTIONALITY (non-negotiable)
+
+**Every feature must be real and really, really working. No fakes. No fallbacks. No pretending.**
+
+This is the third pillar, equal to the iron law and modular code. Read it before you write a single line.
+
+### What "real" means
+
+- **Real APIs, real effects.** A command that says "set the main display" calls `CGCompleteDisplayConfiguration` and the OS actually moves the menu bar. It does not log "would set main display" and return success. It does not write to a file and call that "applied".
+- **Real data, real round-trips.** A command that says "saved profile" must produce a file that `wdm restore` can read back and reproduce the exact configuration. Verified by e2e test, end-to-end, every time.
+- **Real errors.** If the system call fails, surface the underlying error code with context. Never swallow. Never translate to a generic success. Never `try?` an effect away.
+- **Real verification.** Before claiming a command worked, read the post-state back through the same `DisplayProvider` and assert it matches what the user asked for. The e2e test does this; the runtime path should too where cheap.
+
+### What is NOT allowed
+
+- ❌ **No stubs in production code paths.** If a feature isn't fully implemented for a target, it doesn't ship. Period. No `// TODO: actually implement`. No `return .success` placeholders.
+- ❌ **No silent fallbacks.** Don't catch a CoreGraphics error and "fall back" to a no-op that pretends success. If the real path fails, fail loudly with the right exit code.
+- ❌ **No fake data in human output.** `wdm list` shows what `CGGetActiveDisplayList` returns. It does not invent a display. It does not show a "default" entry when the API returns empty.
+- ❌ **No mocks in production.** The fixture backend exists for **tests only**, gated by `WDM_TEST_FIXTURE`. It must be impossible to accidentally ship a binary that uses it. Production builds use `CGDisplayProvider`, full stop.
+- ❌ **No "graceful degradation" that hides failure.** If brightness control isn't supported on a display, return the documented error code (not `0.5` as a guess, not `nil` masquerading as success). The user must be able to tell the difference between "feature unavailable" and "feature applied".
+- ❌ **No "it works in the demo" shortcuts.** No hard-coded display IDs. No assumed display counts. No "if there's only one display, just …" branches that mask the general case.
+- ❌ **No retry-until-success loops that mask broken effects.** If `CGBeginDisplayConfiguration` fails, exit `8`. Don't retry blindly hoping it works on the third try.
+
+### Honest unsupported-path policy
+
+When a hardware or OS limitation genuinely blocks a feature (see "Hardware-specific limitations" below), the response is:
+
+1. **Probe at runtime.** Detect whether the API is available on this machine.
+2. **Refuse explicitly.** Throw a typed error → exit code → human-readable stderr message that says exactly what's unsupported and what the user can do instead.
+3. **Test both branches.** The e2e test asserts the supported path produces the real effect, and the unsupported path produces the documented refusal. Both are real behaviour.
+
+This is the opposite of a fallback. A fallback hides the limitation; honest refusal exposes it.
+
+### Smell check before commit
+
+For every changed file, ask:
+
+- Does every function that claims to do X actually do X, end to end, on real input?
+- If I pulled the network cable / removed a display / revoked a permission, would this code lie about success?
+- Is there any code path I added "just in case" that returns a value I made up?
+
+If any answer is yes: delete the lie, surface the failure, write the test that proves the real path.
+
+---
+
 ## SUPER MODULAR CODE (non-negotiable)
 
 The codebase is decomposed into the smallest sensible units. Every file does one thing. Every type has one reason to change. Every function has one job.
@@ -147,6 +192,12 @@ wdm mirror <src> <dst> [--no-confirm|--confirm]   mirror src→dst (safe-tx)
 wdm unmirror <id> [--no-confirm|--confirm]        break mirror (safe-tx)
 wdm move <id> <x> <y> [--no-confirm|--confirm]    set arrangement origin (safe-tx)
 wdm rotate <id> <0|90|180|270>          physical rotation
+wdm flip <id> <none|horizontal|vertical|both> [--no-confirm|--confirm]  flip framebuffer (h, v, hv, off aliases)
+wdm flip-overlay <id> <axis> [--duration-ms N]  software overlay flip (works on every Mac, incl. AirPlay)
+wdm pip <src> [--on <dst>] [--size WxH] [--flip <axis>] [--duration-ms N]  movable picture-in-picture mirror
+wdm doctor probe [<id>] [--json]        diagnose what wdm sees per display (mode, origin, main, rotation, mirror)
+wdm profiles remove <name>              delete a saved profile (exits 6 if missing — never silent)
+wdm sleep                               sleep the Mac immediately — drains AppleHPM before unplug (issue #1 workaround)
 wdm save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
 wdm restore <name> [--no-confirm|--confirm]       apply named profile (safe-tx)
 wdm profiles [--json]                   list saved profiles
@@ -177,6 +228,7 @@ Build must be clean (zero warnings → `-warnings-as-errors`). Tests must be gre
 - **Display names** come from `NSScreen.localizedName` (AppKit, public).
 - **Brightness** uses the private `DisplayServices.framework` via `dlopen`/`dlsym`. Built-in displays support it; most external monitors return nil (DDC/CI control of external monitors is out of scope; use the monitor's OSD).
 - **Rotate** uses `IOServiceRequestProbe` with `kIOFBSetTransform` against `IODisplayConnect`. This works on Intel Macs and any Apple Silicon Mac whose external displays expose an `IODisplayConnect` framebuffer. On Apple Silicon Macs without that service (most native MacBook Air/Pro built-ins), `wdm rotate` throws a clear error pointing the user to System Settings → Displays → Rotation. There is no public API for rotation on Apple Silicon; we do not ship a private fallback we can't verify.
+- **Flip** uses the same `IOServiceRequestProbe` / `kIOFBSetTransform` pathway as rotate, OR-ing the `kIOScaleInvertX` / `kIOScaleInvertY` bits into the transform alongside the rotation-derived bits. Same Apple Silicon caveat: where `IODisplayConnect` is exposed, `wdm flip` works for that display; where it isn't, `wdm flip` refuses with a clear error and exit 8. AirPlay / Sidecar virtual displays do not expose framebuffer transforms via IOKit and are not supported (no public API exists for them).
 
 When you add a new feature that depends on a private framework or an Apple Silicon-only path, follow the same rule: probe at runtime, throw a clear user-facing error if unsupported, and the e2e test asserts both branches.
 

@@ -19,4 +19,15 @@ public protocol DisplayProvider: Sendable {
     @discardableResult func setBrightness(
         displayID: UInt32, value: Float, options: ApplyOptions
     ) throws -> ApplyResult
+
+    /// Read the current image flip state for a display.
+    /// Returns `.none` for unflipped (default).
+    func flip(for displayID: UInt32) throws -> Flip
+
+    /// Apply an image flip across the X and/or Y axis.
+    /// Throws `displayNotFound` if the id is unknown, or
+    /// `configurationFailed` if the underlying framebuffer doesn't support it.
+    @discardableResult func setFlip(
+        displayID: UInt32, flip: Flip, options: ApplyOptions
+    ) throws -> ApplyResult
 }

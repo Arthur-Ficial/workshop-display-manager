@@ -47,6 +47,20 @@ Set the global-coordinate origin of a display.
 .B rotate <id> <0|90|180|270> [\-\-no\-confirm|\-\-confirm]
 Physically rotate a display. Apple Silicon limitations apply (see TROUBLESHOOTING).
 .TP
+.B flip <id> <none|horizontal|vertical|both> [\-\-no\-confirm|\-\-confirm]
+Framebuffer image flip via IOKit. Aliases: h, v, hv, off. Same Apple Silicon
+IODisplayConnect caveat as rotate \(em refuses with exit 8 where unsupported.
+.TP
+.B flip-overlay <id> <axis> [\-\-duration-ms N]
+Software overlay flip via ScreenCaptureKit + CALayer. Works on every Mac
+including AirPlay / Sidecar. Blocks until SIGTERM or duration elapses.
+Requires Screen Recording permission.
+.TP
+.B pip <src> [\-\-on <dst>] [\-\-size WxH] [\-\-flip <axis>] [\-\-duration-ms N]
+Picture-in-picture: a movable, resizable, titled window on \fIdst\fR
+showing live capture of \fIsrc\fR (optionally flipped). Default
+\fIdst\fR is the current main display; default size is 1280x720.
+.TP
 .B brightness <id> [0.0..1.0] [\-\-no\-confirm|\-\-confirm]
 Read or set the brightness on a 0..1 scale (built\-in displays).
 .TP
@@ -58,6 +72,23 @@ Apply a saved profile through the safe-transaction confirmer.
 .TP
 .B profiles [\-\-json]
 List saved profiles.
+.TP
+.B profiles remove <name>
+Delete a saved profile. Exits 6 if the profile does not exist (never silent).
+.TP
+.B doctor probe [<id>] [\-\-json]
+Diagnose what wdm sees per display \(em mode, origin, main flag, rotation,
+mirror source, online state. Useful when a connected display behaves oddly.
+.TP
+.B doctor disconnect <id> [\-\-duration-ms N]
+Soft-disconnect a display via CGDisplayCapture: the display blanks and
+other apps stop drawing to it; release on SIGTERM/SIGINT/SIGHUP or after
+\fIduration-ms\fR. Public CoreGraphics API \(em no private symbols.
+Useful for blanking a projector mid-workshop without unplugging.
+.TP
+.B sleep
+Put the Mac to sleep immediately via IOPMSleepSystem. Workshop workaround
+for the AppleHPM kernel-panic bug (see issue #1) \(em sleep before unplug.
 .TP
 .B completions <bash|zsh|fish>
 Emit a shell completion script.
