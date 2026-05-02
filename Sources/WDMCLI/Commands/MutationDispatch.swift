@@ -9,6 +9,11 @@ public enum MutationDispatch {
         args: [String],
         apply: () throws -> ApplyResult
     ) throws -> Int32 {
+        // Crash recovery: persist current state to profile 'last' before any mutation.
+        // If the process is killed mid-mutation, the user can `wdm restore last`.
+        let preState = try deps.provider.snapshot()
+        try? deps.profileStore.save(name: "last", snapshot: preState)
+
         let interactive = !args.contains("--no-confirm")
         let confirmer: Confirmer = interactive ? deps.confirmer : AutoYesConfirmer()
         let result = try SafeTransaction.run(
