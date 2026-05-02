@@ -80,6 +80,72 @@ struct VirtualCommandE2ETests {
         #expect(r.exitCode == 2)
     }
 
+    @Test("virtual create --mirror-on <id> also triggers a PIP for the new virtual")
+    func mirrorOnAutoPip() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let virtLog = try makeLogFile()
+        // Separate log dir for the PIP recording impl.
+        let pipLogDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-mirror-on-pip-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: pipLogDir, withIntermediateDirectories: true)
+        let pipLog = pipLogDir.appendingPathComponent("pip.log")
+
+        let stdout = BufferOutputWriter()
+        let stderr = BufferOutputWriter()
+        let env: [String: String] = [
+            "WDM_TEST_FIXTURE": fx.path,
+            "WDM_TEST_VIRTUAL_LOG": virtLog.path,
+            "WDM_TEST_PIP_LOG": pipLog.path,
+        ]
+        // The harness fixture has display 1 = main, 2 = projector. --mirror-on 1
+        // tells the verb to spawn a PIP onto display 1 mirroring the new virtual.
+        // The recording PIP uses the *requested* sourceID — for the test it can
+        // be any positive id since we're verifying the call was made, not which
+        // CG-issued id the virtual got.
+        let code = CLIRunner.run(
+            args: ["virtual", "create",
+                   "--name", "Auto",
+                   "--mode", "1280x720@60",
+                   "--mirror-on", "1",
+                   "--duration-ms", "50"],
+            env: env, stdout: stdout, stderr: stderr
+        )
+        #expect(code == 0)
+        let virtBody = try String(contentsOf: virtLog)
+        #expect(virtBody.contains("name=Auto"))
+        let pipBody = try String(contentsOf: pipLog)
+        #expect(pipBody.contains("destination=1"),
+                "expected the PIP to be spawned with --on 1; log was:\n\(pipBody)")
+        // The PIP source must reference *some* displayID — the recording impl
+        // logs whatever was requested.
+        #expect(pipBody.contains("source="))
+    }
+
+    @Test("virtual create without --mirror-on does NOT spawn a PIP")
+    func noMirrorOnNoPip() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let virtLog = try makeLogFile()
+        let pipLogDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-no-mirror-pip-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: pipLogDir, withIntermediateDirectories: true)
+        let pipLog = pipLogDir.appendingPathComponent("pip.log")
+
+        let stdout = BufferOutputWriter()
+        let stderr = BufferOutputWriter()
+        let env: [String: String] = [
+            "WDM_TEST_FIXTURE": fx.path,
+            "WDM_TEST_VIRTUAL_LOG": virtLog.path,
+            "WDM_TEST_PIP_LOG": pipLog.path,
+        ]
+        let code = CLIRunner.run(
+            args: ["virtual", "create", "--name", "NoPip", "--duration-ms", "50"],
+            env: env, stdout: stdout, stderr: stderr
+        )
+        #expect(code == 0)
+        // PIP log must not exist — recording impl only writes on first call.
+        #expect(!FileManager.default.fileExists(atPath: pipLog.path))
+    }
+
     @Test("virtual remove with no matching process exits 6 (not found)")
     func removeNoMatch() throws {
         let fx = try CLITestHarness.makeFixture()

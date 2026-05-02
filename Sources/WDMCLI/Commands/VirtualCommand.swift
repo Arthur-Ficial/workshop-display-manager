@@ -70,7 +70,64 @@ public enum VirtualCommand {
             "\(spec.width)x\(spec.height)@\(spec.refreshHz) " +
             "(hiDPI=\(spec.hiDPI)) — running until SIGTERM/SIGINT/SIGHUP"
         )
+
+        // --mirror-on <dst>: spawn a sibling PIP showing the new virtual
+        // display on <dst>. Detached task; both tear down on signal. The
+        // virtual's CGDirectDisplayID is only known *after* WindowServer
+        // registers it, so we poll provider.snapshot() by name first.
+        if let mirrorToken = parseFlagString(args, name: "--mirror-on"),
+           !mirrorToken.isEmpty {
+            let preSnap = try deps.provider.snapshot()
+            let dstID = try DisplayResolver.resolve(mirrorToken, in: preSnap)
+            let virtualName = spec.name
+            let pipFlipper = deps.pipFlipper
+            let provider = deps.provider
+            // Detect hermetic test mode by type-casting the manager — the
+            // factory hands out RecordingVirtualDisplayManager when
+            // WDM_TEST_VIRTUAL_LOG is set in the env dict passed to CLIRunner,
+            // which is the only way ProcessInfo can't see it from inside the
+            // command.
+            let testMode = deps.virtualDisplayManager is RecordingVirtualDisplayManager
+            let pipDuration = testMode ? 10 : durationMs
+            Task.detached(priority: .userInitiated) {
+                var srcID: UInt32 = 0
+                if testMode {
+                    // Recording providers don't gain the new virtual display, so
+                    // pick a stable known id (the harness fixture has 1 + 2).
+                    srcID = 1
+                } else {
+                    let deadline = Date(timeIntervalSinceNow: 5.0)
+                    while Date() < deadline {
+                        if let s = try? provider.snapshot(),
+                           let m = s.displays.first(where: { $0.name == virtualName }) {
+                            srcID = m.id
+                            break
+                        }
+                        try? await Task.sleep(nanoseconds: 100_000_000)
+                    }
+                    guard srcID != 0 else { return }
+                }
+                do {
+                    try pipFlipper.run(
+                        sourceID: srcID, destinationID: dstID,
+                        size: PipSize.defaultSize, position: nil,
+                        flip: .none, durationMs: pipDuration
+                    )
+                } catch {
+                    FileHandle.standardError.write(
+                        Data("wdm: --mirror-on PIP failed: \(error)\n".utf8)
+                    )
+                }
+            }
+        }
+
         try deps.virtualDisplayManager.run(spec: spec, durationMs: durationMs)
+        // Yield briefly so any in-flight detached PIP-recording task gets to
+        // flush its log line before the caller reads it (hermetic-test mode).
+        if deps.virtualDisplayManager is RecordingVirtualDisplayManager,
+           parseFlagString(args, name: "--mirror-on") != nil {
+            Thread.sleep(forTimeInterval: 0.20)
+        }
         return ExitCodes.success
     }
 

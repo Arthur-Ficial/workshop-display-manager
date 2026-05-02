@@ -32,8 +32,8 @@ public enum HelpText {
       daemon [install] [--max-events N]   run / install the auto-restore daemon
       doctor probe [<id>] [--json]        diagnose what wdm sees per display
       doctor disconnect <id> [--duration-ms N]  soft-disconnect (CGDisplayCapture; release on SIGTERM)
-      virtual create --name <s> [--mode WxH@Hz] [--hidpi] [--duration-ms N]
-                                          create a virtual display via CGVirtualDisplay SPI
+      virtual create --name <s> [--mode WxH@Hz] [--hidpi] [--mirror-on <id>] [--duration-ms N]
+                                          create a virtual display; --mirror-on auto-spawns a PIP
       virtual list                        list connected displays (incl. virtual)
       virtual remove <id>                 hint: kill the `wdm virtual create` process
       screenshot <id|main> --out <path>   capture display framebuffer to PNG
