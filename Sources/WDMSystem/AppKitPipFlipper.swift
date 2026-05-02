@@ -3,6 +3,7 @@ import AppKit
 import CoreGraphics
 import CoreImage
 import CoreMedia
+import ImageIO
 import ScreenCaptureKit
 import WDMCore
 
@@ -228,35 +229,44 @@ private final class PollerStopBox: @unchecked Sendable {
 
 private final class PipPollingSink: NSObject, @unchecked Sendable {
     nonisolated(unsafe) let layer: CALayer
-    nonisolated(unsafe) private var cachedFilter: Any?
-    nonisolated(unsafe) private var cachedConfig: Any?
-    init(layer: CALayer) { self.layer = layer }
+    nonisolated(unsafe) private var cachedIndex: Int?
+    private let tmpURL: URL
+    init(layer: CALayer) {
+        self.layer = layer
+        self.tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "wdm-pip-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString).png"
+        )
+    }
     func tick(displayID: CGDirectDisplayID) async {
-        guard #available(macOS 14.0, *) else { return }
+        // Shell out to /usr/sbin/screencapture — the same OS-bundled tool the
+        // Screenshotter uses. The async SCK path (`SCShareableContent.current`
+        // + `SCScreenshotManager.captureImage`) leaks continuations under
+        // multi-PIP load on macOS 26 and renders blank frames; the OS tool
+        // sidesteps that. ~10 Hz process spawn is fine on Apple Silicon.
+        let idx: Int
+        if let cached = cachedIndex {
+            idx = cached
+        } else {
+            var n: UInt32 = 0
+            CGGetActiveDisplayList(0, nil, &n)
+            var ids = Array<CGDirectDisplayID>(repeating: 0, count: Int(n))
+            var count: UInt32 = n
+            CGGetActiveDisplayList(n, &ids, &count)
+            guard let zeroBased = ids.firstIndex(of: displayID) else { return }
+            idx = zeroBased + 1
+            cachedIndex = idx
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        process.arguments = ["-D", "\(idx)", "-x", "-t", "png", tmpURL.path]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
         do {
-            // SCShareableContent.current is heavy (XPC + window-server query).
-            // Cache the filter+config per sink: only refresh once on first tick,
-            // then reuse for every subsequent capture. Cuts per-tick cost ~10x
-            // and lets multiple PIPs render concurrently without starving.
-            let filter: SCContentFilter
-            let cfg: SCStreamConfiguration
-            if let f = cachedFilter as? SCContentFilter, let c = cachedConfig as? SCStreamConfiguration {
-                filter = f; cfg = c
-            } else {
-                let content = try await SCShareableContent.current
-                guard let scDisplay = content.displays.first(where: { $0.displayID == displayID }) else { return }
-                filter = SCContentFilter(display: scDisplay, excludingWindows: [])
-                cfg = SCStreamConfiguration()
-                cfg.width = Int(scDisplay.width)
-                cfg.height = Int(scDisplay.height)
-                cfg.showsCursor = true
-                cachedFilter = filter
-                cachedConfig = cfg
-            }
-            let cg = try await SCScreenshotManager.captureImage(
-                contentFilter: filter,
-                configuration: cfg
-            )
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return }
+            guard let src = CGImageSourceCreateWithURL(tmpURL as CFURL, nil),
+                  let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
             let l = self.layer
             DispatchQueue.main.async {
                 CATransaction.begin()
