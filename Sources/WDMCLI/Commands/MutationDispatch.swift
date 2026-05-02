@@ -15,7 +15,15 @@ public enum MutationDispatch {
         try? deps.profileStore.save(name: "last", snapshot: preState)
 
         let interactive = !args.contains("--no-confirm")
-        let confirmer: Confirmer = interactive ? deps.confirmer : AutoYesConfirmer()
+        let useNative = args.contains("--confirm")
+        let confirmer: Confirmer
+        if !interactive {
+            confirmer = AutoYesConfirmer()
+        } else if useNative {
+            confirmer = deps.nativeConfirmer
+        } else {
+            confirmer = deps.confirmer
+        }
         let result = try SafeTransaction.run(
             provider: deps.provider,
             confirmer: confirmer,

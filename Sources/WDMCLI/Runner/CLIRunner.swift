@@ -35,9 +35,17 @@ public enum CLIRunner {
         let confirmer: Confirmer = env["WDM_AUTO_CONFIRM"] == "1"
             ? AutoYesConfirmer()
             : StdinConfirmer(prompt: "keep change?", stderr: stderr)
+        let nativeConfirmer: Confirmer = {
+            switch env["WDM_NATIVE_CONFIRMER_STUB"] {
+            case "yes": return AutoYesConfirmer()
+            case "no":  return AutoNoConfirmer()
+            default:    return NativePopupConfirmer()
+            }
+        }()
         let deps = CLIDeps(
             provider: provider, profileStore: profileStore,
             confirmer: confirmer,
+            nativeConfirmer: nativeConfirmer,
             stdout: stdout, stderr: stderr
         )
 
