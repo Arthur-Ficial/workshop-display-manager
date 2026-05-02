@@ -228,17 +228,31 @@ private final class PollerStopBox: @unchecked Sendable {
 
 private final class PipPollingSink: NSObject, @unchecked Sendable {
     nonisolated(unsafe) let layer: CALayer
+    nonisolated(unsafe) private var cachedFilter: Any?
+    nonisolated(unsafe) private var cachedConfig: Any?
     init(layer: CALayer) { self.layer = layer }
     func tick(displayID: CGDirectDisplayID) async {
         guard #available(macOS 14.0, *) else { return }
         do {
-            let content = try await SCShareableContent.current
-            guard let scDisplay = content.displays.first(where: { $0.displayID == displayID }) else { return }
-            let filter = SCContentFilter(display: scDisplay, excludingWindows: [])
-            let cfg = SCStreamConfiguration()
-            cfg.width = Int(scDisplay.width)
-            cfg.height = Int(scDisplay.height)
-            cfg.showsCursor = true
+            // SCShareableContent.current is heavy (XPC + window-server query).
+            // Cache the filter+config per sink: only refresh once on first tick,
+            // then reuse for every subsequent capture. Cuts per-tick cost ~10x
+            // and lets multiple PIPs render concurrently without starving.
+            let filter: SCContentFilter
+            let cfg: SCStreamConfiguration
+            if let f = cachedFilter as? SCContentFilter, let c = cachedConfig as? SCStreamConfiguration {
+                filter = f; cfg = c
+            } else {
+                let content = try await SCShareableContent.current
+                guard let scDisplay = content.displays.first(where: { $0.displayID == displayID }) else { return }
+                filter = SCContentFilter(display: scDisplay, excludingWindows: [])
+                cfg = SCStreamConfiguration()
+                cfg.width = Int(scDisplay.width)
+                cfg.height = Int(scDisplay.height)
+                cfg.showsCursor = true
+                cachedFilter = filter
+                cachedConfig = cfg
+            }
             let cg = try await SCScreenshotManager.captureImage(
                 contentFilter: filter,
                 configuration: cfg

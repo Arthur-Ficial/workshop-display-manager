@@ -12,6 +12,7 @@ public struct CLIDeps: Sendable {
     public let sleeper: Sleeper
     public let displayCapturer: DisplayCapturer
     public let virtualDisplayManager: VirtualDisplayManager
+    public let screenshotter: Screenshotter
     public let stdout: OutputWriter
     public let stderr: OutputWriter
 
@@ -26,6 +27,7 @@ public struct CLIDeps: Sendable {
         sleeper: Sleeper,
         displayCapturer: DisplayCapturer,
         virtualDisplayManager: VirtualDisplayManager,
+        screenshotter: Screenshotter,
         stdout: OutputWriter,
         stderr: OutputWriter
     ) {
@@ -39,6 +41,7 @@ public struct CLIDeps: Sendable {
         self.sleeper = sleeper
         self.displayCapturer = displayCapturer
         self.virtualDisplayManager = virtualDisplayManager
+        self.screenshotter = screenshotter
         self.stdout = stdout
         self.stderr = stderr
     }
