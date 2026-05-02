@@ -9,15 +9,9 @@ public final class ScreenCaptureRecorder: Recorder, @unchecked Sendable {
     public init() {}
 
     public func record(displayID: UInt32, to url: URL, durationSec: Int) throws {
-        var n: UInt32 = 0
-        CGGetActiveDisplayList(0, nil, &n)
-        var ids = Array<CGDirectDisplayID>(repeating: 0, count: Int(n))
-        var count: UInt32 = n
-        CGGetActiveDisplayList(n, &ids, &count)
-        guard let zeroBased = ids.firstIndex(of: CGDirectDisplayID(displayID)) else {
-            throw ProviderError.displayNotFound(displayID)
-        }
-        let idx = zeroBased + 1     // screencapture is 1-based
+        let idx = try ScreenCaptureDisplayIndex.screencaptureIndex(
+            displayID: CGDirectDisplayID(displayID)
+        )
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")

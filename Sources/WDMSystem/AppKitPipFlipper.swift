@@ -267,13 +267,11 @@ private final class PipPollingSink: NSObject, @unchecked Sendable {
         if let cached = cachedIndex {
             idx = cached
         } else {
-            var n: UInt32 = 0
-            CGGetActiveDisplayList(0, nil, &n)
-            var ids = Array<CGDirectDisplayID>(repeating: 0, count: Int(n))
-            var count: UInt32 = n
-            CGGetActiveDisplayList(n, &ids, &count)
-            guard let zeroBased = ids.firstIndex(of: displayID) else { return }
-            idx = zeroBased + 1
+            do {
+                idx = try ScreenCaptureDisplayIndex.screencaptureIndex(displayID: displayID)
+            } catch {
+                return
+            }
             cachedIndex = idx
         }
         let process = Process()

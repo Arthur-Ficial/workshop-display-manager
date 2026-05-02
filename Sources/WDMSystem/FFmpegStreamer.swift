@@ -113,14 +113,10 @@ public final class FFmpegStreamer: Streamer, @unchecked Sendable {
         }
         // Match by position: the Nth screen reported by ffmpeg = position of
         // the displayID in CGGetActiveDisplayList.
-        var n: UInt32 = 0
-        CGGetActiveDisplayList(0, nil, &n)
-        var ids = Array<CGDirectDisplayID>(repeating: 0, count: Int(n))
-        var count: UInt32 = n
-        CGGetActiveDisplayList(n, &ids, &count)
-        guard let cgPos = ids.firstIndex(of: CGDirectDisplayID(displayID)) else {
-            throw ProviderError.displayNotFound(displayID)
-        }
+        let cgPos = try ScreenCaptureDisplayIndex.zeroBasedPosition(
+            displayID: CGDirectDisplayID(displayID),
+            activeDisplays: ScreenCaptureDisplayIndex.activeDisplays()
+        )
         guard cgPos < screens.count else {
             throw ProviderError.configurationFailed(
                 "stream: ffmpeg avfoundation reports \(screens.count) screen(s); display \(displayID) is at CG position \(cgPos)"
