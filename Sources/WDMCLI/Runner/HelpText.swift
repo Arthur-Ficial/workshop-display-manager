@@ -36,6 +36,8 @@ public enum HelpText {
                                           create a virtual display via CGVirtualDisplay SPI
       virtual list                        list connected displays (incl. virtual)
       virtual remove <id>                 hint: kill the `wdm virtual create` process
+      screenshot <id|main> --out <path>   capture display framebuffer to PNG
+      record <id|main> --out <path> --duration <sec>  record display to .mov (H.264)
       sleep                               sleep the Mac (drains AppleHPM — issue #1)
       completions <bash|zsh|fish>         shell completion script
       manpage                             groff source for wdm(1)

@@ -102,6 +102,16 @@ List currently-connected displays (real and virtual).
 Print a hint to kill the owning \fBwdm virtual create\fR process.
 Removal is process-scoped \(em there is no separate destroy verb.
 .TP
+.B screenshot <id|main> \-\-out <path>
+Capture the framebuffer of the named display to a PNG. Wraps the
+OS-bundled \fI/usr/sbin/screencapture\fR; works for every display
+macOS knows about including virtual ones created with \fBwdm virtual\fR.
+.TP
+.B record <id|main> \-\-out <path> \-\-duration <seconds>
+Record the named display to a QuickTime (.mov) H.264 video for
+\fIseconds\fR seconds. Wraps \fI/usr/sbin/screencapture -v -V\fR;
+works for real, virtual, and AirPlay displays.
+.TP
 .B sleep
 Put the Mac to sleep immediately via IOPMSleepSystem. Workshop workaround
 for the AppleHPM kernel-panic bug (see issue #1) \(em sleep before unplug.

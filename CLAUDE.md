@@ -199,6 +199,8 @@ wdm doctor probe [<id>] [--json]        diagnose what wdm sees per display (mode
 wdm doctor disconnect <id> [--duration-ms N]  soft-disconnect via CGDisplayCapture (public API)
 wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi]  create a virtual display (CGVirtualDisplay SPI)
 wdm virtual list / remove <id>          enumerate / hint to kill the owning create process
+wdm screenshot <id|main> --out <path>   PNG capture of any display (real or virtual)
+wdm record <id|main> --out <path> --duration <sec>  H.264 .mov recording of any display
 wdm profiles remove <name>              delete a saved profile (exits 6 if missing — never silent)
 wdm sleep                               sleep the Mac immediately — drains AppleHPM before unplug (issue #1 workaround)
 wdm save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
