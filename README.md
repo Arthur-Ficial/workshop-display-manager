@@ -4,9 +4,9 @@
 
 **The native macOS CLI for people who actually use multiple displays.**
 
-`switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · doctor · sleep` — atomically, with auto-revert if the projector goes black.
+`switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · virtual · doctor · sleep` — atomically, with auto-revert if the projector goes black.
 
-[![Tests](https://img.shields.io/badge/tests-170%2F40%20green-brightgreen)](#tests)
+[![Tests](https://img.shields.io/badge/tests-193%2F45%20green-brightgreen)](#tests)
 [![Build](https://img.shields.io/badge/build-warnings--as--errors%20clean-brightgreen)](#building)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue)](#install)
 [![Swift](https://img.shields.io/badge/Swift-6-orange)](https://swift.org)
@@ -30,6 +30,7 @@ You're a workshop teacher, conference speaker, hot-desking remote, or just someo
 | Brightness control (built-in)                | ✅  | ❌            | ✅            | ✅              |
 | Software overlay flip (any Mac, incl. AirPlay) | ✅ | ❌           | partial       | ❌              |
 | Picture-in-picture display mirror            | ✅  | ❌            | partial       | ❌              |
+| Virtual display (no hardware, real `CGDirectDisplayID`) | ✅ | ❌    | ✅ (closed)   | ❌              |
 | `wdm doctor` per-display diagnostics         | ✅  | ❌            | ❌            | ❌              |
 | Issue-#1 (`AppleHPM` panic) `wdm sleep` workaround | ✅ | ❌       | ❌            | ❌              |
 | Crash-recovery `wdm restore last`            | ✅  | ❌            | ❌            | ❌              |
@@ -95,6 +96,7 @@ wdm daemon install                           # auto-restore arrangements at logi
 | `wdm get <id\|main> [field]` | Read one field of one display. Pipe-friendly. |
 | `wdm doctor probe [<id>] [--json]` | Full diagnostic per display — what wdm sees, side-by-side with what you expected. |
 | `wdm doctor disconnect <id> [--duration-ms N]` | Soft-disconnect via `CGDisplayCapture` (public API). Display blanks, other apps stop drawing to it. Release: SIGTERM, or `--duration-ms` elapses. |
+| `wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi]` | **Software-backed virtual display via Apple's `CGVirtualDisplay` SPI.** macOS treats it as a real display — gets a `CGDirectDisplayID`, appears in System Settings → Displays, valid target for `main`/`mode`/`pip`/`flip-overlay`/`save`/`restore`. Lifetime is process-bound (kill to remove). |
 | `wdm switch` | Swap which of two displays is main. <1 second. |
 | `wdm cycle` | Rotate "main" forward across N displays. |
 | `wdm mode <id> <WxH@Hz>` | Set resolution + refresh. Safe-tx wrapped. |
@@ -164,6 +166,21 @@ wdm flip-overlay 2 horizontal
 wdm pip 2 --on 1 --size 1280x720
 # Same idea but flipped, e.g. for a teleprompter:
 wdm pip 2 --on 1 --flip horizontal
+```
+
+### Demo on a "second screen" without one being plugged in
+
+```sh
+# Create a virtual 1920x1080 display, then PIP it onto the built-in so you
+# can see it. Drag windows into the new display; everything works as if
+# you'd plugged in a real monitor.
+nohup wdm virtual create --name "Demo Screen" --mode 1920x1080@60 --hidpi >/tmp/v.log 2>&1 &
+sleep 2
+wdm list                              # third row appears
+wdm pip "Demo Screen" --on 1 --size 1280x720 &
+# … demo time …
+pkill -TERM -f 'wdm virtual create'   # virtual display vanishes
+pkill -TERM -f 'wdm pip'              # pip window closes
 ```
 
 ### Safe unplug (avoid the AppleHPM kernel panic — issue #1)
@@ -239,7 +256,7 @@ Full breakdown in [`docs/architecture.md`](docs/architecture.md).
 ## Tests
 
 ```sh
-make test                    # 170+ tests in 40 suites, hermetic, ~0.2s
+make test                    # 190+ tests in 45 suites, hermetic, ~0.2s
 make smoke                   # opt-in: runs read-only ops against your real displays
 WDM_REAL_HARDWARE=1 swift test            # hardware-gated read smoke
 WDM_REAL_HARDWARE_FLIP=1 swift test       # actually flips your external display, then restores

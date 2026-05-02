@@ -11,7 +11,7 @@ public enum CompletionsFormatter {
         "switch", "cycle", "brightness",
         "save", "restore", "profiles",
         "watch", "workshop", "daemon",
-        "doctor", "sleep",
+        "doctor", "sleep", "virtual",
         "completions", "manpage",
         "version", "help",
     ]

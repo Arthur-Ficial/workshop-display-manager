@@ -1,0 +1,6 @@
+module CGVirtualDisplaySPI {
+    header "CGVirtualDisplaySPI.h"
+    link framework "CoreGraphics"
+    link framework "Foundation"
+    export *
+}

@@ -32,6 +32,10 @@ public enum HelpText {
       daemon [install] [--max-events N]   run / install the auto-restore daemon
       doctor probe [<id>] [--json]        diagnose what wdm sees per display
       doctor disconnect <id> [--duration-ms N]  soft-disconnect (CGDisplayCapture; release on SIGTERM)
+      virtual create --name <s> [--mode WxH@Hz] [--hidpi] [--duration-ms N]
+                                          create a virtual display via CGVirtualDisplay SPI
+      virtual list                        list connected displays (incl. virtual)
+      virtual remove <id>                 hint: kill the `wdm virtual create` process
       sleep                               sleep the Mac (drains AppleHPM — issue #1)
       completions <bash|zsh|fish>         shell completion script
       manpage                             groff source for wdm(1)

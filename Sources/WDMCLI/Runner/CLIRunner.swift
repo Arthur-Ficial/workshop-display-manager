@@ -47,6 +47,7 @@ public enum CLIRunner {
         let pipFlipper = PipFlipperFactory.make(env: env)
         let sleeper = SleeperFactory.make(env: env)
         let displayCapturer = DisplayCapturerFactory.make(env: env)
+        let virtualDisplayManager = VirtualDisplayManagerFactory.make(env: env)
         let deps = CLIDeps(
             provider: provider, profileStore: profileStore,
             confirmer: confirmer,
@@ -56,6 +57,7 @@ public enum CLIRunner {
             pipFlipper: pipFlipper,
             sleeper: sleeper,
             displayCapturer: displayCapturer,
+            virtualDisplayManager: virtualDisplayManager,
             stdout: stdout, stderr: stderr
         )
 
@@ -78,6 +80,7 @@ public enum CLIRunner {
             case "sleep":    return try SleepCommand.run(args: rest, deps: deps)
             case "pip":      return try PipCommand.run(args: rest, deps: deps)
             case "doctor":   return try DoctorCommand.run(args: rest, deps: deps)
+            case "virtual":  return try VirtualCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)

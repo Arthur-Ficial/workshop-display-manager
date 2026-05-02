@@ -95,6 +95,22 @@ public enum ManpageFormatter {
         \\fIduration-ms\\fR. Public CoreGraphics API \\(em no private symbols.
         Useful for blanking a projector mid-workshop without unplugging.
         .TP
+        .B virtual create \\-\\-name <s> [\\-\\-mode WxH@Hz] [\\-\\-hidpi] [\\-\\-duration-ms N]
+        Create a software-backed virtual display via Apple's CGVirtualDisplay
+        CoreGraphics SPI. macOS treats it as a real display: it gets a
+        CGDirectDisplayID, appears in System Settings \\(-> Displays, and is a
+        valid target for \\fBmain\\fR, \\fBmode\\fR, \\fBpip\\fR, \\fBflip-overlay\\fR,
+        \\fBsave\\fR/\\fBrestore\\fR. Lifetime is process-bound \\(em the display
+        vanishes when this command returns (SIGTERM/SIGINT/SIGHUP, or
+        \\fIduration-ms\\fR elapses). Defaults: 1920x1080@60, hiDPI on.
+        .TP
+        .B virtual list
+        List currently-connected displays (real and virtual).
+        .TP
+        .B virtual remove <id>
+        Print a hint to kill the owning \\fBwdm virtual create\\fR process.
+        Removal is process-scoped \\(em there is no separate destroy verb.
+        .TP
         .B sleep
         Put the Mac to sleep immediately via IOPMSleepSystem. Workshop workaround
         for the AppleHPM kernel-panic bug (see issue #1) \\(em sleep before unplug.

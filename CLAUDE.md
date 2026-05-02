@@ -196,6 +196,9 @@ wdm flip <id> <none|horizontal|vertical|both> [--no-confirm|--confirm]  flip fra
 wdm flip-overlay <id> <axis> [--duration-ms N]  software overlay flip (works on every Mac, incl. AirPlay)
 wdm pip <src> [--on <dst>] [--size WxH] [--flip <axis>] [--duration-ms N]  movable picture-in-picture mirror
 wdm doctor probe [<id>] [--json]        diagnose what wdm sees per display (mode, origin, main, rotation, mirror)
+wdm doctor disconnect <id> [--duration-ms N]  soft-disconnect via CGDisplayCapture (public API)
+wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi]  create a virtual display (CGVirtualDisplay SPI)
+wdm virtual list / remove <id>          enumerate / hint to kill the owning create process
 wdm profiles remove <name>              delete a saved profile (exits 6 if missing — never silent)
 wdm sleep                               sleep the Mac immediately — drains AppleHPM before unplug (issue #1 workaround)
 wdm save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json

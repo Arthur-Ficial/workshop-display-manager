@@ -19,8 +19,13 @@ let package = Package(
             path: "Sources/WDMCore"
         ),
         .target(
+            name: "CGVirtualDisplaySPI",
+            path: "Sources/CGVirtualDisplaySPI",
+            publicHeadersPath: "include"
+        ),
+        .target(
             name: "WDMSystem",
-            dependencies: ["WDMCore"],
+            dependencies: ["WDMCore", "CGVirtualDisplaySPI"],
             path: "Sources/WDMSystem"
         ),
         .target(
