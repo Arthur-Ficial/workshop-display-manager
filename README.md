@@ -72,8 +72,12 @@ wdm mode 2 1920x1080@60                      # set resolution+refresh, with safe
 wdm mirror 1 2                               # mirror display 1 onto display 2
 wdm brightness main 0.5                      # 50% brightness on the built-in
 wdm save desk-A                              # snapshot current arrangement
+wdm save --auto                              # snapshot keyed by EDID set (auto-recognised by daemon)
 wdm restore desk-A                           # apply it back later
 wdm watch --json                             # stream display reconfig events
+wdm workshop start --audience 2              # one-step "main → projector, save the rest"
+wdm workshop stop                            # restore the pre-workshop arrangement
+wdm daemon install                           # auto-restore arrangements at login
 ```
 
 | Command | What it does |
@@ -86,6 +90,9 @@ wdm watch --json                             # stream display reconfig events
 | `wdm save <name>` / `wdm restore <name>` | Named profiles in `~/.config/wdm/profiles/`. |
 | `wdm restore last` | Recover the last pre-mutation snapshot, even after a crash. |
 | `wdm brightness <id> [0..1]` | Read or set brightness on the built-in display. |
+| `wdm watch [--json]` | Stream display reconfiguration events (added/removed/mode/move/mirror/main). |
+| `wdm workshop start --audience <id>` / `wdm workshop stop` | One-step presentation toggle with auto-revert. |
+| `wdm daemon install` | Install a LaunchAgent so the daemon auto-restores per-EDID profiles at login. |
 
 ---
 
