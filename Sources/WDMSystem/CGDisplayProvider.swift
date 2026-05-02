@@ -88,12 +88,28 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
         try assertExists(displayID)
         let current = Int(CGDisplayRotation(displayID).rounded())
         if current == degrees { return .noChange }
-        // Rotation requires the private IOServiceRequestProbe + kIOFBSetTransform path.
-        // Implementing it correctly across hardware vendors is out of scope for this
-        // version; the user can use System Settings → Displays → Rotate.
-        throw ProviderError.configurationFailed(
-            "rotate requires private IOKit APIs not yet wired; use System Settings"
-        )
+        try IOKitRotation.rotate(displayID, degrees: degrees)
+        return .applied
+    }
+
+    public func brightness(for displayID: UInt32) throws -> Float? {
+        try assertExists(displayID)
+        return DisplayServicesBridge.get(displayID)
+    }
+
+    public func setBrightness(
+        displayID: UInt32, value: Float, options: ApplyOptions
+    ) throws -> ApplyResult {
+        guard value >= 0 && value <= 1 else { throw ProviderError.brightnessOutOfRange(value) }
+        try assertExists(displayID)
+        guard let current = DisplayServicesBridge.get(displayID) else {
+            throw ProviderError.brightnessUnsupported(displayID)
+        }
+        if abs(current - value) < 0.001 { return .noChange }
+        guard DisplayServicesBridge.set(displayID, value) else {
+            throw ProviderError.configurationFailed("DisplayServicesSetBrightness")
+        }
+        return .applied
     }
 
     // MARK: - apply with auto-revert on CG-side failure
@@ -150,7 +166,7 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
         }
         return DisplayInfo(
             id: id,
-            name: nil,
+            name: DisplayNameResolver.name(for: id),
             isMain: id == mainID,
             isOnline: CGDisplayIsOnline(id) != 0,
             mirrorSource: mirrorOf == 0 ? nil : mirrorOf,

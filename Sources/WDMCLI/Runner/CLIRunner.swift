@@ -57,6 +57,7 @@ public enum CLIRunner {
             case "rotate":   return try RotateCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
+            case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)
             default:
                 stderr.writeLine("unknown command: \(sub)")
                 return ExitCodes.usage
@@ -82,6 +83,12 @@ public enum CLIRunner {
             return ExitCodes.modeNotSupported
         case .invalidRotation(let d):
             stderr.writeLine("error: invalid rotation: \(d)")
+            return ExitCodes.usage
+        case .brightnessUnsupported(let id):
+            stderr.writeLine("error: brightness not supported on display \(id)")
+            return ExitCodes.modeNotSupported
+        case .brightnessOutOfRange(let v):
+            stderr.writeLine("error: brightness out of range (0…1): \(v)")
             return ExitCodes.usage
         case .configurationFailed(let s):
             stderr.writeLine("error: \(s)")

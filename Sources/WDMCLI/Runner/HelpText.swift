@@ -17,6 +17,7 @@ public enum HelpText {
       unmirror <id> [--no-confirm]        break mirror
       move <id> <x> <y> [--no-confirm]    set arrangement origin
       rotate <id> <0|90|180|270>          physical rotation
+      brightness <id> [0.0..1.0]          read or set brightness (built-in)
       save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
       restore <name> [--no-confirm]       apply named profile
       profiles [--json]                   list saved profiles

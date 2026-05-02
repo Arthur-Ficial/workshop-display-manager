@@ -147,6 +147,7 @@ wdm rotate <id> <0|90|180|270>          physical rotation
 wdm save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
 wdm restore <name> [--no-confirm]       apply named profile (safe-tx)
 wdm profiles [--json]                   list saved profiles
+wdm brightness <id> [0.0..1.0]          read or set brightness (built-in only)
 wdm watch [--json]                      stream display reconfiguration events
 wdm version                             print version
 ```
@@ -165,6 +166,16 @@ make install        copy .build/release/wdm to /usr/local/bin/
 ```
 
 Build must be clean (zero warnings → `-warnings-as-errors`). Tests must be green. No skipped tests. No `@disabled` without an issue link in a comment.
+
+---
+
+## Hardware-specific limitations (intentional, documented)
+
+- **Display names** come from `NSScreen.localizedName` (AppKit, public).
+- **Brightness** uses the private `DisplayServices.framework` via `dlopen`/`dlsym`. Built-in displays support it; most external monitors return nil (DDC/CI control of external monitors is out of scope; use the monitor's OSD).
+- **Rotate** uses `IOServiceRequestProbe` with `kIOFBSetTransform` against `IODisplayConnect`. This works on Intel Macs and any Apple Silicon Mac whose external displays expose an `IODisplayConnect` framebuffer. On Apple Silicon Macs without that service (most native MacBook Air/Pro built-ins), `wdm rotate` throws a clear error pointing the user to System Settings → Displays → Rotation. There is no public API for rotation on Apple Silicon; we do not ship a private fallback we can't verify.
+
+When you add a new feature that depends on a private framework or an Apple Silicon-only path, follow the same rule: probe at runtime, throw a clear user-facing error if unsupported, and the e2e test asserts both branches.
 
 ---
 

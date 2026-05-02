@@ -134,6 +134,39 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
         }
     }
 
+    public func brightness(for displayID: UInt32) throws -> Float? {
+        try lock.withLock {
+            guard state.snapshot.display(id: displayID) != nil else {
+                throw ProviderError.displayNotFound(displayID)
+            }
+            return state.brightness?[String(displayID)] ?? nil
+        }
+    }
+
+    public func setBrightness(displayID: UInt32, value: Float, options: ApplyOptions) throws -> ApplyResult {
+        guard value >= 0 && value <= 1 else { throw ProviderError.brightnessOutOfRange(value) }
+        return try lock.withLock {
+            guard state.snapshot.display(id: displayID) != nil else {
+                throw ProviderError.displayNotFound(displayID)
+            }
+            // A nil entry in the brightness table means "this display has no brightness control".
+            // Missing key entirely means the fixture was authored before brightness — also unsupported.
+            let key = String(displayID)
+            guard let table = state.brightness, table.keys.contains(key), table[key] ?? nil != nil else {
+                throw ProviderError.brightnessUnsupported(displayID)
+            }
+            var newTable = table
+            newTable[key] = value
+            state = FixtureFile(
+                snapshot: state.snapshot,
+                availableModes: state.availableModes,
+                brightness: newTable
+            )
+            try persist()
+            return .applied
+        }
+    }
+
     // MARK: - Helpers
 
     private func mutate(_ block: (inout Snapshot) throws -> ApplyResult) throws -> ApplyResult {
@@ -164,6 +197,7 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
 }
 
 struct FixtureFile: Codable, Sendable {
-    let snapshot: Snapshot
-    let availableModes: [String: [Mode]]
+    var snapshot: Snapshot
+    var availableModes: [String: [Mode]]
+    var brightness: [String: Float?]?
 }
