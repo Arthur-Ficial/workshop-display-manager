@@ -86,6 +86,7 @@ public enum CLIRunner {
             case "doctor":   return try DoctorCommand.run(args: rest, deps: deps)
             case "virtual":  return try VirtualCommand.run(args: rest, deps: deps)
             case "screenshot": return try ScreenshotCommand.run(args: rest, deps: deps)
+            case "shot-all": return try ShotAllCommand.run(args: rest, deps: deps)
             case "record":   return try RecordCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)

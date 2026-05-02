@@ -80,14 +80,14 @@ struct VirtualCommandE2ETests {
         #expect(r.exitCode == 2)
     }
 
-    @Test("virtual remove returns exit 0 with a clear message about process scope")
-    func removeMessage() throws {
+    @Test("virtual remove with no matching process exits 6 (not found)")
+    func removeNoMatch() throws {
         let fx = try CLITestHarness.makeFixture()
         let log = try makeLogFile()
-        let r = run(args: ["virtual", "remove", "3"], fixture: fx, log: log)
-        #expect(r.exitCode == 0)
-        let combined = r.stdout + r.stderr
-        #expect(combined.lowercased().contains("kill") || combined.lowercased().contains("process"))
+        // Name doesn't exist as a running `wdm virtual create` process — the
+        // implementation pgreps for it and finds nothing.
+        let r = run(args: ["virtual", "remove", "definitely-not-running"], fixture: fx, log: log)
+        #expect(r.exitCode == ExitCodes.profileNotFound)
     }
 
     @Test("virtual list prints virtual displays from the fixture (none in default fixture)")

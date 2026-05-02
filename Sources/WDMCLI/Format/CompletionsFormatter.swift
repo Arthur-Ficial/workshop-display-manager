@@ -12,7 +12,7 @@ public enum CompletionsFormatter {
         "save", "restore", "profiles",
         "watch", "workshop", "daemon",
         "doctor", "sleep", "virtual",
-        "screenshot", "record",
+        "screenshot", "shot-all", "record",
         "completions", "manpage",
         "version", "help",
     ]

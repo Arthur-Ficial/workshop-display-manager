@@ -116,6 +116,11 @@ public enum ManpageFormatter {
         OS-bundled \\fI/usr/sbin/screencapture\\fR; works for every display
         macOS knows about including virtual ones created with \\fBwdm virtual\\fR.
         .TP
+        .B shot-all \\-\\-dir <path>
+        Capture every active display to \\fIpath/display-<id>.png\\fR. Creates
+        the directory if missing. Useful for "what is every screen showing
+        right now" verification when debugging multi-monitor setups.
+        .TP
         .B record <id|main> \\-\\-out <path> \\-\\-duration <seconds>
         Record the named display to a QuickTime (.mov) H.264 video for
         \\fIseconds\\fR seconds. Wraps \\fI/usr/sbin/screencapture -v -V\\fR;

@@ -96,16 +96,62 @@ public enum VirtualCommand {
     // MARK: - remove
 
     private static func remove(args: [String], deps: CLIDeps) throws -> Int32 {
+        // Accept either `wdm virtual remove --all` or `wdm virtual remove <id|name>`.
         let pos = Args.positional(args)
-        guard pos.count >= 2 else {
-            throw CLIError.usage("usage: wdm virtual remove <id>")
+        let target: String
+        if args.contains("--all") {
+            target = "--all"
+        } else if pos.count >= 2 {
+            target = pos[1]
+        } else {
+            throw CLIError.usage("usage: wdm virtual remove <id|name|--all>")
         }
-        let id = pos[1]
-        deps.stderr.writeLine(
-            "wdm virtual remove: virtual displays are process-scoped. " +
-            "To remove display \(id), kill the `wdm virtual create` process " +
-            "that owns it (e.g. `pkill -TERM -f 'wdm virtual create'`)."
-        )
+
+        // Find owning `wdm virtual create` processes via pgrep -f. Each line
+        // is "<pid> <command-line>"; match by --name <target> or any name if
+        // target == "--all".
+        let pgrepProc = Process()
+        pgrepProc.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+        pgrepProc.arguments = ["-fl", "wdm virtual create"]
+        let pipe = Pipe()
+        pgrepProc.standardOutput = pipe
+        try pgrepProc.run()
+        pgrepProc.waitUntilExit()
+        let raw = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        let lines = raw.split(separator: "\n").map(String.init)
+
+        var killed: [Int32] = []
+        for line in lines {
+            let parts = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard let pidStr = parts.first, let pid = Int32(pidStr) else { continue }
+            let cmd = parts.count > 1 ? String(parts[1]) : ""
+            // Resolve target: numeric id, exact name, or --all.
+            let isMatch: Bool
+            if target == "--all" {
+                isMatch = true
+            } else if let _ = Int(target) {
+                // Numeric id — match if cmd contains the running display's name we
+                // can find by snapshot lookup.
+                let snap = try? deps.provider.snapshot()
+                if let id = UInt32(target),
+                   let name = snap?.display(id: id)?.name {
+                    isMatch = cmd.contains("--name \(name)") || cmd.contains("--name \"\(name)\"")
+                } else {
+                    isMatch = false
+                }
+            } else {
+                isMatch = cmd.contains("--name \(target)") || cmd.contains("--name \"\(target)\"")
+            }
+            if isMatch {
+                kill(pid, SIGTERM)
+                killed.append(pid)
+            }
+        }
+        if killed.isEmpty {
+            deps.stderr.writeLine("wdm virtual remove: no matching `wdm virtual create` process found for \(target)")
+            return ExitCodes.profileNotFound
+        }
+        deps.stderr.writeLine("wdm virtual remove: SIGTERM → pids \(killed.map(String.init).joined(separator: ", "))")
         return ExitCodes.success
     }
 

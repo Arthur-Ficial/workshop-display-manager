@@ -37,6 +37,7 @@ public enum HelpText {
       virtual list                        list connected displays (incl. virtual)
       virtual remove <id>                 hint: kill the `wdm virtual create` process
       screenshot <id|main> --out <path>   capture display framebuffer to PNG
+      shot-all --dir <path>               capture every active display to <dir>/display-<id>.png
       record <id|main> --out <path> --duration <sec>  record display to .mov (H.264)
       sleep                               sleep the Mac (drains AppleHPM — issue #1)
       completions <bash|zsh|fish>         shell completion script
