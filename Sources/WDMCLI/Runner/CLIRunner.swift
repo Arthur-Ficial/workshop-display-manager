@@ -52,6 +52,7 @@ public enum CLIRunner {
         let recorder = RecorderFactory.make(env: env)
         let windowMover = WindowMoverFactory.make(env: env)
         let streamer = StreamerFactory.make(env: env)
+        let windowLister = WindowListerFactory.make(env: env)
         let deps = CLIDeps(
             provider: provider, profileStore: profileStore,
             confirmer: confirmer,
@@ -66,6 +67,7 @@ public enum CLIRunner {
             recorder: recorder,
             windowMover: windowMover,
             streamer: streamer,
+            windowLister: windowLister,
             processEnv: env,
             stdout: stdout, stderr: stderr
         )
@@ -98,6 +100,8 @@ public enum CLIRunner {
             case "focus":    return try FocusCommand.run(args: rest, deps: deps)
             case "stream":   return try StreamCommand.run(args: rest, deps: deps)
             case "pip-grid": return try PipGridCommand.run(args: rest, deps: deps)
+            case "panorama": return try PanoramaCommand.run(args: rest, deps: deps)
+            case "screen-windows": return try ScreenWindowsCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)

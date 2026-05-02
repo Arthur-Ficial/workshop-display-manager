@@ -16,6 +16,7 @@ public struct CLIDeps: Sendable {
     public let recorder: Recorder
     public let windowMover: WindowMover
     public let streamer: Streamer
+    public let windowLister: WindowLister
     public let processEnv: [String: String]
     public let stdout: OutputWriter
     public let stderr: OutputWriter
@@ -35,6 +36,7 @@ public struct CLIDeps: Sendable {
         recorder: Recorder,
         windowMover: WindowMover,
         streamer: Streamer,
+        windowLister: WindowLister,
         processEnv: [String: String],
         stdout: OutputWriter,
         stderr: OutputWriter
@@ -53,6 +55,7 @@ public struct CLIDeps: Sendable {
         self.recorder = recorder
         self.windowMover = windowMover
         self.streamer = streamer
+        self.windowLister = windowLister
         self.processEnv = processEnv
         self.stdout = stdout
         self.stderr = stderr
