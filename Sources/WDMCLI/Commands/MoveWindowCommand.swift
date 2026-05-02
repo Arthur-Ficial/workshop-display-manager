@@ -8,7 +8,7 @@ public enum MoveWindowCommand {
         guard let pattern = pos.first, !pattern.isEmpty else {
             throw CLIError.usage("usage: wdm move-window <app|pattern> --to <id|main>")
         }
-        guard let dstToken = parseFlagString(args, name: "--to"), !dstToken.isEmpty else {
+        guard let dstToken = Args.flagString(args, name: "--to"), !dstToken.isEmpty else {
             throw CLIError.usage("usage: wdm move-window <app|pattern> --to <id|main>")
         }
         let snap = try deps.provider.snapshot()
@@ -16,10 +16,5 @@ public enum MoveWindowCommand {
         try deps.windowMover.move(pattern: pattern, displayID: dstID)
         deps.stderr.writeLine("wdm: moved windows matching '\(pattern)' → display \(dstID)")
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
     }
 }

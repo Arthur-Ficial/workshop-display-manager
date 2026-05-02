@@ -13,7 +13,7 @@ public enum PipCommand {
         let snap = try deps.provider.snapshot()
         let srcID = try DisplayResolver.resolve(srcToken, in: snap)
         let dstID: UInt32
-        if let dstToken = parseFlagString(args, name: "--on") {
+        if let dstToken = Args.flagString(args, name: "--on") {
             dstID = try DisplayResolver.resolve(dstToken, in: snap)
         } else {
             guard let main = snap.main?.id else {
@@ -22,7 +22,7 @@ public enum PipCommand {
             dstID = main
         }
         let size: PipSize
-        if let token = parseFlagString(args, name: "--size") {
+        if let token = Args.flagString(args, name: "--size") {
             guard let parsed = PipSize.parse(token) else {
                 throw CLIError.usage("pip: --size must be WxH (e.g. 1280x720), got '\(token)'")
             }
@@ -31,7 +31,7 @@ public enum PipCommand {
             size = .defaultSize
         }
         let flip: Flip
-        if let token = parseFlagString(args, name: "--flip") {
+        if let token = Args.flagString(args, name: "--flip") {
             guard let parsed = Flip.parse(token) else {
                 throw CLIError.usage("pip: --flip must be one of none|horizontal|vertical|both|h|v|hv|off, got '\(token)'")
             }
@@ -39,10 +39,10 @@ public enum PipCommand {
         } else {
             flip = .none
         }
-        let durationMs = parseFlagInt(args, name: "--duration-ms")
+        let durationMs = Args.flagInt(args, name: "--duration-ms")
         let position: PipPosition?
-        if let xs = parseFlagString(args, name: "--x"),
-           let ys = parseFlagString(args, name: "--y"),
+        if let xs = Args.flagString(args, name: "--x"),
+           let ys = Args.flagString(args, name: "--y"),
            let xi = Int(xs), let yi = Int(ys) {
             position = PipPosition(x: xi, y: yi)
         } else {
@@ -56,14 +56,5 @@ public enum PipCommand {
             remoteControl: remote
         )
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
-    }
-
-    private static func parseFlagInt(_ args: [String], name: String) -> Int? {
-        parseFlagString(args, name: name).flatMap(Int.init)
     }
 }

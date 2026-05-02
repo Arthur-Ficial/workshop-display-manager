@@ -156,16 +156,16 @@ public enum VirtualCommand {
     // MARK: - create
 
     private static func create(args: [String], deps: CLIDeps) throws -> Int32 {
-        guard let name = parseFlagString(args, name: "--name"), !name.isEmpty else {
+        guard let name = Args.flagString(args, name: "--name"), !name.isEmpty else {
             throw CLIError.usage(
                 "usage: wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi] [--duration-ms N]"
             )
         }
         let hiDPI = args.contains("--hidpi")
-        let durationMs = parseFlagInt(args, name: "--duration-ms")
+        let durationMs = Args.flagInt(args, name: "--duration-ms")
 
         let spec: VirtualDisplaySpec
-        if let modeToken = parseFlagString(args, name: "--mode") {
+        if let modeToken = Args.flagString(args, name: "--mode") {
             guard let mode = VirtualDisplaySpec.parseMode(modeToken) else {
                 throw CLIError.usage(
                     "wdm virtual create: --mode must be WxH@Hz (e.g. 1920x1080@60), got '\(modeToken)'"
@@ -198,7 +198,7 @@ public enum VirtualCommand {
         // display on <dst>. Detached task; both tear down on signal. The
         // virtual's CGDirectDisplayID is only known *after* WindowServer
         // registers it, so we poll provider.snapshot() by name first.
-        if let mirrorToken = parseFlagString(args, name: "--mirror-on"),
+        if let mirrorToken = Args.flagString(args, name: "--mirror-on"),
            !mirrorToken.isEmpty {
             let preSnap = try deps.provider.snapshot()
             let dstID = try DisplayResolver.resolve(mirrorToken, in: preSnap)
@@ -249,7 +249,7 @@ public enum VirtualCommand {
         // Yield briefly so any in-flight detached PIP-recording task gets to
         // flush its log line before the caller reads it (hermetic-test mode).
         if deps.virtualDisplayManager is RecordingVirtualDisplayManager,
-           parseFlagString(args, name: "--mirror-on") != nil {
+           Args.flagString(args, name: "--mirror-on") != nil {
             Thread.sleep(forTimeInterval: 0.20)
         }
         return ExitCodes.success
@@ -336,14 +336,4 @@ public enum VirtualCommand {
         return ExitCodes.success
     }
 
-    // MARK: - flag helpers
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
-    }
-
-    private static func parseFlagInt(_ args: [String], name: String) -> Int? {
-        parseFlagString(args, name: name).flatMap(Int.init)
-    }
 }

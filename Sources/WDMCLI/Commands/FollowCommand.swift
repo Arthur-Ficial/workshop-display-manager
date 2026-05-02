@@ -17,8 +17,8 @@ public enum FollowCommand {
         }
         let snap = try deps.provider.snapshot()
         let dstID = try DisplayResolver.resolve(dstAlias, in: snap)
-        let pollMs = parseFlagInt(args, name: "--poll-ms") ?? 500
-        let durationMs = parseFlagInt(args, name: "--duration-ms")
+        let pollMs = Args.flagInt(args, name: "--poll-ms") ?? 500
+        let durationMs = Args.flagInt(args, name: "--duration-ms")
 
         let deadline: Date? = durationMs.map { Date(timeIntervalSinceNow: TimeInterval($0) / 1000.0) }
         var lastSrc: UInt32 = 0
@@ -42,8 +42,4 @@ public enum FollowCommand {
     }
 
     private static func shouldStop() -> Bool { false }   // signal handlers TBD
-    private static func parseFlagInt(_ args: [String], name: String) -> Int? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return Int(args[i + 1])
-    }
 }

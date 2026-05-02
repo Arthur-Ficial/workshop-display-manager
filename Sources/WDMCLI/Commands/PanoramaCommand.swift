@@ -10,7 +10,7 @@ import WDMSystem
 /// screen showing right now?" status reports + workshop session archives.
 public enum PanoramaCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
-        guard let outPath = parseFlagString(args, name: "--out"), !outPath.isEmpty else {
+        guard let outPath = Args.flagString(args, name: "--out"), !outPath.isEmpty else {
             throw CLIError.usage("usage: wdm panorama --out <path>")
         }
         let snap = try deps.provider.snapshot()
@@ -78,10 +78,5 @@ public enum PanoramaCommand {
         }
         deps.stderr.writeLine("wdm: panorama \(perDisplay.count) display(s) → \(outURL.path) (\(totalW)x\(maxH))")
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
     }
 }

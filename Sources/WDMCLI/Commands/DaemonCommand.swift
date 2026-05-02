@@ -14,7 +14,7 @@ public enum DaemonCommand {
     // MARK: - watch loop
 
     private static func watchAndRestore(args: [String], deps: CLIDeps) throws -> Int32 {
-        let max = parseFlagInt(args, name: "--max-events")
+        let max = Args.flagInt(args, name: "--max-events")
 
         let stream = deps.eventStream
         let auto = AutoProfileStore.resolve(from: deps.profileStore)
@@ -54,26 +54,16 @@ public enum DaemonCommand {
 
     private static func install(args: [String], deps: CLIDeps) throws -> Int32 {
         let target: URL
-        if let custom = parseFlagString(args, name: "--to") {
+        if let custom = Args.flagString(args, name: "--to") {
             target = URL(fileURLWithPath: custom)
         } else {
             target = LaunchAgentInstaller.defaultPlistURL()
         }
-        let exec = parseFlagString(args, name: "--exec") ?? "/usr/local/bin/wdm"
+        let exec = Args.flagString(args, name: "--exec") ?? "/usr/local/bin/wdm"
         try LaunchAgentInstaller.write(to: target, executablePath: exec)
         deps.stderr.writeLine("daemon: wrote \(target.path)")
         deps.stderr.writeLine("daemon: load with `launchctl load \(target.path)`")
         return ExitCodes.success
     }
 
-    // MARK: - flag helpers
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
-    }
-
-    private static func parseFlagInt(_ args: [String], name: String) -> Int? {
-        parseFlagString(args, name: name).flatMap(Int.init)
-    }
 }

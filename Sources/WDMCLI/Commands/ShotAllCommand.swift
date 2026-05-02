@@ -8,7 +8,7 @@ import WDMSystem
 /// debugging multi-monitor or virtual-display setups.
 public enum ShotAllCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
-        guard let dirPath = parseFlagString(args, name: "--dir"), !dirPath.isEmpty else {
+        guard let dirPath = Args.flagString(args, name: "--dir"), !dirPath.isEmpty else {
             throw CLIError.usage("usage: wdm shot-all --dir <path>")
         }
         let dirURL = URL(fileURLWithPath: dirPath)
@@ -22,10 +22,5 @@ public enum ShotAllCommand {
         }
         deps.stderr.writeLine("wdm: captured \(snap.displays.count) displays into \(dirURL.path)")
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
     }
 }

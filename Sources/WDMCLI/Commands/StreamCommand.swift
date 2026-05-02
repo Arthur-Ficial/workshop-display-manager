@@ -10,7 +10,7 @@ public enum StreamCommand {
                 "usage: wdm stream <id|main> [--hls <dir>|--rtmp <url>] --duration <sec>"
             )
         }
-        guard let durStr = parseFlagString(args, name: "--duration"),
+        guard let durStr = Args.flagString(args, name: "--duration"),
               let dur = Int(durStr), dur > 0 else {
             throw CLIError.usage(
                 "usage: wdm stream <id|main> [--hls <dir>|--rtmp <url>] --duration <sec>"
@@ -18,10 +18,10 @@ public enum StreamCommand {
         }
         let mode: StreamMode
         let target: String
-        if let hls = parseFlagString(args, name: "--hls"), !hls.isEmpty {
+        if let hls = Args.flagString(args, name: "--hls"), !hls.isEmpty {
             mode = .hls
             target = hls
-        } else if let rtmp = parseFlagString(args, name: "--rtmp"), !rtmp.isEmpty {
+        } else if let rtmp = Args.flagString(args, name: "--rtmp"), !rtmp.isEmpty {
             mode = .rtmp
             target = rtmp
         } else {
@@ -38,10 +38,5 @@ public enum StreamCommand {
         try deps.streamer.stream(displayID: id, target: target, mode: mode, durationSec: dur)
         deps.stderr.writeLine("wdm: stream complete")
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
     }
 }

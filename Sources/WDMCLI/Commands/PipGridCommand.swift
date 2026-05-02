@@ -24,7 +24,7 @@ public enum PipGridCommand {
             .split(separator: ",")
             .map { try DisplayResolver.resolve(String($0), in: snap) }
         let dstID: UInt32
-        if let dstToken = parseFlagString(args, name: "--on"), !dstToken.isEmpty {
+        if let dstToken = Args.flagString(args, name: "--on"), !dstToken.isEmpty {
             dstID = try DisplayResolver.resolve(dstToken, in: snap)
         } else {
             guard let m = snap.main?.id else {
@@ -33,12 +33,12 @@ public enum PipGridCommand {
             dstID = m
         }
         let cols: Int
-        if let c = parseFlagString(args, name: "--cols"), let n = Int(c), n > 0 {
+        if let c = Args.flagString(args, name: "--cols"), let n = Int(c), n > 0 {
             cols = n
         } else {
             cols = max(1, Int(Double(srcIDs.count).squareRoot().rounded(.up)))
         }
-        let durationMs = parseFlagInt(args, name: "--duration-ms")
+        let durationMs = Args.flagInt(args, name: "--duration-ms")
 
         // Resolve dst display bounds for grid layout.
         guard let dstInfo = snap.display(id: dstID) else {
@@ -94,15 +94,6 @@ public enum PipGridCommand {
             }
         }
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
-    }
-
-    private static func parseFlagInt(_ args: [String], name: String) -> Int? {
-        parseFlagString(args, name: name).flatMap(Int.init)
     }
 
     private static func installSignalHandlers(_ onSignal: @escaping () -> Void) -> [DispatchSourceSignal] {

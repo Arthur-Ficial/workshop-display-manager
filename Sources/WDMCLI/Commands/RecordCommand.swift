@@ -8,10 +8,10 @@ public enum RecordCommand {
         guard let alias = pos.first else {
             throw CLIError.usage("usage: wdm record <id|main> --out <path> --duration <seconds>")
         }
-        guard let outPath = parseFlagString(args, name: "--out"), !outPath.isEmpty else {
+        guard let outPath = Args.flagString(args, name: "--out"), !outPath.isEmpty else {
             throw CLIError.usage("usage: wdm record <id|main> --out <path> --duration <seconds>")
         }
-        guard let durStr = parseFlagString(args, name: "--duration"),
+        guard let durStr = Args.flagString(args, name: "--duration"),
               let dur = Int(durStr), dur > 0 else {
             throw CLIError.usage("usage: wdm record <id|main> --out <path> --duration <seconds>")
         }
@@ -22,10 +22,5 @@ public enum RecordCommand {
         try deps.recorder.record(displayID: id, to: url, durationSec: dur)
         deps.stderr.writeLine("wdm: recording complete")
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
     }
 }

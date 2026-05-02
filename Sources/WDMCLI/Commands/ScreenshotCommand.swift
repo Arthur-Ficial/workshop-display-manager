@@ -8,7 +8,7 @@ public enum ScreenshotCommand {
         guard let alias = pos.first else {
             throw CLIError.usage("usage: wdm screenshot <id|main> --out <path>")
         }
-        guard let outPath = parseFlagString(args, name: "--out"), !outPath.isEmpty else {
+        guard let outPath = Args.flagString(args, name: "--out"), !outPath.isEmpty else {
             throw CLIError.usage("usage: wdm screenshot <id|main> --out <path>")
         }
         let snap = try deps.provider.snapshot()
@@ -17,10 +17,5 @@ public enum ScreenshotCommand {
         try deps.screenshotter.capture(displayID: id, to: url)
         deps.stderr.writeLine("wdm: captured display \(id) → \(url.path)")
         return ExitCodes.success
-    }
-
-    private static func parseFlagString(_ args: [String], name: String) -> String? {
-        guard let i = args.firstIndex(of: name), args.count > i + 1 else { return nil }
-        return args[i + 1]
     }
 }
