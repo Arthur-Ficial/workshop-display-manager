@@ -3,10 +3,17 @@ import AppKit
 
 /// Mac-native confirmation popup with a live countdown. Activated by `--confirm`.
 ///
-/// Frosted-glass NSPanel (NSVisualEffectView, hudWindow material), borderless
-/// with a soft white inner stroke, large circular countdown ring, prominent
-/// SPACE keycap cue. Briefly raises activation policy to `.regular` so the
-/// panel reliably grabs keyboard focus, then restores prior policy on dismiss.
+/// On macOS 26 (Tahoe) the background uses **Liquid Glass** via
+/// `NSGlassEffectView`. Earlier macOS versions fall back to `NSVisualEffectView`
+/// with hudWindow material. Window has transparent title bar with the standard
+/// traffic-light buttons (close/minimise/zoom). The countdown ring animates
+/// smoothly via Core Animation; the number updates once per second.
+///
+/// Behaviour:
+///   - SPACE key → keep the change (returns true).
+///   - Any other key → cancel/revert.
+///   - Close button (red traffic light) → cancel/revert.
+///   - Timeout reaching 0 → cancel/revert.
 public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
     public init() {}
 
@@ -24,10 +31,15 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let window = ConfirmPanel.make()
-        let view = ConfirmView(frame: window.contentView!.bounds, total: timeout)
-        view.autoresizingMask = [.width, .height]
-        window.contentView?.addSubview(view)
+        let window = ConfirmWindow.make()
+        let bounds = window.contentView!.bounds
+        let content = ConfirmView(frame: bounds, total: timeout)
+        content.autoresizingMask = [.width, .height]
+        window.installContent(content)
+
+        let closeFlag = CloseFlag()
+        let delegate = ConfirmWindowDelegate(flag: closeFlag)
+        window.delegate = delegate
 
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -36,13 +48,13 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         window.makeKey()
 
         defer {
+            window.delegate = nil
             window.orderOut(nil)
             window.close()
         }
 
-        // A CGEventTap-based global key catcher works even when our process
-        // is `.accessory` and does not own the keyboard focus. We tear it
-        // down on dismiss.
+        // Global key tap so SPACE/etc. are caught even when our process
+        // is `.accessory` and does not own the keyboard focus.
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -70,18 +82,20 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
             KeyBoxStash.shared.box.clear()
         }
 
+        // Kick off the smooth ring animation: shrink from full → empty across timeout.
+        content.beginRingAnimation(duration: TimeInterval(timeout))
+
         let start = Date()
         var lastShown = -1
-        while true {
+        while !closeFlag.isClosed {
             let elapsed = Int(Date().timeIntervalSince(start))
             let remaining = timeout - elapsed
             if remaining <= 0 { return false }
             if remaining != lastShown {
                 lastShown = remaining
-                view.update(remaining: remaining, total: timeout)
+                content.updateNumber(remaining)
             }
 
-            // Drain a tick of AppKit events so the window draws + animates.
             let until = Date().addingTimeInterval(0.05)
             while let event = app.nextEvent(matching: .any, until: until, inMode: .default, dequeue: true) {
                 if event.type == .keyDown {
@@ -89,94 +103,104 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
                 }
                 app.sendEvent(event)
             }
-            // Then check the global tap.
             if let kc = KeyBoxStash.shared.box.takeIfChanged() {
                 return kc == 49
             }
         }
+        // Window was closed by the user (red traffic light) → revert.
+        return false
     }
 }
 
-// MARK: - Global key tap plumbing
-
-/// Tiny mailbox that the C event-tap callback can write into safely.
-final class KeyBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var key: UInt16? = nil
-    var lastKey: UInt16 = 0xFFFF
-    func set(_ k: UInt16) {
-        lock.withLock { key = k; lastKey = k }
-    }
-    func takeIfChanged() -> UInt16? {
-        lock.withLock {
-            let v = key
-            key = nil
-            return v
-        }
-    }
-    func clear() {
-        lock.withLock { key = nil; lastKey = 0xFFFF }
-    }
-}
-
-enum KeyBoxStash {
-    static let shared = Singleton()
-    final class Singleton: @unchecked Sendable {
-        let box = KeyBox()
-    }
-}
-
-// MARK: - Panel
+// MARK: - Window
 
 @MainActor
-final class ConfirmPanel: NSPanel {
-    static func make() -> ConfirmPanel {
-        let frame = NSRect(x: 0, y: 0, width: 620, height: 360)
-        let panel = ConfirmPanel(
+final class ConfirmWindow: NSPanel {
+    private var glass: NSView?
+
+    static func make() -> ConfirmWindow {
+        let frame = NSRect(x: 0, y: 0, width: 640, height: 420)
+        let w = ConfirmWindow(
             contentRect: frame,
-            styleMask: [.borderless],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.level = .popUpMenu
-        panel.isMovableByWindowBackground = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
+        w.title = "wdm"
+        w.titleVisibility = .visible
+        w.titlebarAppearsTransparent = true
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.hasShadow = true
+        w.level = .popUpMenu
+        w.isMovableByWindowBackground = true
+        w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // Force standard traffic lights to render — NSPanel hides them by
+        // default. We explicitly unhide each so the user sees the familiar
+        // close / minimise / zoom dots and can dismiss with the close button.
+        w.standardWindowButton(.closeButton)?.isHidden = false
+        w.standardWindowButton(.miniaturizeButton)?.isHidden = false
+        w.standardWindowButton(.zoomButton)?.isHidden = false
+        // Keep zoom enabled but disable the resize edge to keep our layout stable.
+        w.styleMask.remove(.resizable)
+        w.installGlass()
+        return w
+    }
 
-        let blur = NSVisualEffectView(frame: frame)
-        blur.material = .hudWindow
-        blur.blendingMode = .behindWindow
-        blur.state = .active
-        blur.wantsLayer = true
-        blur.layer?.cornerRadius = 28
-        blur.layer?.cornerCurve = .continuous
-        blur.layer?.masksToBounds = true
-        blur.layer?.borderWidth = 1
-        blur.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
-        blur.autoresizingMask = [.width, .height]
+    private func installGlass() {
+        let bounds = contentView!.bounds
+        let glass: NSView
+        if #available(macOS 26.0, *) {
+            let g = NSGlassEffectView(frame: bounds)
+            g.cornerRadius = 22
+            glass = g
+        } else {
+            let v = NSVisualEffectView(frame: bounds)
+            v.material = .hudWindow
+            v.blendingMode = .behindWindow
+            v.state = .active
+            v.wantsLayer = true
+            v.layer?.cornerRadius = 22
+            v.layer?.cornerCurve = .continuous
+            v.layer?.masksToBounds = true
+            v.layer?.borderWidth = 0.5
+            v.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+            glass = v
+        }
+        glass.autoresizingMask = [.width, .height]
+        contentView = glass
+        self.glass = glass
+    }
 
-        // Inner highlight — a 1px white stroke just inside the rounded edge,
-        // emphasising the "glass" feel the way native HUDs do.
-        let highlight = CALayer()
-        highlight.frame = blur.bounds.insetBy(dx: 1, dy: 1)
-        highlight.cornerRadius = 27
-        highlight.cornerCurve = .continuous
-        highlight.borderWidth = 0.5
-        highlight.borderColor = NSColor.white.withAlphaComponent(0.10).cgColor
-        highlight.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
-        blur.layer?.addSublayer(highlight)
-
-        panel.contentView = blur
-        return panel
+    /// Place the content view inside whichever glass container is active.
+    func installContent(_ content: NSView) {
+        guard let host = glass else { return }
+        if #available(macOS 26.0, *), let glassHost = host as? NSGlassEffectView {
+            glassHost.contentView = content
+        } else {
+            host.addSubview(content)
+        }
     }
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+}
+
+@MainActor
+final class ConfirmWindowDelegate: NSObject, NSWindowDelegate {
+    let flag: CloseFlag
+    init(flag: CloseFlag) { self.flag = flag }
+    func windowWillClose(_ notification: Notification) { flag.isClosed = true }
+}
+
+final class CloseFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var closed = false
+    var isClosed: Bool {
+        get { lock.withLock { closed } }
+        set { lock.withLock { closed = newValue } }
+    }
 }
 
 // MARK: - Content view
@@ -198,13 +222,13 @@ final class ConfirmView: NSView {
         title.stringValue = "Keep this display change?"
         title.alignment = .center
         title.font = roundedFont(size: 26, weight: .semibold)
-        title.textColor = NSColor.labelColor
+        title.textColor = .labelColor
         addSubview(title)
 
         countdown.stringValue = "\(total)"
         countdown.alignment = .center
-        countdown.font = .monospacedDigitSystemFont(ofSize: 72, weight: .bold)
-        countdown.textColor = NSColor.labelColor
+        countdown.font = .monospacedDigitSystemFont(ofSize: 80, weight: .bold)
+        countdown.textColor = .labelColor
         addSubview(countdown)
 
         addSubview(progress)
@@ -212,16 +236,16 @@ final class ConfirmView: NSView {
         addSubview(spaceCap)
         spaceText.stringValue = "to keep"
         spaceText.font = roundedFont(size: 14, weight: .medium)
-        spaceText.textColor = NSColor.secondaryLabelColor
+        spaceText.textColor = .secondaryLabelColor
         addSubview(spaceText)
 
         separator.font = .systemFont(ofSize: 14, weight: .regular)
-        separator.textColor = NSColor.tertiaryLabelColor
+        separator.textColor = .tertiaryLabelColor
         addSubview(separator)
 
         cancelText.stringValue = "any other key cancels"
         cancelText.font = roundedFont(size: 14, weight: .medium)
-        cancelText.textColor = NSColor.secondaryLabelColor
+        cancelText.textColor = .secondaryLabelColor
         addSubview(cancelText)
     }
 
@@ -239,25 +263,25 @@ final class ConfirmView: NSView {
         super.layout()
         let w = bounds.width
 
-        title.frame = NSRect(x: 0, y: bounds.height - 64, width: w, height: 30)
+        title.frame = NSRect(x: 0, y: bounds.height - 80, width: w, height: 32)
 
-        let ringSize: CGFloat = 170
-        let ringY: CGFloat = 96
+        let ringSize: CGFloat = 190
+        let ringY: CGFloat = 100
         progress.frame  = NSRect(x: (w - ringSize) / 2, y: ringY,
                                  width: ringSize, height: ringSize)
         countdown.frame = NSRect(x: (w - ringSize) / 2,
-                                 y: ringY + (ringSize - 80) / 2,
-                                 width: ringSize, height: 80)
+                                 y: ringY + (ringSize - 90) / 2,
+                                 width: ringSize, height: 90)
 
-        // Bottom row: [SPACE] to keep   ·   any other key cancels
-        let capW: CGFloat = 80, capH: CGFloat = 30
+        // Bottom row: [SPACE] to keep · any other key cancels
+        let capW: CGFloat = 78, capH: CGFloat = 28
         let toKeepW: CGFloat = 70
-        let dotW: CGFloat = 18
+        let dotW: CGFloat = 14
         let cancelW: CGFloat = 200
         let gap: CGFloat = 10
         let totalW = capW + gap + toKeepW + gap + dotW + gap + cancelW
         let baseX = (w - totalW) / 2
-        let rowY: CGFloat = 36
+        let rowY: CGFloat = 38
 
         spaceCap.frame   = NSRect(x: baseX,                                 y: rowY - 4, width: capW, height: capH)
         spaceText.frame  = NSRect(x: baseX + capW + gap,                    y: rowY,     width: toKeepW, height: 22)
@@ -266,10 +290,19 @@ final class ConfirmView: NSView {
                                   y: rowY, width: cancelW, height: 22)
     }
 
-    func update(remaining: Int, total: Int) {
+    func updateNumber(_ remaining: Int) {
+        // Cross-fade the digit change for a less jarring update.
+        countdown.layer?.removeAllAnimations()
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.4
+        fade.toValue = 1.0
+        fade.duration = 0.2
+        countdown.layer?.add(fade, forKey: "fade")
         countdown.stringValue = "\(remaining)"
-        progress.progress = Double(remaining) / Double(max(1, total))
-        progress.needsDisplay = true
+    }
+
+    func beginRingAnimation(duration: TimeInterval) {
+        progress.animate(toProgress: 0.0, duration: duration)
     }
 }
 
@@ -291,7 +324,7 @@ final class KeyCapView: NSView {
         label.stringValue = text
         label.alignment = .center
         label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = NSColor.labelColor
+        label.textColor = .labelColor
         addSubview(label)
     }
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -302,37 +335,87 @@ final class KeyCapView: NSView {
     }
 }
 
-// MARK: - Progress ring
+// MARK: - Progress ring (CAShapeLayer-based, smoothly animated)
 
 @MainActor
 final class ProgressRing: NSView {
-    var progress: Double = 1.0   // 1.0 → full ring, 0.0 → empty
+    private let trackLayer = CAShapeLayer()
+    private let progressLayer = CAShapeLayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        layer?.addSublayer(trackLayer)
+        layer?.addSublayer(progressLayer)
+        configureLayers()
     }
     required init?(coder: NSCoder) { fatalError("not used") }
 
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        let lineWidth: CGFloat = 8
-        let r = min(bounds.width, bounds.height) / 2 - lineWidth
-        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+    override func layout() {
+        super.layout()
+        configureLayers()
+    }
 
-        // Track
-        ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.10).cgColor)
-        ctx.setLineWidth(lineWidth)
-        ctx.addArc(center: center, radius: r, startAngle: 0, endAngle: .pi * 2, clockwise: false)
-        ctx.strokePath()
+    private func configureLayers() {
+        let lineWidth: CGFloat = 9
+        let inset = lineWidth / 2 + 2
+        let rect = bounds.insetBy(dx: inset, dy: inset)
+        let path = CGPath(ellipseIn: rect, transform: nil)
 
-        // Active arc — drawn from top, clockwise
-        let start = CGFloat.pi / 2
-        let end = start - CGFloat(progress) * .pi * 2
-        ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
-        ctx.setLineWidth(lineWidth)
-        ctx.setLineCap(.round)
-        ctx.addArc(center: center, radius: r, startAngle: start, endAngle: end, clockwise: true)
-        ctx.strokePath()
+        trackLayer.frame = bounds
+        trackLayer.path = path
+        trackLayer.fillColor = NSColor.clear.cgColor
+        trackLayer.strokeColor = NSColor.white.withAlphaComponent(0.10).cgColor
+        trackLayer.lineWidth = lineWidth
+
+        progressLayer.frame = bounds
+        progressLayer.path = path
+        progressLayer.fillColor = NSColor.clear.cgColor
+        progressLayer.strokeColor = NSColor.controlAccentColor.cgColor
+        progressLayer.lineWidth = lineWidth
+        progressLayer.lineCap = .round
+        progressLayer.strokeEnd = 1.0
+        // Rotate 90° counter-clockwise so the stroke starts at 12 o'clock and
+        // shrinks clockwise, matching native countdown UI.
+        progressLayer.transform = CATransform3DMakeRotation(-.pi / 2, 0, 0, 1)
+        progressLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        progressLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        progressLayer.bounds = bounds
+    }
+
+    func animate(toProgress target: CGFloat, duration: TimeInterval) {
+        let anim = CABasicAnimation(keyPath: "strokeEnd")
+        anim.fromValue = progressLayer.strokeEnd
+        anim.toValue = target
+        anim.duration = duration
+        anim.timingFunction = CAMediaTimingFunction(name: .linear)
+        anim.fillMode = .forwards
+        anim.isRemovedOnCompletion = false
+        progressLayer.add(anim, forKey: "shrink")
+        progressLayer.strokeEnd = target
+    }
+}
+
+// MARK: - Global key tap plumbing
+
+/// Tiny mailbox that the C event-tap callback can write into safely.
+final class KeyBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var key: UInt16? = nil
+    func set(_ k: UInt16) { lock.withLock { key = k } }
+    func takeIfChanged() -> UInt16? {
+        lock.withLock {
+            let v = key
+            key = nil
+            return v
+        }
+    }
+    func clear() { lock.withLock { key = nil } }
+}
+
+enum KeyBoxStash {
+    static let shared = Singleton()
+    final class Singleton: @unchecked Sendable {
+        let box = KeyBox()
     }
 }
