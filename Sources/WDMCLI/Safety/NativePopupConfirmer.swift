@@ -112,9 +112,7 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         guard let s = screen else { window.center(); return }
         let f = window.frame
         let x = s.frame.midX - f.width / 2
-        // Place at the lower third — same vertical zone as the system
-        // volume / brightness HUD.
-        let y = s.frame.minY + s.frame.height * 0.18
+        let y = s.frame.midY - f.height / 2
         window.setFrame(NSRect(x: x, y: y, width: f.width, height: f.height), display: true)
     }
 }
