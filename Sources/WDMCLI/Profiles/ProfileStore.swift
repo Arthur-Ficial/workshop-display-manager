@@ -46,10 +46,18 @@ public final class ProfileStore: @unchecked Sendable {
         return try JSONDecoder().decode(Snapshot.self, from: data)
     }
 
-    public func list() -> [String] {
+    public func list() throws -> [String] {
         let fm = FileManager.default
-        guard let entries = try? fm.contentsOfDirectory(atPath: directory.path) else {
+        guard fm.fileExists(atPath: directory.path) else {
             return []
+        }
+        let entries: [String]
+        do {
+            entries = try fm.contentsOfDirectory(atPath: directory.path)
+        } catch {
+            throw CLIError.ioError(
+                "cannot list profiles in \(directory.path): \(error)"
+            )
         }
         return entries
             .filter { $0.hasSuffix(".json") }

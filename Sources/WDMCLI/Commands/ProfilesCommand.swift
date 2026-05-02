@@ -5,7 +5,7 @@ public enum ProfilesCommand {
             return try remove(args: args, deps: deps)
         }
         let useJSON = args.contains("--json")
-        let names = deps.profileStore.list()
+        let names = try deps.profileStore.list()
         if useJSON {
             deps.stdout.write(try JSONFormatter.encode(names))
         } else {

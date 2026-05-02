@@ -57,6 +57,18 @@ struct ProfileCommandsE2ETests {
         #expect(parsed == ["one"])
     }
 
+    @Test("profiles refuses when the profile directory cannot be read")
+    func profilesListReadFailure() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let badPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-profiles-file-\(UUID().uuidString)")
+        try "not a directory".write(to: badPath, atomically: true, encoding: .utf8)
+
+        let result = runWithProfilesDir(["profiles"], fixture: fx, profilesDir: badPath)
+        #expect(result.exitCode == ExitCodes.ioError)
+        #expect(result.stderr.contains("I/O error"))
+    }
+
     @Test("restore applies a saved profile to fixture provider")
     func restoreApplies() throws {
         let fx = try CLITestHarness.makeFixture()
