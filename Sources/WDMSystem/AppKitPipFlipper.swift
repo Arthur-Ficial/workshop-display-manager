@@ -37,21 +37,9 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
     ) throws {
         self.requestedPosition = position
         self.remoteControl = remoteControl
-        if !CGPreflightScreenCaptureAccess() {
-            _ = CGRequestScreenCaptureAccess()
-            throw ProviderError.configurationFailed(
-                "pip: Screen Recording permission not granted for `wdm`. " +
-                "Open System Settings → Privacy & Security → Screen Recording → enable `wdm`."
-            )
-        }
+        try PermissionProbe.requireScreenRecording(context: "pip")
         if remoteControl {
-            let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
-            if !AXIsProcessTrustedWithOptions(opts as CFDictionary) {
-                throw ProviderError.configurationFailed(
-                    "pip --remote: Accessibility permission not granted for `wdm`. " +
-                    "Open System Settings → Privacy & Security → Accessibility → enable `wdm`."
-                )
-            }
+            try PermissionProbe.requireAccessibility(context: "pip --remote")
         }
         // .accessory: window visible, no dock icon, no menu bar pollution.
         // Workshop spawns dozens of virtual+pip processes; .regular gives every

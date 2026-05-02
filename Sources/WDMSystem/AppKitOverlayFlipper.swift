@@ -28,14 +28,7 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
     public init() {}
 
     public func run(displayID: UInt32, flip: Flip, durationMs: Int?) throws {
-        if !CGPreflightScreenCaptureAccess() {
-            _ = CGRequestScreenCaptureAccess()
-            throw ProviderError.configurationFailed(
-                "flip-overlay: Screen Recording permission not granted for `wdm`. " +
-                "Open System Settings → Privacy & Security → Screen Recording, " +
-                "enable `wdm`, then re-run. (A prompt was just requested.)"
-            )
-        }
+        try PermissionProbe.requireScreenRecording(context: "flip-overlay")
         runOnMainSetActivationPolicy(.accessory)
         installSignalHandlers()
 

@@ -19,18 +19,7 @@ public final class AXWindowMover: WindowMover, @unchecked Sendable {
     public init() {}
 
     public func move(pattern: String, displayID: UInt32) throws {
-        // Permission preflight. Use the literal key string — the symbol
-        // `kAXTrustedCheckOptionPrompt` is var-qualified in the SDK and
-        // Swift 6 strict concurrency rejects reading it from a non-isolated
-        // context. The literal is contractually stable across macOS versions.
-        let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
-        guard AXIsProcessTrustedWithOptions(opts as CFDictionary) else {
-            throw ProviderError.configurationFailed(
-                "move-window: Accessibility permission not granted for `wdm`. " +
-                "Open System Settings → Privacy & Security → Accessibility, " +
-                "enable `wdm`, then re-run."
-            )
-        }
+        try PermissionProbe.requireAccessibility(context: "move-window")
 
         // Find a running app whose localized name contains the pattern.
         let lower = pattern.lowercased()
@@ -89,8 +78,7 @@ public final class AXWindowMover: WindowMover, @unchecked Sendable {
         // Best-effort: AX-raise the topmost on-screen window whose frame
         // intersects the target display. The cursor warp already happened —
         // it's the primary goal — so silently skip the raise if AX is missing.
-        let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
-        guard AXIsProcessTrustedWithOptions(opts as CFDictionary) else { return }
+        guard PermissionProbe.hasAccessibility() else { return }
         let listOpts = CGWindowListOption([.optionOnScreenOnly, .excludeDesktopElements])
         guard let arr = CGWindowListCopyWindowInfo(listOpts, kCGNullWindowID) as? [[String: Any]] else { return }
         for info in arr {
@@ -116,13 +104,7 @@ public final class AXWindowMover: WindowMover, @unchecked Sendable {
         guard !displayIDs.isEmpty else {
             throw ProviderError.configurationFailed("tile-across: no destinations")
         }
-        let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
-        guard AXIsProcessTrustedWithOptions(opts as CFDictionary) else {
-            throw ProviderError.configurationFailed(
-                "tile-across: Accessibility permission not granted for `wdm`. " +
-                "Open System Settings → Privacy & Security → Accessibility."
-            )
-        }
+        try PermissionProbe.requireAccessibility(context: "tile-across")
         let lower = pattern.lowercased()
         guard let app = NSWorkspace.shared.runningApplications.first(where: {
             ($0.localizedName ?? "").lowercased().contains(lower)
