@@ -1,19 +1,23 @@
 import Foundation
 import AppKit
 
-/// Mac-native confirmation popup with a live countdown. Activated by `--confirm`.
+/// Native macOS HUD-style confirmation overlay. Activated by `--confirm`.
 ///
-/// On macOS 26 (Tahoe) the background uses **Liquid Glass** via
-/// `NSGlassEffectView`. Earlier macOS versions fall back to `NSVisualEffectView`
-/// with hudWindow material. Window has transparent title bar with the standard
-/// traffic-light buttons (close/minimise/zoom). The countdown ring animates
-/// smoothly via Core Animation; the number updates once per second.
+/// Modeled on the system volume / brightness HUD: borderless `NSPanel` with
+/// `.hudWindow` style and `NSVisualEffectView` (.hudWindow material,
+/// .behindWindow blending), no title bar, no traffic-light buttons, compact,
+/// shown at the lower third of the screen the cursor is on. Content is a
+/// large monospaced countdown, a thin progress bar that drains over the
+/// timeout, and a one-line hint with the keyboard shortcuts.
 ///
 /// Behaviour:
-///   - SPACE key → keep the change (returns true).
+///   - SPACE → keep (returns true).
 ///   - Any other key → cancel/revert.
-///   - Close button (red traffic light) → cancel/revert.
-///   - Timeout reaching 0 → cancel/revert.
+///   - Timeout → cancel/revert.
+///
+/// `NSGlassEffectView` is intentionally avoided — it has known issues on
+/// macOS Tahoe that produce blank or wrongly-tinted overlays for unbundled
+/// CLI tools.
 public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
     public init() {}
 
@@ -31,32 +35,22 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
 
-        let window = ConfirmWindow.make()
-        let bounds = window.contentView!.bounds
-        let content = ConfirmView(frame: bounds, total: timeout)
+        let panel = HUDPanel.make()
+        let bounds = panel.contentView!.bounds
+        let content = HUDContent(frame: bounds, total: timeout)
         content.autoresizingMask = [.width, .height]
-        window.installContent(content)
+        panel.installContent(content)
 
-        let closeFlag = CloseFlag()
-        let delegate = ConfirmWindowDelegate(flag: closeFlag)
-        window.delegate = delegate
-
-        // Place the window on the screen the user is actually looking at —
-        // i.e. the one under the cursor. Falls back to the main screen.
-        Self.placeOnCursorScreen(window)
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
-        app.activate(ignoringOtherApps: true)
-        window.makeKey()
+        Self.placeOnCursorScreen(panel)
+        panel.orderFrontRegardless()
 
         defer {
-            window.delegate = nil
-            window.orderOut(nil)
-            window.close()
+            panel.orderOut(nil)
+            panel.close()
         }
 
-        // Global key tap so SPACE/etc. are caught even when our process
-        // is `.accessory` and does not own the keyboard focus.
+        // Global key tap so SPACE/ESC are caught even though `.accessory` +
+        // `.nonactivatingPanel` mean we never own the keyboard focus.
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
         let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -84,12 +78,12 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
             KeyBoxStash.shared.box.clear()
         }
 
-        // Kick off the smooth ring animation: shrink from full → empty across timeout.
-        content.beginRingAnimation(duration: TimeInterval(timeout))
+        // Smooth bar drain across the full timeout.
+        content.beginBarAnimation(duration: TimeInterval(timeout))
 
         let start = Date()
         var lastShown = -1
-        while !closeFlag.isClosed {
+        while true {
             let elapsed = Int(Date().timeIntervalSince(start))
             let remaining = timeout - elapsed
             if remaining <= 0 { return false }
@@ -97,11 +91,10 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
                 lastShown = remaining
                 content.updateNumber(remaining)
             }
-
             let until = Date().addingTimeInterval(0.05)
             while let event = app.nextEvent(matching: .any, until: until, inMode: .default, dequeue: true) {
                 if event.type == .keyDown {
-                    return event.keyCode == 49
+                    return event.keyCode == 49   // 49 = space
                 }
                 app.sendEvent(event)
             }
@@ -109,8 +102,6 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
                 return kc == 49
             }
         }
-        // Window was closed by the user (red traffic light) → revert.
-        return false
     }
 
     @MainActor
@@ -121,246 +112,111 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         guard let s = screen else { window.center(); return }
         let f = window.frame
         let x = s.frame.midX - f.width / 2
-        let y = s.frame.midY - f.height / 2
+        // Place at the lower third — same vertical zone as the system
+        // volume / brightness HUD.
+        let y = s.frame.minY + s.frame.height * 0.18
         window.setFrame(NSRect(x: x, y: y, width: f.width, height: f.height), display: true)
     }
 }
 
-// MARK: - Window
+// MARK: - Panel
 
 @MainActor
-final class ConfirmWindow: NSPanel {
-    private var glass: NSView?
-
-    static func make() -> ConfirmWindow {
-        let frame = NSRect(x: 0, y: 0, width: 640, height: 420)
-        let w = ConfirmWindow(
+final class HUDPanel: NSPanel {
+    static func make() -> HUDPanel {
+        let frame = NSRect(x: 0, y: 0, width: 280, height: 120)
+        let p = HUDPanel(
             contentRect: frame,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .nonactivatingPanel],
+            styleMask: [.borderless, .nonactivatingPanel, .hudWindow, .utilityWindow, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        w.title = "wdm"
-        w.titleVisibility = .visible
-        w.titlebarAppearsTransparent = true
-        w.isOpaque = false
-        w.backgroundColor = .clear
-        w.hasShadow = true
-        w.level = .popUpMenu
-        w.isMovableByWindowBackground = true
-        w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        // Force standard traffic lights to render — NSPanel hides them by
-        // default. We explicitly unhide each so the user sees the familiar
-        // close / minimise / zoom dots and can dismiss with the close button.
-        w.standardWindowButton(.closeButton)?.isHidden = false
-        w.standardWindowButton(.miniaturizeButton)?.isHidden = false
-        w.standardWindowButton(.zoomButton)?.isHidden = false
-        // Keep zoom enabled but disable the resize edge to keep our layout stable.
-        w.styleMask.remove(.resizable)
-        w.installGlass()
-        return w
+        p.isOpaque = false
+        p.backgroundColor = .clear
+        p.hasShadow = true
+        p.level = .statusBar
+        p.becomesKeyOnlyIfNeeded = true
+        p.hidesOnDeactivate = false
+        p.isMovableByWindowBackground = false
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        p.animationBehavior = .utilityWindow
+
+        let bg = NSVisualEffectView(frame: frame)
+        bg.material = .hudWindow
+        bg.blendingMode = .behindWindow
+        bg.state = .active
+        bg.wantsLayer = true
+        bg.layer?.cornerRadius = 16
+        bg.layer?.cornerCurve = .continuous
+        bg.layer?.masksToBounds = true
+        bg.autoresizingMask = [.width, .height]
+        p.contentView = bg
+        return p
     }
 
-    private func installGlass() {
-        let bounds = contentView!.bounds
-        let glass: NSView
-        if #available(macOS 26.0, *) {
-            let g = NSGlassEffectView(frame: bounds)
-            g.cornerRadius = 22
-            glass = g
-        } else {
-            let v = NSVisualEffectView(frame: bounds)
-            v.material = .hudWindow
-            v.blendingMode = .behindWindow
-            v.state = .active
-            v.wantsLayer = true
-            v.layer?.cornerRadius = 22
-            v.layer?.cornerCurve = .continuous
-            v.layer?.masksToBounds = true
-            v.layer?.borderWidth = 0.5
-            v.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
-            glass = v
-        }
-        glass.autoresizingMask = [.width, .height]
-        contentView = glass
-        self.glass = glass
-    }
-
-    /// Place the content view inside whichever glass container is active.
     func installContent(_ content: NSView) {
-        guard let host = glass else { return }
-        if #available(macOS 26.0, *), let glassHost = host as? NSGlassEffectView {
-            glassHost.contentView = content
-        } else {
-            host.addSubview(content)
-        }
-    }
-
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
-    override var acceptsFirstResponder: Bool { true }
-}
-
-@MainActor
-final class ConfirmWindowDelegate: NSObject, NSWindowDelegate {
-    let flag: CloseFlag
-    init(flag: CloseFlag) { self.flag = flag }
-    func windowWillClose(_ notification: Notification) { flag.isClosed = true }
-}
-
-final class CloseFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var closed = false
-    var isClosed: Bool {
-        get { lock.withLock { closed } }
-        set { lock.withLock { closed = newValue } }
+        contentView?.addSubview(content)
     }
 }
 
-// MARK: - Content view
+// MARK: - Content
 
 @MainActor
-final class ConfirmView: NSView {
-    private let title = NSTextField(labelWithString: "")
+final class HUDContent: NSView {
     private let countdown = NSTextField(labelWithString: "")
-    private let progress = ProgressRing()
-    private let spaceCap = KeyCapView(label: "space")
-    private let spaceText = NSTextField(labelWithString: "")
-    private let separator = NSTextField(labelWithString: "·")
-    private let cancelText = NSTextField(labelWithString: "")
+    private let bar = ProgressBar()
+    private let hint = NSTextField(labelWithString: "")
 
     init(frame: NSRect, total: Int) {
         super.init(frame: frame)
         wantsLayer = true
 
-        title.stringValue = "Keep this display change?"
-        title.alignment = .center
-        title.font = roundedFont(size: 26, weight: .semibold)
-        title.textColor = .labelColor
-        addSubview(title)
-
-        countdown.stringValue = "\(total)"
+        countdown.stringValue = "\(total)s"
         countdown.alignment = .center
-        countdown.font = .monospacedDigitSystemFont(ofSize: 80, weight: .bold)
+        countdown.font = .monospacedDigitSystemFont(ofSize: 38, weight: .bold)
         countdown.textColor = .labelColor
         addSubview(countdown)
 
-        addSubview(progress)
+        addSubview(bar)
 
-        addSubview(spaceCap)
-        spaceText.stringValue = "to keep"
-        spaceText.font = roundedFont(size: 14, weight: .medium)
-        spaceText.textColor = .secondaryLabelColor
-        addSubview(spaceText)
-
-        separator.font = .systemFont(ofSize: 14, weight: .regular)
-        separator.textColor = .tertiaryLabelColor
-        addSubview(separator)
-
-        cancelText.stringValue = "any other key cancels"
-        cancelText.font = roundedFont(size: 14, weight: .medium)
-        cancelText.textColor = .secondaryLabelColor
-        addSubview(cancelText)
+        hint.stringValue = "space  keep    ·    any key  cancel"
+        hint.alignment = .center
+        hint.font = .systemFont(ofSize: 11, weight: .medium)
+        hint.textColor = .secondaryLabelColor
+        addSubview(hint)
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
-
-    private func roundedFont(size: CGFloat, weight: NSFont.Weight) -> NSFont {
-        let base = NSFont.systemFont(ofSize: size, weight: weight)
-        if let desc = base.fontDescriptor.withDesign(.rounded) {
-            return NSFont(descriptor: desc, size: size) ?? base
-        }
-        return base
-    }
 
     override func layout() {
         super.layout()
         let w = bounds.width
-
-        title.frame = NSRect(x: 0, y: bounds.height - 80, width: w, height: 32)
-
-        let ringSize: CGFloat = 190
-        let ringY: CGFloat = 100
-        progress.frame  = NSRect(x: (w - ringSize) / 2, y: ringY,
-                                 width: ringSize, height: ringSize)
-        countdown.frame = NSRect(x: (w - ringSize) / 2,
-                                 y: ringY + (ringSize - 90) / 2,
-                                 width: ringSize, height: 90)
-
-        // Bottom row: [SPACE] to keep · any other key cancels
-        let capW: CGFloat = 78, capH: CGFloat = 28
-        let toKeepW: CGFloat = 70
-        let dotW: CGFloat = 14
-        let cancelW: CGFloat = 200
-        let gap: CGFloat = 10
-        let totalW = capW + gap + toKeepW + gap + dotW + gap + cancelW
-        let baseX = (w - totalW) / 2
-        let rowY: CGFloat = 38
-
-        spaceCap.frame   = NSRect(x: baseX,                                 y: rowY - 4, width: capW, height: capH)
-        spaceText.frame  = NSRect(x: baseX + capW + gap,                    y: rowY,     width: toKeepW, height: 22)
-        separator.frame  = NSRect(x: baseX + capW + gap + toKeepW + gap,    y: rowY,     width: dotW, height: 22)
-        cancelText.frame = NSRect(x: baseX + capW + gap + toKeepW + gap + dotW + gap,
-                                  y: rowY, width: cancelW, height: 22)
+        countdown.frame = NSRect(x: 0, y: bounds.height - 60, width: w, height: 44)
+        bar.frame       = NSRect(x: 24, y: 32, width: w - 48, height: 4)
+        hint.frame      = NSRect(x: 0, y: 10, width: w, height: 16)
     }
 
     func updateNumber(_ remaining: Int) {
-        // Cross-fade the digit change for a less jarring update.
-        countdown.layer?.removeAllAnimations()
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0.4
-        fade.toValue = 1.0
-        fade.duration = 0.2
-        countdown.layer?.add(fade, forKey: "fade")
-        countdown.stringValue = "\(remaining)"
+        countdown.stringValue = "\(remaining)s"
     }
 
-    func beginRingAnimation(duration: TimeInterval) {
-        progress.animate(toProgress: 0.0, duration: duration)
+    func beginBarAnimation(duration: TimeInterval) {
+        bar.animate(toProgress: 0.0, duration: duration)
     }
 }
 
-// MARK: - SPACE key cap
+// MARK: - Thin progress bar (volume-HUD style)
 
 @MainActor
-final class KeyCapView: NSView {
-    private let label = NSTextField(labelWithString: "")
-
-    init(label text: String) {
-        super.init(frame: .zero)
-        wantsLayer = true
-        layer?.cornerRadius = 7
-        layer?.cornerCurve = .continuous
-        layer?.borderWidth = 0.5
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.30).cgColor
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.10).cgColor
-
-        label.stringValue = text
-        label.alignment = .center
-        label.font = .systemFont(ofSize: 12, weight: .semibold)
-        label.textColor = .labelColor
-        addSubview(label)
-    }
-    required init?(coder: NSCoder) { fatalError("not used") }
-
-    override func layout() {
-        super.layout()
-        label.frame = bounds.insetBy(dx: 8, dy: 4)
-    }
-}
-
-// MARK: - Progress ring (CAShapeLayer-based, smoothly animated)
-
-@MainActor
-final class ProgressRing: NSView {
-    private let trackLayer = CAShapeLayer()
-    private let progressLayer = CAShapeLayer()
+final class ProgressBar: NSView {
+    private let track = CAShapeLayer()
+    private let fill = CAShapeLayer()
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer?.addSublayer(trackLayer)
-        layer?.addSublayer(progressLayer)
+        layer?.addSublayer(track)
+        layer?.addSublayer(fill)
         configureLayers()
     }
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -371,42 +227,33 @@ final class ProgressRing: NSView {
     }
 
     private func configureLayers() {
-        let lineWidth: CGFloat = 9
-        let inset = lineWidth / 2 + 2
-        let rect = bounds.insetBy(dx: inset, dy: inset)
-        let path = CGPath(ellipseIn: rect, transform: nil)
+        let radius = bounds.height / 2
+        let rect = bounds
+        let path = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
 
-        trackLayer.frame = bounds
-        trackLayer.path = path
-        trackLayer.fillColor = NSColor.clear.cgColor
-        trackLayer.strokeColor = NSColor.white.withAlphaComponent(0.10).cgColor
-        trackLayer.lineWidth = lineWidth
+        track.frame = bounds
+        track.path = path
+        track.fillColor = NSColor.white.withAlphaComponent(0.12).cgColor
 
-        progressLayer.frame = bounds
-        progressLayer.path = path
-        progressLayer.fillColor = NSColor.clear.cgColor
-        progressLayer.strokeColor = NSColor.controlAccentColor.cgColor
-        progressLayer.lineWidth = lineWidth
-        progressLayer.lineCap = .round
-        progressLayer.strokeEnd = 1.0
-        // Rotate 90° counter-clockwise so the stroke starts at 12 o'clock and
-        // shrinks clockwise, matching native countdown UI.
-        progressLayer.transform = CATransform3DMakeRotation(-.pi / 2, 0, 0, 1)
-        progressLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        progressLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        progressLayer.bounds = bounds
+        fill.frame = bounds
+        fill.path = path
+        fill.fillColor = NSColor.labelColor.cgColor
+        fill.anchorPoint = CGPoint(x: 0, y: 0.5)
+        fill.position = CGPoint(x: 0, y: bounds.midY)
+        fill.bounds = bounds
+        fill.transform = CATransform3DMakeScale(1.0, 1.0, 1.0)
     }
 
+    /// Animates the fill horizontally from full → `target` proportion.
     func animate(toProgress target: CGFloat, duration: TimeInterval) {
-        let anim = CABasicAnimation(keyPath: "strokeEnd")
-        anim.fromValue = progressLayer.strokeEnd
+        let anim = CABasicAnimation(keyPath: "transform.scale.x")
+        anim.fromValue = 1.0
         anim.toValue = target
         anim.duration = duration
         anim.timingFunction = CAMediaTimingFunction(name: .linear)
         anim.fillMode = .forwards
         anim.isRemovedOnCompletion = false
-        progressLayer.add(anim, forKey: "shrink")
-        progressLayer.strokeEnd = target
+        fill.add(anim, forKey: "drain")
     }
 }
 
