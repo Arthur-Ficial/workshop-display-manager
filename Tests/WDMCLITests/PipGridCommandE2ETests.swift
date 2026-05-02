@@ -64,4 +64,18 @@ struct PipGridCommandE2ETests {
         let r = run(args: ["pip-grid", "1,999", "--duration-ms", "30"], fixture: fx, log: log)
         #expect(r.exitCode == 3)
     }
+
+    @Test("pip-grid surfaces PIP task failures")
+    func pipTaskFailure() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let badLog = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-pip-grid-bad-log-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: badLog, withIntermediateDirectories: true)
+        let r = run(
+            args: ["pip-grid", "1,2", "--on", "1", "--duration-ms", "30"],
+            fixture: fx, log: badLog
+        )
+        #expect(r.exitCode == ExitCodes.ioError)
+        #expect(r.stderr.contains("pip-grid: PIP failed"))
+    }
 }

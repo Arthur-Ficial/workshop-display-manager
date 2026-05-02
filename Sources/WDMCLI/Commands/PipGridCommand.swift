@@ -52,6 +52,7 @@ public enum PipGridCommand {
         let cellH = max(80,  (dstH - margin * (rows + 1)) / rows)
 
         let pipFlipper = deps.pipFlipper
+        let errorBox = PipGridErrorBox()
         let testMode = deps.virtualDisplayManager is RecordingVirtualDisplayManager
             || ProcessInfo.processInfo.environment["WDM_TEST_PIP_LOG"]
                 .map({ !$0.isEmpty }) ?? false
@@ -68,12 +69,16 @@ public enum PipGridCommand {
             let size = PipSize(width: cellW, height: cellH)
             let pipDur = testMode ? 10 : durationMs
             Task.detached(priority: .userInitiated) {
-                try? pipFlipper.run(
-                    sourceID: src, destinationID: dstID,
-                    size: size, position: pos,
-                    flip: .none, durationMs: pipDur,
-                    remoteControl: false
-                )
+                do {
+                    try pipFlipper.run(
+                        sourceID: src, destinationID: dstID,
+                        size: size, position: pos,
+                        flip: .none, durationMs: pipDur,
+                        remoteControl: false
+                    )
+                } catch {
+                    errorBox.set(error)
+                }
             }
         }
 
@@ -93,7 +98,16 @@ public enum PipGridCommand {
                 RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
             }
         }
+        if let error = errorBox.get() {
+            try throwPipError(error)
+        }
         return ExitCodes.success
+    }
+
+    private static func throwPipError(_ error: Error) throws {
+        if let error = error as? CLIError { throw error }
+        if let error = error as? ProviderError { throw error }
+        throw CLIError.ioError("pip-grid: PIP failed: \(error)")
     }
 
     private static func installSignalHandlers(_ onSignal: @escaping () -> Void) -> [DispatchSourceSignal] {
@@ -114,4 +128,11 @@ private final class AtomicGridFlag: @unchecked Sendable {
     private var f = false
     func set() { lock.withLock { f = true } }
     func get() -> Bool { lock.withLock { f } }
+}
+
+private final class PipGridErrorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var error: Error?
+    func set(_ e: Error) { lock.withLock { if error == nil { error = e } } }
+    func get() -> Error? { lock.withLock { error } }
 }
