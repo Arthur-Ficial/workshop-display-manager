@@ -15,6 +15,11 @@ public final class RecordingWindowMover: WindowMover, @unchecked Sendable {
         try writeLine("focus displayID=\(displayID)\n")
     }
 
+    public func tileAcross(pattern: String, displayIDs: [UInt32]) throws {
+        let csv = displayIDs.map(String.init).joined(separator: ",")
+        try writeLine("tile pattern=\(pattern) displayIDs=\(csv)\n")
+    }
+
     private func writeLine(_ line: String) throws {
         let data = Data(line.utf8)
         if FileManager.default.fileExists(atPath: logURL.path) {

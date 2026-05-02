@@ -111,4 +111,50 @@ public final class AXWindowMover: WindowMover, @unchecked Sendable {
             }
         }
     }
+
+    public func tileAcross(pattern: String, displayIDs: [UInt32]) throws {
+        guard !displayIDs.isEmpty else {
+            throw ProviderError.configurationFailed("tile-across: no destinations")
+        }
+        let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
+        guard AXIsProcessTrustedWithOptions(opts as CFDictionary) else {
+            throw ProviderError.configurationFailed(
+                "tile-across: Accessibility permission not granted for `wdm`. " +
+                "Open System Settings → Privacy & Security → Accessibility."
+            )
+        }
+        let lower = pattern.lowercased()
+        guard let app = NSWorkspace.shared.runningApplications.first(where: {
+            ($0.localizedName ?? "").lowercased().contains(lower)
+        }) else {
+            throw ProviderError.configurationFailed(
+                "tile-across: no running app matches '\(pattern)'"
+            )
+        }
+        let appElem = AXUIElementCreateApplication(app.processIdentifier)
+        var winsRef: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            appElem, kAXWindowsAttribute as CFString, &winsRef
+        ) == .success, let arr = winsRef as? [AXUIElement] else {
+            throw ProviderError.configurationFailed(
+                "tile-across: cannot enumerate windows of '\(app.localizedName ?? pattern)'"
+            )
+        }
+        for (i, win) in arr.enumerated() {
+            let id = displayIDs[i % displayIDs.count]
+            let bounds = CGDisplayBounds(CGDirectDisplayID(id))
+            let w = bounds.size.width * 0.8
+            let h = bounds.size.height * 0.8
+            let x = bounds.origin.x + (bounds.size.width  - w) / 2
+            let y = bounds.origin.y + (bounds.size.height - h) / 2
+            var pos = CGPoint(x: x, y: y)
+            var sz = CGSize(width: w, height: h)
+            if let posVal = AXValueCreate(.cgPoint, &pos) {
+                AXUIElementSetAttributeValue(win, kAXPositionAttribute as CFString, posVal)
+            }
+            if let szVal = AXValueCreate(.cgSize, &sz) {
+                AXUIElementSetAttributeValue(win, kAXSizeAttribute as CFString, szVal)
+            }
+        }
+    }
 }

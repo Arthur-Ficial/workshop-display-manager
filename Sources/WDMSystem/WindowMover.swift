@@ -16,4 +16,11 @@ public protocol WindowMover: Sendable {
     /// impl also raises the frontmost window already on that display via AX;
     /// if the display has no windows, only the warp happens.
     func focus(displayID: UInt32) throws
+
+    /// Distribute every window of any running app whose name matches
+    /// `pattern` round-robin across `displayIDs`. First window → first
+    /// display, etc., wrapping if there are more windows than destinations.
+    /// ~80% sized and centered per display. Same Accessibility permission
+    /// requirement as `move`.
+    func tileAcross(pattern: String, displayIDs: [UInt32]) throws
 }
