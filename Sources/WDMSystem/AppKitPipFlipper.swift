@@ -22,6 +22,7 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
     private let pollerStopBox = PollerStopBox()
     nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
     nonisolated(unsafe) private var requestedPosition: PipPosition?
+    nonisolated(unsafe) private var remoteControl: Bool = false
 
     public init() {}
 
@@ -31,15 +32,26 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         size: PipSize,
         position: PipPosition?,
         flip: Flip,
-        durationMs: Int?
+        durationMs: Int?,
+        remoteControl: Bool
     ) throws {
         self.requestedPosition = position
+        self.remoteControl = remoteControl
         if !CGPreflightScreenCaptureAccess() {
             _ = CGRequestScreenCaptureAccess()
             throw ProviderError.configurationFailed(
                 "pip: Screen Recording permission not granted for `wdm`. " +
                 "Open System Settings → Privacy & Security → Screen Recording → enable `wdm`."
             )
+        }
+        if remoteControl {
+            let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
+            if !AXIsProcessTrustedWithOptions(opts as CFDictionary) {
+                throw ProviderError.configurationFailed(
+                    "pip --remote: Accessibility permission not granted for `wdm`. " +
+                    "Open System Settings → Privacy & Security → Accessibility → enable `wdm`."
+                )
+            }
         }
         // .accessory: window visible, no dock icon, no menu bar pollution.
         // Workshop spawns dozens of virtual+pip processes; .regular gives every
@@ -96,6 +108,7 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         size: PipSize,
         flip: Flip
     ) async throws {
+        let remote = self.remoteControl
         // Validate the source display id is something macOS actually has
         // active. Avoid SCShareableContent here — it skips virtual displays.
         guard NSScreen.screens.contains(where: {
@@ -137,7 +150,10 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         win.isReleasedWhenClosed = false
         win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let view = NSView(frame: win.contentView!.bounds)
+        let bounds = win.contentView!.bounds
+        let view: NSView = remote
+            ? RemoteControlPipView(frame: bounds, sourceID: CGDirectDisplayID(sourceID))
+            : NSView(frame: bounds)
         view.wantsLayer = true
         let imageLayer = CALayer()
         imageLayer.contentsGravity = .resizeAspectFill
@@ -147,6 +163,10 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         view.layer?.addSublayer(imageLayer)
         win.contentView = view
         win.makeKeyAndOrderFront(nil)
+        if remote {
+            win.makeFirstResponder(view)
+            win.title = "wdm pip — display \(sourceID) [remote]"
+        }
         self.window = win
 
         // Poll CGDisplayCreateImage at 30 Hz: SCStream returns empty frames on

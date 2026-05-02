@@ -48,10 +48,12 @@ public enum PipCommand {
         } else {
             position = nil
         }
+        let remote = args.contains("--remote")
 
         try deps.pipFlipper.run(
             sourceID: srcID, destinationID: dstID,
-            size: size, position: position, flip: flip, durationMs: durationMs
+            size: size, position: position, flip: flip, durationMs: durationMs,
+            remoteControl: remote
         )
         return ExitCodes.success
     }

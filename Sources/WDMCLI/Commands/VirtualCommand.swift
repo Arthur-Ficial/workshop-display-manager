@@ -234,7 +234,8 @@ public enum VirtualCommand {
                     try pipFlipper.run(
                         sourceID: srcID, destinationID: dstID,
                         size: PipSize.defaultSize, position: nil,
-                        flip: .none, durationMs: pipDuration
+                        flip: .none, durationMs: pipDuration,
+                        remoteControl: false
                     )
                 } catch {
                     FileHandle.standardError.write(

@@ -95,4 +95,24 @@ struct PipCommandE2ETests {
         #expect(body.contains("source=1"))
         #expect(body.contains("destination=1"))
     }
+
+    @Test("pip without --remote records remote=false (the default)")
+    func pipRemoteDefault() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(args: ["pip", "2", "--duration-ms", "50"], fixture: fx, log: log)
+        #expect(r.exitCode == 0)
+        let body = (try? String(contentsOf: log)) ?? ""
+        #expect(body.contains("remote=false"))
+    }
+
+    @Test("pip --remote records remote=true so events flow to the source display")
+    func pipRemote() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(args: ["pip", "2", "--remote", "--duration-ms", "50"], fixture: fx, log: log)
+        #expect(r.exitCode == 0)
+        let body = (try? String(contentsOf: log)) ?? ""
+        #expect(body.contains("remote=true"))
+    }
 }

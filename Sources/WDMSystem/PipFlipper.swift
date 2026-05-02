@@ -22,7 +22,8 @@ public protocol PipFlipper: Sendable {
         size: PipSize,
         position: PipPosition?,
         flip: Flip,
-        durationMs: Int?
+        durationMs: Int?,
+        remoteControl: Bool
     ) throws
 
     func stop()

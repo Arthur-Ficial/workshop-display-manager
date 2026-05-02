@@ -17,7 +17,8 @@ public final class RecordingPipFlipper: PipFlipper, @unchecked Sendable {
         size: PipSize,
         position: PipPosition?,
         flip: Flip,
-        durationMs: Int?
+        durationMs: Int?,
+        remoteControl: Bool
     ) throws {
         let posTag = position.map { "\($0.x),\($0.y)" } ?? "centered"
         let line =
@@ -25,7 +26,8 @@ public final class RecordingPipFlipper: PipFlipper, @unchecked Sendable {
             "size=\(size.width)x\(size.height) " +
             "position=\(posTag) " +
             "flip=\(flip.rawValue) " +
-            "durationMs=\(durationMs.map(String.init) ?? "nil")\n"
+            "durationMs=\(durationMs.map(String.init) ?? "nil") " +
+            "remote=\(remoteControl ? "true" : "false")\n"
         try append(line)
         if let ms = durationMs {
             Thread.sleep(forTimeInterval: TimeInterval(ms) / 1000.0)

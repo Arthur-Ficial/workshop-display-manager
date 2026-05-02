@@ -29,7 +29,8 @@ public enum FollowCommand {
                 try? deps.pipFlipper.run(
                     sourceID: src, destinationID: dstID,
                     size: PipSize.defaultSize, position: nil,
-                    flip: .none, durationMs: pollMs
+                    flip: .none, durationMs: pollMs,
+                    remoteControl: false
                 )
                 lastSrc = src
             } else {

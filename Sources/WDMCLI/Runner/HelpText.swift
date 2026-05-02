@@ -19,8 +19,9 @@ public enum HelpText {
       rotate <id> <0|90|180|270>          physical rotation
       flip <id> <none|h|v|hv|off> [--no-confirm]  framebuffer flip (IOKit)
       flip-overlay <id> <axis> [--duration-ms N]  software overlay flip (any Mac)
-      pip <src> [--on <dst>] [--size WxH] [--flip <axis>] [--duration-ms N]
-                                          movable picture-in-picture mirror
+      pip <src> [--on <dst>] [--size WxH] [--flip <axis>] [--remote] [--duration-ms N]
+                                          movable picture-in-picture mirror;
+                                          --remote forwards mouse+keys to source (AX)
       brightness <id> [0.0..1.0]          read or set brightness (built-in)
       save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
       restore <name> [--no-confirm]       apply named profile

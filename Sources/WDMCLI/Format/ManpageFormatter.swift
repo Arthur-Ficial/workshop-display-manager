@@ -65,10 +65,14 @@ public enum ManpageFormatter {
         including AirPlay / Sidecar. Blocks until SIGTERM or duration elapses.
         Requires Screen Recording permission.
         .TP
-        .B pip <src> [\\-\\-on <dst>] [\\-\\-size WxH] [\\-\\-flip <axis>] [\\-\\-duration-ms N]
+        .B pip <src> [\\-\\-on <dst>] [\\-\\-size WxH] [\\-\\-flip <axis>] [\\-\\-remote] [\\-\\-duration-ms N]
         Picture-in-picture: a movable, resizable, titled window on \\fIdst\\fR
         showing live capture of \\fIsrc\\fR (optionally flipped). Default
         \\fIdst\\fR is the current main display; default size is 1280x720.
+        With \\fB\\-\\-remote\\fR, mouse and keyboard events on the PIP window
+        are forwarded to \\fIsrc\\fR via CGEvent so the user can drive a
+        screen they aren't physically pointed at. Requires Accessibility
+        permission (System Settings \\(-> Privacy & Security \\(-> Accessibility).
         .TP
         .B brightness <id> [0.0..1.0] [\\-\\-no\\-confirm|\\-\\-confirm]
         Read or set the brightness on a 0..1 scale (built\\-in displays).

@@ -71,7 +71,8 @@ public enum PipGridCommand {
                 try? pipFlipper.run(
                     sourceID: src, destinationID: dstID,
                     size: size, position: pos,
-                    flip: .none, durationMs: pipDur
+                    flip: .none, durationMs: pipDur,
+                    remoteControl: false
                 )
             }
         }
