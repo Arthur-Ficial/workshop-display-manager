@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+Package.resolved
+*.xcodeproj
+.DS_Store
+DerivedData/
+*.xcuserstate
+.idea/
+.vscode/
+/tmp/
