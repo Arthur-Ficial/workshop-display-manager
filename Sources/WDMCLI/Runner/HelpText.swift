@@ -40,6 +40,9 @@ public enum HelpText {
       virtual restore <name> [--dry-run]  re-spawn each saved spec
       scene <name> [--dry-run]            multi-display scene orchestrator (JSON)
       move-window <pattern> --to <id|main>  AX-place frontmost window onto display
+      focus <id|main>                     warp cursor + raise topmost window on display
+      stream <id|main> --hls <dir>|--rtmp <url> --duration <sec>
+                                          live broadcast via ffmpeg
       screenshot <id|main> --out <path>   capture display framebuffer to PNG
       shot-all --dir <path>               capture every active display to <dir>/display-<id>.png
       record <id|main> --out <path> --duration <sec>  record display to .mov (H.264)

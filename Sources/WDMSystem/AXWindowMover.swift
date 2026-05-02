@@ -77,4 +77,38 @@ public final class AXWindowMover: WindowMover, @unchecked Sendable {
         // Raise to front.
         AXUIElementPerformAction(win, kAXRaiseAction as CFString)
     }
+
+    public func focus(displayID: UInt32) throws {
+        let bounds = CGDisplayBounds(CGDirectDisplayID(displayID))
+        let center = CGPoint(
+            x: bounds.origin.x + bounds.size.width / 2,
+            y: bounds.origin.y + bounds.size.height / 2
+        )
+        CGWarpMouseCursorPosition(center)
+
+        // Best-effort: AX-raise the topmost on-screen window whose frame
+        // intersects the target display. The cursor warp already happened —
+        // it's the primary goal — so silently skip the raise if AX is missing.
+        let opts: [String: Bool] = ["AXTrustedCheckOptionPrompt": false]
+        guard AXIsProcessTrustedWithOptions(opts as CFDictionary) else { return }
+        let listOpts = CGWindowListOption([.optionOnScreenOnly, .excludeDesktopElements])
+        guard let arr = CGWindowListCopyWindowInfo(listOpts, kCGNullWindowID) as? [[String: Any]] else { return }
+        for info in arr {
+            guard let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
+                  let pid = info[kCGWindowOwnerPID as String] as? Int32 else { continue }
+            let frame = CGRect(
+                x: boundsDict["X"] ?? 0, y: boundsDict["Y"] ?? 0,
+                width: boundsDict["Width"] ?? 0, height: boundsDict["Height"] ?? 0
+            )
+            guard frame.intersects(bounds) else { continue }
+            let appElem = AXUIElementCreateApplication(pid)
+            var winRef: CFTypeRef?
+            if AXUIElementCopyAttributeValue(appElem, kAXMainWindowAttribute as CFString, &winRef) == .success,
+               let winRef {
+                let w = winRef as! AXUIElement
+                AXUIElementPerformAction(w, kAXRaiseAction as CFString)
+                break
+            }
+        }
+    }
 }

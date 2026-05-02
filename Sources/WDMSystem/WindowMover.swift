@@ -11,4 +11,9 @@ public protocol WindowMover: Sendable {
     /// Throws `displayNotFound` if `displayID` is unknown,
     /// `configurationFailed` if Accessibility permission is missing.
     func move(pattern: String, displayID: UInt32) throws
+
+    /// Warp the cursor to the center of `displayID`. Best-effort: the real
+    /// impl also raises the frontmost window already on that display via AX;
+    /// if the display has no windows, only the warp happens.
+    func focus(displayID: UInt32) throws
 }
