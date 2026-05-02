@@ -41,7 +41,9 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         let delegate = ConfirmWindowDelegate(flag: closeFlag)
         window.delegate = delegate
 
-        window.center()
+        // Place the window on the screen the user is actually looking at —
+        // i.e. the one under the cursor. Falls back to the main screen.
+        Self.placeOnCursorScreen(window)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()
         app.activate(ignoringOtherApps: true)
@@ -109,6 +111,18 @@ public final class NativePopupConfirmer: Confirmer, @unchecked Sendable {
         }
         // Window was closed by the user (red traffic light) → revert.
         return false
+    }
+
+    @MainActor
+    private static func placeOnCursorScreen(_ window: NSWindow) {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) }
+            ?? NSScreen.main
+        guard let s = screen else { window.center(); return }
+        let f = window.frame
+        let x = s.frame.midX - f.width / 2
+        let y = s.frame.midY - f.height / 2
+        window.setFrame(NSRect(x: x, y: y, width: f.width, height: f.height), display: true)
     }
 }
 
