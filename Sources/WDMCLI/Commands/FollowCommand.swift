@@ -26,12 +26,20 @@ public enum FollowCommand {
             guard let src = deps.cursorTracker.currentDisplayID() else { break }
             if src != lastSrc, src != dstID {
                 deps.stderr.writeLine("wdm follow: cursor on display \(src) → spawn PIP on \(dstID)")
-                try? deps.pipFlipper.run(
-                    sourceID: src, destinationID: dstID,
-                    size: PipSize.defaultSize, position: nil,
-                    flip: .none, durationMs: pollMs,
-                    remoteControl: false
-                )
+                do {
+                    try deps.pipFlipper.run(
+                        sourceID: src, destinationID: dstID,
+                        size: PipSize.defaultSize, position: nil,
+                        flip: .none, durationMs: pollMs,
+                        remoteControl: false
+                    )
+                } catch let error as CLIError {
+                    throw error
+                } catch let error as ProviderError {
+                    throw error
+                } catch {
+                    throw CLIError.ioError("follow: PIP failed: \(error)")
+                }
                 lastSrc = src
             } else {
                 Thread.sleep(forTimeInterval: TimeInterval(pollMs) / 1000.0)

@@ -58,4 +58,17 @@ struct FollowCommandE2ETests {
         )
         #expect(r.exitCode == 3)
     }
+
+    @Test("follow surfaces PIP failures instead of reporting success")
+    func pipFailure() throws {
+        let badLog = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-follow-bad-log-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: badLog, withIntermediateDirectories: true)
+        let r = run(
+            args: ["follow", "1", "--poll-ms", "1", "--duration-ms", "20"],
+            pipLog: badLog, cursorSeq: "2"
+        )
+        #expect(r.exitCode == ExitCodes.ioError)
+        #expect(r.stderr.contains("follow: PIP failed"))
+    }
 }
