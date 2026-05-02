@@ -13,7 +13,13 @@ public enum MutationDispatch {
         // Crash recovery: persist current state to profile 'last' before any mutation.
         // If the process is killed mid-mutation, the user can `wdm restore last`.
         let preState = try deps.provider.snapshot()
-        try? deps.profileStore.save(name: "last", snapshot: preState)
+        do {
+            try deps.profileStore.save(name: "last", snapshot: preState)
+        } catch {
+            throw CLIError.ioError(
+                "could not save crash-recovery profile 'last': \(error)"
+            )
+        }
 
         let interactive = !args.contains("--no-confirm")
         let useNative = args.contains("--confirm")

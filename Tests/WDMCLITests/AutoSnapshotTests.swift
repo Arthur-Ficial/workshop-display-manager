@@ -55,4 +55,19 @@ struct AutoSnapshotTests {
         let lastPath = pd.appendingPathComponent("last.json")
         #expect(FileManager.default.fileExists(atPath: lastPath.path) == false)
     }
+
+    @Test("mutation refuses if the pre-state snapshot cannot be saved")
+    func snapshotFailureStopsMutation() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let badProfilesPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-profiles-file-\(UUID().uuidString)")
+        try "not a directory".write(to: badProfilesPath, atomically: true, encoding: .utf8)
+
+        let r = run(["switch", "--no-confirm"], fixture: fx, profilesDir: badProfilesPath)
+        #expect(r.exitCode == ExitCodes.ioError)
+        #expect(r.stderr.contains("I/O error"))
+
+        let after = run(["get", "main", "id"], fixture: fx, profilesDir: badProfilesPath)
+        #expect(after.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
+    }
 }
