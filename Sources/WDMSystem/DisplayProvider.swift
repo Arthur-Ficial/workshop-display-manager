@@ -38,4 +38,26 @@ public protocol DisplayProvider: Sendable {
     /// display does not expose EDID (virtual displays, AirPlay receivers,
     /// some software-backed surfaces), or `displayNotFound` for an unknown id.
     func edid(for displayID: UInt32) throws -> EDID
+
+    /// Atomic bulk arrangement: move every entry to its origin in one CG
+    /// transaction. Either every move applies or every move reverts. Used by
+    /// drag-to-rearrange GUIs that update many displays per gesture.
+    /// Default impl applies sequentially (non-atomic) — adopters can override
+    /// for true atomic semantics.
+    @discardableResult func setArrangement(
+        _ entries: [ArrangementEntry], options: ApplyOptions
+    ) throws -> ApplyResult
+}
+
+extension DisplayProvider {
+    @discardableResult public func setArrangement(
+        _ entries: [ArrangementEntry], options: ApplyOptions
+    ) throws -> ApplyResult {
+        var changed = false
+        for entry in entries {
+            let result = try move(displayID: entry.id, to: entry.origin, options: options)
+            if result == .applied { changed = true }
+        }
+        return changed ? .applied : .noChange
+    }
 }

@@ -4,9 +4,11 @@
 
 **The native macOS CLI for people who actually use multiple displays.**
 
-`switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · virtual · doctor · sleep · edid · hotkeys · ddc · rename · scale · hdr` — atomically, with auto-revert if the projector goes black.
+`list · arrange · switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · virtual · scene · doctor · sleep · edid · hotkeys · ddc · rename · scale · hdr · panorama` — atomically, with auto-revert if the projector goes black.
 
-[![Tests](https://img.shields.io/badge/tests-386%2F79%20green-brightgreen)](#tests)
+The CLI is the source of truth. Every verb is a typed `WDMKit` op underneath, so a Mac GUI or a local web server (`wdm-web`, included as a proof of concept) can drive the exact same surface without touching `WDMSystem`.
+
+[![Tests](https://img.shields.io/badge/tests-446%2F103%20green-brightgreen)](#tests)
 [![Build](https://img.shields.io/badge/build-warnings--as--errors%20clean-brightgreen)](#building)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue)](#install)
 [![Swift](https://img.shields.io/badge/Swift-6-orange)](https://swift.org)
@@ -77,6 +79,8 @@ Requires Swift 6, macOS 13+. See [`docs/contributing.md`](docs/contributing.md).
 ```sh
 wdm list                                     # see every display
 wdm doctor probe                             # full diagnostic per display (mode, origin, rotation, mirror)
+wdm arrange list --json                      # real-time read of every display's origin + rotation (drag-GUI hook)
+wdm arrange move 1 -1920 0 2 0 0             # bulk rearrange in one safe transaction
 wdm switch                                   # swap main between two displays
 wdm cycle                                    # rotate main forward through all displays
 wdm mode 2 1920x1080@60                      # set resolution+refresh, with safe revert
@@ -99,6 +103,9 @@ wdm daemon install                           # auto-restore arrangements at logi
 |---|---|
 | `wdm list [--json]` | Enumerate every connected display: ID, name, current mode, origin, rotation, main flag, mirror source. |
 | `wdm get <id\|main> [field]` | Read one field of one display. Pipe-friendly. |
+| `wdm arrange list [--json]` | Real-time read of every display's origin + rotation. Pipe-friendly snapshot for drag-to-rearrange GUIs. |
+| `wdm arrange move <id> <x> <y> [<id> <x> <y> ...]` | Bulk move multiple displays in one safe transaction. Triples are positional. |
+| `wdm arrange set @-\|@<path>` | Apply a JSON arrangement plan from stdin / file. Round-trips with `arrange list --json`: `wdm arrange list --json \| jq … \| wdm arrange set @-`. |
 | `wdm doctor probe [<id>] [--json]` | Full diagnostic per display — what wdm sees, side-by-side with what you expected. |
 | `wdm doctor disconnect <id> [--duration-ms N]` | Soft-disconnect via `CGDisplayCapture` (public API). Display blanks, other apps stop drawing to it. Release: SIGTERM, or `--duration-ms` elapses. |
 | `wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi]` | **Software-backed virtual display via Apple's `CGVirtualDisplay` SPI.** Gets a `CGDirectDisplayID`, appears in System Settings → Displays, and starts a cursor edge portal so physical mouse movement can cross onto adjacent virtual bounds. If macOS refuses the event tap, `wdm` exits with an error instead of pretending the cursor path works. Lifetime is process-bound (kill to remove). |
@@ -241,20 +248,45 @@ Full sequence diagram in [`docs/safety.md`](docs/safety.md).
 ## Architecture
 
 ```
-WDMCore     pure value types      Mode · DisplayInfo · Snapshot · Point
+WDMCore     pure value types        Mode · DisplayInfo · Snapshot · Point · ArrangementEntry
    │
-WDMSystem   protocol + adapters   DisplayProvider · CGDisplayProvider · FixtureDisplayProvider
-   │                              IOKitRotation · DisplayServicesBridge · DisplayNameResolver
+WDMSystem   effects                  DisplayProvider · CGDisplayProvider · FixtureDisplayProvider
+   │                                 CursorIO · ProcessLister · ProcessSignaler · Screenshotter
+   │                                 Recorder · PipFlipper · OverlayFlipper · DisplayCapturer …
    │
-WDMCLI      command dispatch      ListCommand … SwitchCommand … BrightnessCommand
-   │                              SafeTransaction · MutationDispatch · ProfileStore · NativePopupConfirmer
-   │
-wdm         executable            18-line main.swift
+WDMKit      typed façade (SSOT)     WDMController · safety primitives · profile/scene stores
+   │                                 typed errors (WDMError) · provider factories · alias overlay
+   │                ┌────────────────┴────────────────┐
+WDMCLI       thin   │                                  │   thin   WDMWeb (proof of concept)
+   │                                                                JSON HTTP via Network.framework
+wdm  executable                                              wdm-web executable
 ```
 
-Layering rule: dependencies only point downward. Every command goes through the `DisplayProvider` protocol — the same code path is exercised in tests against a JSON-fixture provider as on real hardware.
+**Layering rule.** Dependencies only point downward. Frontends are siblings;
+they never depend on each other. Every command goes through the `DisplayProvider`
+protocol — the same code path is exercised in tests against a JSON-fixture provider
+as on real hardware.
+
+**Single source of truth.** Every user-visible verb has exactly one
+`WDMController` op. Adding a verb = (1) add the Kit method (test-first),
+(2) wrap it in each frontend that exposes it. Two frontends never duplicate
+business logic. The CLI is the primary frontend; `wdm-web` ships as a proof
+that the lib is interface-agnostic — same fixture, same output, no `WDMSystem`
+imports.
 
 Full breakdown in [`docs/architecture.md`](docs/architecture.md).
+
+### Drive every verb from a non-CLI frontend
+
+```sh
+# Start the local web bridge (proof of concept; same lib, same fixture).
+wdm-web --port 8080 &
+curl -s http://127.0.0.1:8080/displays | jq                     # === wdm list --json
+curl -s http://127.0.0.1:8080/arrangement | jq                  # === wdm arrange list --json
+curl -s -X POST http://127.0.0.1:8080/arrangement \
+  -d '[{"id":1,"origin":{"x":-1920,"y":0}},{"id":2,"origin":{"x":0,"y":0}}]'
+                                                                 # === wdm arrange set @-
+```
 
 ---
 

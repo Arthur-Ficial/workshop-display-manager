@@ -113,23 +113,121 @@ The codebase is decomposed into the smallest sensible units. Every file does one
 ```
 Sources/
   WDMCore/      Pure value types + pure functions. No I/O, no Apple frameworks beyond Foundation.
-                Mode, DisplayInfo, Profile, Snapshot, parsers, formatters, JSON codec.
-  WDMSystem/    DisplayProvider protocol + two implementations:
+                Mode, DisplayInfo, Profile, Snapshot, ArrangementEntry, parsers, formatters, JSON codec.
+  WDMSystem/    Effects layer. DisplayProvider protocol + two implementations:
                   - CGDisplayProvider (real, CoreGraphics + IOKit)
                   - FixtureDisplayProvider (reads/writes a JSON fixture for tests)
-                Factory: DisplayProviderFactory.make() honours WDM_TEST_FIXTURE.
-  WDMCLI/       Command parsing (swift-argument-parser), dispatch, output formatters.
-                Each subcommand is its own type. No subcommand calls CoreGraphics directly —
-                always through DisplayProvider.
-  wdm/          Tiny executable: parses argv, calls WDMCLI.run(), translates errors to exit codes.
+                Plus injectable side-effect protocols: CursorIO, ProcessLister,
+                ProcessSignaler, Screenshotter, Recorder, Streamer, PipFlipper,
+                OverlayFlipper, DisplayCapturer, VirtualDisplayManager,
+                Sleeper, WindowMover, WindowLister, CursorTracker, DDCProvider,
+                HDRProvider, HotkeyRegistrar, DisplayEventStream — each with a
+                real impl + a recording impl for hermetic tests.
+  WDMKit/       Typed façade — the SINGLE SOURCE OF TRUTH for every operation.
+                WDMController is the cohesive entry point, organised by domain
+                in Operations/WDMController<Topic>.swift. Profile/scene stores,
+                safety primitives (SafeMutation, Confirmer), provider factories,
+                formatters, alias overlay, typed errors (WDMError) all live
+                here. Knows nothing of argv, exit codes, stdin, FileHandle, or HTTP.
+  WDMCLI/      THIN frontend. Argv → WDMKit op → exit code + stdout/stderr.
+                Commands/*.swift never `import WDMSystem` and never instantiate
+                providers directly — they go through `deps.controller` (a WDMController).
+  WDMWeb/       THIN frontend. JSON HTTP → WDMKit op → JSON + HTTP status.
+                Imports ONLY WDMKit — never WDMSystem, never WDMCLI. Backed by
+                Foundation Network.framework, no third-party deps. One handler
+                per CLI verb in Handlers/, declarative routes in Router/Routes.swift.
+  wdm/          Tiny executable: parses argv, calls WDMCLI.run(), exits.
+  wdm-web/      Tiny executable: parses argv, calls WDMWebMain.run(), serves HTTP.
 
 Tests/
   WDMCoreTests/    Pure unit tests for Core types.
-  WDMSystemTests/  Tests for FixtureDisplayProvider behaviour (round-trip, error paths).
-  WDMCLITests/     E2E: spawn the built binary with WDM_TEST_FIXTURE and assert.
+  WDMSystemTests/  Tests for the effect-layer protocols (round-trip, error paths).
+  WDMKitTests/     Lib-level tests for every WDMController op against the
+                   FixtureDisplayProvider (red→green per new symbol).
+  WDMCLITests/     E2E: invoke CLIRunner with WDM_TEST_FIXTURE, assert exit
+                   code + stdout/stderr.
+  WDMWebTests/     Real-HTTP smoke: bind to ephemeral localhost port, drive
+                   routes via URLSession, assert status + body.
 ```
 
-**Layering rule:** dependencies only point downward. `WDMCore` knows nothing of `WDMSystem` or `WDMCLI`. `WDMSystem` depends on `WDMCore`. `WDMCLI` depends on both. `wdm` depends on `WDMCLI`.
+**Layering rule:** dependencies only point downward. `WDMCore` ⤺ `WDMSystem` ⤺
+`WDMKit` ⤺ {`WDMCLI`, `WDMWeb`, future `WDMMac`}. The frontends are SIBLINGS;
+they never depend on each other. CLI must never `import WDMSystem` from a
+command file. Web must never `import WDMSystem` or `import WDMCLI`.
+
+**SSOT + DRY (non-negotiable):** every user-visible verb has EXACTLY ONE Kit
+op behind it. Adding a new verb = (1) add a method on `WDMController` (or a
+typed enum like `WDMController.virtual`), (2) add a frontend wrapper per
+frontend that needs it. Two frontends never re-implement the same logic. If
+you find yourself copying logic between `Sources/WDMCLI/Commands/X.swift` and
+`Sources/WDMWeb/Handlers/X.swift`, the extraction is incomplete — push it
+into `Sources/WDMKit/Operations/`.
+
+### Frontend boundary contract
+
+A frontend is anything user-facing: CLI, web, GUI, IDE plugin, MCP server.
+Every frontend follows the same shape:
+
+```
+input  → frontend-specific parsing (argv / HTTP / GUI events / RPC)
+       → typed Kit call (WDMController.<verb>(...))
+       → typed Kit result (value / ApplyResult / typed throw)
+       → frontend-specific output (stdout+exit code / JSON+HTTP status / GUI redraw / RPC reply)
+```
+
+Frontend code is allowed to:
+- Parse its own input format.
+- Format Kit results for its presentation layer (table, JSON, HTML).
+- Map `WDMError` cases to its own surface (exit codes, HTTP status, alert).
+
+Frontend code is NOT allowed to:
+- Call `provider.snapshot()` or any other `DisplayProvider` method directly.
+- Import `WDMSystem`.
+- Instantiate stores, factories, or safety primitives that live in `WDMKit`.
+- Re-implement business logic that another frontend already drives.
+
+**Adding a new frontend** (e.g. WDMMac SwiftUI app, MCP server): create a
+sibling target depending only on `WDMKit`. You should be able to drive every
+existing verb without touching any other module.
+
+### Frontend status
+
+- **CLI (`wdm`) — primary, shipped.** All flow-of-business decisions are made
+  with the CLI in mind first. New verbs land in the CLI before any other
+  frontend. The unix-pipe contract is the contract.
+- **Web (`wdm-web`) — proof of concept.** Demonstrates the lib is
+  interface-agnostic. Not a shipped product. Runs locally, no auth, no TLS.
+  Used to verify that "every CLI verb has a Kit op" because if it doesn't,
+  the web frontend can't expose it.
+- **GUI / Mac (future).** Will sit on the same Kit. Same SSOT rule applies.
+
+If a verb works in the CLI but not in the web (or vice-versa), the lib is
+under-specified. Fix the lib, then both frontends pick it up automatically.
+
+### The drag-to-rearrange use case (worked example)
+
+A live GUI that lets the user drag monitor tiles to rearrange them needs:
+1. A real-time **read** of the current layout — origin + rotation per display.
+2. A **bulk write** that applies many moves atomically when the gesture ends.
+
+This is `wdm arrange` in the CLI, identical via `GET /arrangement` and
+`POST /arrangement` in the web. Both are thin wrappers over
+`WDMController.arrangement()` and `WDMController.setArrangement(_:confirmer:)`.
+
+Pure unix-pipe demo (no GUI, no web — proves the lib's surface):
+
+```sh
+# Nudge every display 100 px right, atomically:
+wdm arrange list --json \
+  | jq '[.[] | .origin.x = .origin.x + 100]' \
+  | wdm arrange set @- --no-confirm
+
+# Read, modify, write — exactly what the future GUI will do.
+```
+
+If a future use case can't be expressed as `wdm <verb>` in the CLI, the lib
+is missing an op. Add the Kit op first, then the CLI verb, then the other
+frontends.
 
 ---
 
@@ -191,6 +289,9 @@ wdm cycle [--no-confirm|--confirm]                rotate main forward through al
 wdm mirror <src> <dst> [--no-confirm|--confirm]   mirror src→dst (safe-tx)
 wdm unmirror <id> [--no-confirm|--confirm]        break mirror (safe-tx)
 wdm move <id> <x> <y> [--no-confirm|--confirm]    set arrangement origin (safe-tx)
+wdm arrange list [--json]               real-time read of every display's origin + rotation
+wdm arrange move <id> <x> <y> [<id> <x> <y> ...] [--no-confirm|--confirm]   bulk move
+wdm arrange set @-|@<path> [--no-confirm|--confirm]   apply a JSON arrangement plan (drag-to-rearrange GUI hook)
 wdm rotate <id> <0|90|180|270>          physical rotation
 wdm flip <id> <none|horizontal|vertical|both> [--no-confirm|--confirm]  flip framebuffer (h, v, hv, off aliases)
 wdm flip-overlay <id> <axis> [--duration-ms N]  software overlay flip (works on every Mac, incl. AirPlay)

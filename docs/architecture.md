@@ -1,49 +1,81 @@
 # Architecture
 
-`wdm` is intentionally tiny. The whole binary fits in four modules with strict downward dependencies. This document explains why each module exists and what lives where.
+`wdm` is intentionally tiny. The codebase is five layers with strict downward
+dependencies. The CLI (`wdm`) is the primary frontend; a local web server
+(`wdm-web`) ships as a proof of concept that the lib is interface-agnostic.
+A future Mac GUI sits as a sibling on the same lib.
 
 ```
-        ┌───────────────────────────────┐
-        │ wdm  (executable, 6 lines)    │
-        │   parses argv → CLIRunner.run │
-        └───────────────┬───────────────┘
-                        │
-        ┌───────────────▼───────────────┐
-        │ WDMCLI                        │
-        │   • CLIRunner (top-level)     │
-        │   • Commands/* (one per verb) │
-        │   • Safety/SafeTransaction    │
-        │   • Profiles/ProfileStore     │
-        │   • Format/* (JSON, table)    │
-        │   • Output/* (writers)        │
-        └───────────────┬───────────────┘
-                        │
-        ┌───────────────▼───────────────┐
-        │ WDMSystem                     │
-        │   • DisplayProvider (protocol)│
-        │   • CGDisplayProvider (real)  │
-        │   • FixtureDisplayProvider    │
-        │   • IOKitRotation             │
-        │   • DisplayServicesBridge     │
-        │   • DisplayNameResolver       │
-        └───────────────┬───────────────┘
-                        │
-        ┌───────────────▼───────────────┐
-        │ WDMCore                       │
-        │   • Mode, Point               │
-        │   • DisplayInfo, Snapshot     │
-        │   • Pure parsers/formatters   │
-        └───────────────────────────────┘
+   ┌───────────────────────────────┐    ┌────────────────────────────────┐
+   │ wdm (executable)              │    │ wdm-web (executable, PoC)      │
+   │   parses argv → CLIRunner.run │    │   parses argv → WDMWebMain.run │
+   └───────────────┬───────────────┘    └───────────────┬────────────────┘
+                   │                                    │
+   ┌───────────────▼───────────────┐    ┌───────────────▼────────────────┐
+   │ WDMCLI (thin frontend)        │    │ WDMWeb (thin frontend, PoC)    │
+   │   • CLIRunner                 │    │   • WDMWebServer (NWListener)  │
+   │   • Commands/* (one per verb) │    │   • Router + Routes            │
+   │   • argv→Kit, exit codes      │    │   • Handlers/* (one per verb)  │
+   │   • output formatting         │    │   • JSON in/out, HTTP status   │
+   └───────────────┬───────────────┘    └───────────────┬────────────────┘
+                   │                                    │
+                   └───────────────┬────────────────────┘
+                                   │
+                   ┌───────────────▼───────────────┐
+                   │ WDMKit (typed façade · SSOT)  │
+                   │   • WDMController + Operations│
+                   │   • SafeMutation, Confirmer   │
+                   │   • Profile/Scene stores      │
+                   │   • Provider factories        │
+                   │   • WDMError (typed)          │
+                   │   • Output writers, formatters│
+                   └───────────────┬───────────────┘
+                                   │
+                   ┌───────────────▼───────────────┐
+                   │ WDMSystem (effects)           │
+                   │   • DisplayProvider (protocol)│
+                   │   • CGDisplayProvider (real)  │
+                   │   • FixtureDisplayProvider    │
+                   │   • CursorIO, ProcessLister,  │
+                   │     Screenshotter, Recorder,  │
+                   │     PipFlipper, … (each w/    │
+                   │     real + recording impl)    │
+                   └───────────────┬───────────────┘
+                                   │
+                   ┌───────────────▼───────────────┐
+                   │ WDMCore (pure)                │
+                   │   • Mode, Point, Snapshot     │
+                   │   • DisplayInfo, Profile      │
+                   │   • ArrangementEntry          │
+                   │   • parsers, formatters       │
+                   └───────────────────────────────┘
 ```
 
 ## Layering rule
 
-**Dependencies point downward only.**
+**Dependencies point downward only. Frontends are siblings; they never depend on each other.**
 
-- `WDMCore` knows nothing about the system. It is value types and pure functions. No `import AppKit`, no `import CoreGraphics`. It exists so unit tests for parsing, formatting, and JSON round-trip never need a display.
-- `WDMSystem` adapts `WDMCore` to real hardware. It defines the `DisplayProvider` protocol and ships two implementations: `CGDisplayProvider` (CoreGraphics + IOKit + DisplayServices) and `FixtureDisplayProvider` (reads/writes a JSON fixture file). Any future backend implements the same protocol.
-- `WDMCLI` consumes `WDMSystem` only through the protocol. Commands never call CoreGraphics directly. This is why the e2e tests can spawn the entire CLI against the fixture and exercise 100% of the user-facing logic without touching real displays.
-- `wdm` is six lines: parse argv, build the writers, call `CLIRunner.run`, exit.
+- `WDMCore` knows nothing about the system. Value types + pure functions. No `import AppKit`, no `import CoreGraphics`. Pure-function unit tests need no displays.
+- `WDMSystem` adapts `WDMCore` to real hardware. Each side-effect category is a protocol with a real impl + a recording impl: `DisplayProvider`, `CursorIO`, `ProcessLister`/`ProcessSignaler`, `Screenshotter`, `Recorder`, `PipFlipper`, `OverlayFlipper`, `DisplayCapturer`, `VirtualDisplayManager`, `Sleeper`, `WindowMover`/`WindowLister`/`CursorTracker`, `DDCProvider`, `HDRProvider`, `HotkeyRegistrar`, `DisplayEventStream`. Recording impls let every Kit op be tested hermetically.
+- `WDMKit` is the **single source of truth**. Every user-visible verb has exactly one `WDMController.<verb>` op. Frontends call it; never re-implement it. Knows nothing of argv, exit codes, stdin, FileHandle, HTTP, or window servers.
+- `WDMCLI` consumes only `WDMKit`. Commands never call `WDMSystem` directly — they go through `deps.controller`. The CLI is responsible for argv parsing, stdout/stderr formatting, exit-code mapping, and signal handling for blocking commands.
+- `WDMWeb` consumes only `WDMKit`. Same lib, different parser (HTTP/1.1) and presenter (JSON + HTTP status). **Never imports `WDMSystem`. Never imports `WDMCLI`.** Backed by Foundation `Network.framework`, no third-party dependencies.
+- `wdm` is a six-line `main.swift`: parse argv, build writers, call `CLIRunner.run`, exit. `wdm-web` is a one-liner: `WDMWebMain.run()`.
+
+## SSOT and the frontend contract
+
+A frontend's job is parsing and presenting. The shape:
+
+```
+input  → frontend-specific parsing (argv / HTTP / GUI events / RPC)
+       → typed Kit call (WDMController.<verb>(...))
+       → typed Kit result (value / ApplyResult / typed throw)
+       → frontend-specific output (stdout+exit code / JSON+HTTP status / GUI redraw / RPC reply)
+```
+
+If the same logic appears in two frontends, the extraction is incomplete. Push it into `Sources/WDMKit/Operations/`.
+
+The `wdm arrange` verb is the canonical example: one Kit op (`WDMController.arrangement()` / `setArrangement(_:confirmer:)`), one CLI verb (`wdm arrange list / move / set @-`), one HTTP route pair (`GET/POST /arrangement`). All three round-trip the same JSON shape — a future Mac GUI subscribes to the same data via `WDMController.arrangement()` directly.
 
 ## Why protocols, not concretes
 

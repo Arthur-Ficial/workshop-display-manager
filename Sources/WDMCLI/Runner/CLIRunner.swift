@@ -123,6 +123,7 @@ public enum CLIRunner {
             case "workshop": return try WorkshopCommand.run(args: rest, deps: deps)
             case "daemon":   return try DaemonCommand.run(args: rest, deps: deps)
             case "cursor-wrap": return try CursorWrapCommand.run(args: rest, deps: deps)
+            case "arrange":  return try ArrangeCommand.run(args: rest, deps: deps)
             default:
                 stderr.writeLine("unknown command: \(sub)")
                 return ExitCodes.usage

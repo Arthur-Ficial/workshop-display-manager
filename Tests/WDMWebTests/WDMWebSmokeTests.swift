@@ -42,6 +42,32 @@ struct WDMWebSmokeTests {
         #expect(snap.main?.id == 2)
     }
 
+    @Test("GET /arrangement returns the live layout; POST /arrangement applies it atomically")
+    func arrangementRoundTrip() async throws {
+        let (server, port, deps) = try makeServer()
+        defer { server.stop() }
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let getURL = URL(string: "http://127.0.0.1:\(port)/arrangement")!
+        let (getData, getResp) = try await URLSession.shared.data(from: getURL)
+        let getHttp = getResp as! HTTPURLResponse
+        #expect(getHttp.statusCode == 200)
+        let parsed = try JSONSerialization.jsonObject(with: getData) as? [[String: Any]]
+        #expect(parsed?.count == 2)
+
+        let plan = #"[{"id":1,"origin":{"x":-1920,"y":0}},{"id":2,"origin":{"x":0,"y":0}}]"#
+        var req = URLRequest(url: getURL)
+        req.httpMethod = "POST"
+        req.httpBody = Data(plan.utf8)
+        let (_, postResp) = try await URLSession.shared.data(for: req)
+        let postHttp = postResp as! HTTPURLResponse
+        #expect(postHttp.statusCode == 200)
+
+        let snap = try deps.provider.snapshot()
+        #expect(snap.display(id: 1)?.origin == Point(x: -1920, y: 0))
+        #expect(snap.display(id: 2)?.origin == Point(x: 0, y: 0))
+    }
+
     @Test("GET /displays/{alias} on unknown returns 404 with typed error JSON")
     func notFound() async throws {
         let (server, port, _) = try makeServer()
