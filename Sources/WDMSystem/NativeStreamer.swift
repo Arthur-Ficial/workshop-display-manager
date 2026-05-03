@@ -3,7 +3,7 @@ import AppKit
 import CoreGraphics
 import CoreMedia
 import AVFoundation
-import ScreenCaptureKit
+@preconcurrency import ScreenCaptureKit
 import WDMCore
 
 /// Native HLS streamer. SCStream → AVAssetWriter (mpeg4AppleHLS profile) →
