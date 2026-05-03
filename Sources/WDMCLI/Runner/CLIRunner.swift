@@ -109,6 +109,7 @@ public enum CLIRunner {
             case "bind":     return try BindCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
             case "edid":     return try EDIDCommand.run(args: rest, deps: deps)
+            case "hotkeys":  return try HotkeysCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)
             case "completions": return try CompletionsCommand.run(args: rest, deps: deps)

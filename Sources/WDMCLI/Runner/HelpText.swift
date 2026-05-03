@@ -49,6 +49,8 @@ public enum HelpText {
       shot-all --dir <path>               capture every active display to <dir>/display-<id>.png
       record <id|main> --out <path> --duration <sec>  record display to .mov (H.264)
       sleep                               sleep the Mac (drains AppleHPM — issue #1)
+      hotkeys list|set|delete|reset       configure global keyboard shortcuts
+      hotkeys daemon|install|uninstall|status   run / install the listener daemon
       completions <bash|zsh|fish>         shell completion script
       manpage                             groff source for wdm(1)
       version                             print version
