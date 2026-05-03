@@ -4,7 +4,7 @@ import CoreGraphics
 import CoreImage
 import CoreMedia
 import ImageIO
-import ScreenCaptureKit
+@preconcurrency import ScreenCaptureKit
 import WDMCore
 
 /// Real PIP flipper. Captures `sourceID` via `SCStream` and renders frames

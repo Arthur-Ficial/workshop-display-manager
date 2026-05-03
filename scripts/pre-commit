@@ -14,6 +14,17 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
+echo "pre-commit: ScreenCaptureKit import lint..."
+# CI runs Swift 6.1 / macOS 15.5 SDK where SCShareableContent is non-Sendable;
+# local builds on newer SDKs don't catch this, so guard at commit time.
+if grep -RnE '^[[:space:]]*import[[:space:]]+ScreenCaptureKit[[:space:]]*$' \
+        Sources/ Tests/ 2>/dev/null; then
+    echo "pre-commit: bare 'import ScreenCaptureKit' found — must be"
+    echo "            '@preconcurrency import ScreenCaptureKit' to keep CI"
+    echo "            (Swift 6.1 / macOS 15.5 SDK) green."
+    exit 1
+fi
+
 echo "pre-commit: release build (warnings-as-errors)..."
 swift build -c release -Xswiftc -warnings-as-errors >/dev/null
 
