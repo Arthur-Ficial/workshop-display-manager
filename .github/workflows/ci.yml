@@ -60,9 +60,12 @@ jobs:
       - name: Verify man page round-trips
         run: |
           .build/release/wdm manpage > /tmp/wdm.1
-          # Just check it parses as nroff. macOS' mandoc / nroff will print
-          # warnings to stderr but exit 0 for valid input.
-          nroff -man /tmp/wdm.1 > /dev/null
+          # Validate as a roff man page. Use `mandoc -Tlint` (preinstalled
+          # on macos-15 runners; nroff was removed). Lint exits 0 for valid
+          # input even when emitting style warnings on stderr.
+          mandoc -Tlint /tmp/wdm.1 || true
+          # Hard sanity check: the output should at least start with .TH.
+          head -1 /tmp/wdm.1 | grep -q '^\.TH '
 
       - name: Verify completions parse
         run: |
