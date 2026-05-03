@@ -115,6 +115,7 @@ public enum CLIRunner {
             case "watch":    return try WatchCommand.run(args: rest, deps: deps)
             case "workshop": return try WorkshopCommand.run(args: rest, deps: deps)
             case "daemon":   return try DaemonCommand.run(args: rest, deps: deps)
+            case "cursor-wrap": return try CursorWrapCommand.run(args: rest, deps: deps)
             default:
                 stderr.writeLine("unknown command: \(sub)")
                 return ExitCodes.usage
