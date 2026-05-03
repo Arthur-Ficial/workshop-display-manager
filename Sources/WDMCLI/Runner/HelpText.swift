@@ -11,6 +11,7 @@ public enum HelpText {
       edid <id|main> [--raw|--json]       parsed EDID + stable per-display identity
       modes <id|main> [--json]            list available modes
       mode <id> <WxH@Hz> [--no-confirm]   set display mode (safe-tx)
+      scale <id> <WxH> | looks-like <WxH> | list   logical-resolution shortcut over `mode`
       main <id> [--no-confirm]            set primary display (safe-tx)
       switch [--no-confirm]               swap main between two displays
       cycle  [--no-confirm]               rotate main forward through all displays
