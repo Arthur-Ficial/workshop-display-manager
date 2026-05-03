@@ -72,18 +72,31 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
     }
 
     public func mirror(source: UInt32, mirror target: UInt32, options: ApplyOptions) throws -> ApplyResult {
+        try mirror(source: source, targets: [target], options: options)
+    }
+
+    public func mirror(source: UInt32, targets: [UInt32], options: ApplyOptions) throws -> ApplyResult {
         try mutate { snap in
             guard snap.display(id: source) != nil else { throw ProviderError.displayNotFound(source) }
-            guard snap.display(id: target) != nil else { throw ProviderError.displayNotFound(target) }
-            snap = replace(snap, id: target) { d in
-                DisplayInfo(
-                    id: d.id, name: d.name, isMain: d.isMain, isOnline: d.isOnline,
-                    mirrorSource: source,
-                    currentMode: d.currentMode,
-                    origin: d.origin, rotationDegrees: d.rotationDegrees
-                )
+            // Validate every target before mutating any state.
+            for t in targets {
+                guard snap.display(id: t) != nil else { throw ProviderError.displayNotFound(t) }
             }
-            return .applied
+            var didChange = false
+            for t in targets {
+                let cur = snap.display(id: t)?.mirrorSource
+                if cur == source { continue }
+                snap = replace(snap, id: t) { d in
+                    DisplayInfo(
+                        id: d.id, name: d.name, isMain: d.isMain, isOnline: d.isOnline,
+                        mirrorSource: source,
+                        currentMode: d.currentMode,
+                        origin: d.origin, rotationDegrees: d.rotationDegrees
+                    )
+                }
+                didChange = true
+            }
+            return didChange ? .applied : .noChange
         }
     }
 

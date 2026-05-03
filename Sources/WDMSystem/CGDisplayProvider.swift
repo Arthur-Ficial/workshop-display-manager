@@ -56,12 +56,20 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
     }
 
     public func mirror(source: UInt32, mirror target: UInt32, options: ApplyOptions) throws -> ApplyResult {
+        try mirror(source: source, targets: [target], options: options)
+    }
+
+    public func mirror(source: UInt32, targets: [UInt32], options: ApplyOptions) throws -> ApplyResult {
         try assertExists(source)
-        try assertExists(target)
-        if CGDisplayMirrorsDisplay(target) == source { return .noChange }
+        // Validate every target up front so a failed call applies nothing.
+        for t in targets { try assertExists(t) }
+        let needed = targets.filter { CGDisplayMirrorsDisplay($0) != source }
+        if needed.isEmpty { return .noChange }
         return try applyConfig { config in
-            let err = CGConfigureDisplayMirrorOfDisplay(config, target, source)
-            try Self.check(err, "mirror")
+            for t in needed {
+                let err = CGConfigureDisplayMirrorOfDisplay(config, t, source)
+                try Self.check(err, "mirror.target(\(t))")
+            }
         }
     }
 

@@ -39,6 +39,117 @@ struct MutatingCommandsE2ETests {
         #expect(after.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
     }
 
+    @Test("mirror src dst1 dst2 mirrors source onto BOTH targets at once")
+    func mirrorMulti() throws {
+        let fx = try CLITestHarness.makeFixture(threeDisplayFixture)
+        let r = CLITestHarness.run(["mirror", "1", "2", "3", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+        let m2 = CLITestHarness.run(["get", "2", "mirror"], fixture: fx)
+        #expect(m2.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
+        let m3 = CLITestHarness.run(["get", "3", "mirror"], fixture: fx)
+        #expect(m3.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
+    }
+
+    @Test("mirror with three targets — source mirrors to all of them")
+    func mirrorThreeTargets() throws {
+        let fx = try CLITestHarness.makeFixture(fourDisplayFixture)
+        let r = CLITestHarness.run(["mirror", "1", "2", "3", "4", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+        for tgt in ["2", "3", "4"] {
+            let g = CLITestHarness.run(["get", tgt, "mirror"], fixture: fx)
+            #expect(g.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
+        }
+    }
+
+    @Test("mirror unknown target exits 3 and atomically applies nothing")
+    func mirrorUnknownAtomic() throws {
+        let fx = try CLITestHarness.makeFixture(threeDisplayFixture)
+        let r = CLITestHarness.run(["mirror", "1", "2", "999", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 3)
+        // Display 2 should NOT be mirroring after the failed call.
+        let after = CLITestHarness.run(["get", "2", "mirror"], fixture: fx)
+        #expect(after.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "")
+    }
+
+    @Test("mirror without dst exits 2")
+    func mirrorMissingDst() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let r = CLITestHarness.run(["mirror", "1", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 2)
+    }
+
+    private var threeDisplayFixture: String {
+        """
+        {
+          "snapshot": {
+            "createdAt": 1700000000,
+            "displays": [
+              {
+                "id": 1, "name": "Built-in", "isMain": true, "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 2560, "height": 1664, "refreshHz": 60 },
+                "origin": { "x": 0, "y": 0 },
+                "rotationDegrees": 0
+              },
+              {
+                "id": 2, "name": "Projector", "isMain": false, "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 1920, "height": 1080, "refreshHz": 60 },
+                "origin": { "x": 2560, "y": 0 },
+                "rotationDegrees": 0
+              },
+              {
+                "id": 3, "name": "Stage Right", "isMain": false, "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 1280, "height": 720, "refreshHz": 60 },
+                "origin": { "x": 4480, "y": 0 },
+                "rotationDegrees": 0
+              }
+            ]
+          },
+          "availableModes": {
+            "1": [{ "width": 2560, "height": 1664, "refreshHz": 60 }],
+            "2": [{ "width": 1920, "height": 1080, "refreshHz": 60 }],
+            "3": [{ "width": 1280, "height": 720,  "refreshHz": 60 }]
+          }
+        }
+        """
+    }
+
+    private var fourDisplayFixture: String {
+        """
+        {
+          "snapshot": {
+            "createdAt": 1700000000,
+            "displays": [
+              { "id": 1, "name": "A", "isMain": true,  "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 1920, "height": 1080, "refreshHz": 60 },
+                "origin": { "x": 0, "y": 0 }, "rotationDegrees": 0 },
+              { "id": 2, "name": "B", "isMain": false, "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 1920, "height": 1080, "refreshHz": 60 },
+                "origin": { "x": 1920, "y": 0 }, "rotationDegrees": 0 },
+              { "id": 3, "name": "C", "isMain": false, "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 1280, "height": 720, "refreshHz": 60 },
+                "origin": { "x": 3840, "y": 0 }, "rotationDegrees": 0 },
+              { "id": 4, "name": "D", "isMain": false, "isOnline": true,
+                "mirrorSource": null,
+                "currentMode": { "width": 1024, "height": 768, "refreshHz": 60 },
+                "origin": { "x": 5120, "y": 0 }, "rotationDegrees": 0 }
+            ]
+          },
+          "availableModes": {
+            "1": [{ "width": 1920, "height": 1080, "refreshHz": 60 }],
+            "2": [{ "width": 1920, "height": 1080, "refreshHz": 60 }],
+            "3": [{ "width": 1280, "height": 720,  "refreshHz": 60 }],
+            "4": [{ "width": 1024, "height": 768,  "refreshHz": 60 }]
+          }
+        }
+        """
+    }
+
     @Test("unmirror clears the mirror relationship")
     func unmirror() throws {
         let fx = try CLITestHarness.makeFixture()

@@ -7,6 +7,9 @@ public protocol DisplayProvider: Sendable {
     @discardableResult func setMain(displayID: UInt32, options: ApplyOptions) throws -> ApplyResult
     @discardableResult func setMode(displayID: UInt32, mode: Mode, options: ApplyOptions) throws -> ApplyResult
     @discardableResult func mirror(source: UInt32, mirror: UInt32, options: ApplyOptions) throws -> ApplyResult
+    /// Mirror `source` onto every id in `targets` atomically (single CG config commit).
+    /// Validates every target up front; if any one is unknown, throws and applies nothing.
+    @discardableResult func mirror(source: UInt32, targets: [UInt32], options: ApplyOptions) throws -> ApplyResult
     @discardableResult func unmirror(displayID: UInt32, options: ApplyOptions) throws -> ApplyResult
     @discardableResult func move(displayID: UInt32, to origin: Point, options: ApplyOptions) throws -> ApplyResult
     @discardableResult func rotate(displayID: UInt32, degrees: Int, options: ApplyOptions) throws -> ApplyResult
