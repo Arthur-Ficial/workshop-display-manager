@@ -21,11 +21,14 @@ public enum VirtualCommand {
             return try save(args: args, deps: deps)
         case "restore":
             return try restore(args: args, deps: deps)
+        case "presets":
+            return presets(deps: deps)
         case nil:
             deps.stdout.writeLine("usage: wdm virtual <subcommand>")
             deps.stdout.writeLine("subcommands:")
-            deps.stdout.writeLine("  create --name <s> [--mode WxH@Hz] [--hidpi] [--mirror-on <id>] [--duration-ms N]")
+            deps.stdout.writeLine("  create --name <s> [--mode WxH@Hz | --preset <id>] [--hidpi] [--mirror-on <id>] [--duration-ms N]")
             deps.stdout.writeLine("                            create a virtual display (blocks until SIGTERM)")
+            deps.stdout.writeLine("  presets                   list known iPhone/iPad/Android presets for --preset")
             deps.stdout.writeLine("  list                      list virtual displays currently registered")
             deps.stdout.writeLine("  remove <id|name|--all>    SIGTERM the owning create process(es)")
             deps.stdout.writeLine("  save <name> [--at-login]  snapshot current running virtuals to JSON")
@@ -34,6 +37,27 @@ public enum VirtualCommand {
         default:
             throw CLIError.usage("wdm virtual: unknown subcommand '\(pos[0])'")
         }
+    }
+
+    private static func presets(deps: CLIDeps) -> Int32 {
+        let nameW = (MobilePresets.all.map { $0.name.count }.max() ?? 16)
+        let labelW = (MobilePresets.all.map { $0.label.count }.max() ?? 24)
+        let header = pad("ID", nameW) + "  " + pad("DEVICE", labelW)
+            + "  RESOLUTION    RATE   HIDPI"
+        deps.stdout.writeLine(header)
+        for p in MobilePresets.all {
+            let res = "\(p.width)x\(p.height)"
+            let line = pad(p.name, nameW) + "  " + pad(p.label, labelW)
+                + "  " + pad(res, 12)
+                + "  " + pad("\(p.refreshHz)Hz", 5)
+                + "  " + (p.hiDPI ? "yes" : "no")
+            deps.stdout.writeLine(line)
+        }
+        return ExitCodes.success
+    }
+
+    private static func pad(_ s: String, _ n: Int) -> String {
+        s.padding(toLength: n, withPad: " ", startingAt: 0)
     }
 
     // MARK: - save / restore (scenes)
@@ -165,7 +189,23 @@ public enum VirtualCommand {
         let durationMs = Args.flagInt(args, name: "--duration-ms")
 
         let spec: VirtualDisplaySpec
-        if let modeToken = Args.flagString(args, name: "--mode") {
+        if let presetName = Args.flagString(args, name: "--preset") {
+            guard let preset = MobilePresets.find(presetName) else {
+                throw CLIError.usage(
+                    "wdm virtual create: unknown --preset '\(presetName)'. Run `wdm virtual presets` to list."
+                )
+            }
+            spec = VirtualDisplaySpec(
+                name: name,
+                width: preset.width, height: preset.height, refreshHz: preset.refreshHz,
+                hiDPI: hiDPI || preset.hiDPI,
+                // Approximate physical size from a 460ppi class panel — close to
+                // every iPhone Pro since the 12 generation. Doesn't affect what
+                // the OS draws, just the EDID-reported size.
+                widthMM: max(50, preset.width * 25 / 460),
+                heightMM: max(100, preset.height * 25 / 460)
+            )
+        } else if let modeToken = Args.flagString(args, name: "--mode") {
             guard let mode = VirtualDisplaySpec.parseMode(modeToken) else {
                 throw CLIError.usage(
                     "wdm virtual create: --mode must be WxH@Hz (e.g. 1920x1080@60), got '\(modeToken)'"

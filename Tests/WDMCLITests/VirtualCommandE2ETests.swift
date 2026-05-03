@@ -43,6 +43,99 @@ struct VirtualCommandE2ETests {
         #expect(body.contains("hiDPI=true"))
     }
 
+    @Test("virtual create --preset iphone-17-pro-max uses the current flagship size")
+    func createPresetIPhone17ProMax() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(
+            args: ["virtual", "create",
+                   "--name", "iPhone 17 Pro Max",
+                   "--preset", "iphone-17-pro-max",
+                   "--duration-ms", "50"],
+            fixture: fx, log: log
+        )
+        #expect(r.exitCode == 0)
+        let body = try String(contentsOf: log)
+        #expect(body.contains("1320x2868@120"))
+        #expect(body.contains("hiDPI=true"))
+    }
+
+    @Test("virtual create --preset iphone (alias) resolves to the current flagship")
+    func createPresetIPhoneAlias() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(
+            args: ["virtual", "create",
+                   "--name", "iPhone",
+                   "--preset", "iphone",
+                   "--duration-ms", "50"],
+            fixture: fx, log: log
+        )
+        #expect(r.exitCode == 0)
+        let body = try String(contentsOf: log)
+        // alias `iphone` → `iphone-17-pro-max` → 1320x2868@120
+        #expect(body.contains("1320x2868@120"))
+    }
+
+    @Test("virtual create --preset iphone-15-pro still works (legacy)")
+    func createPresetIPhone15Pro() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(
+            args: ["virtual", "create",
+                   "--name", "iPhone 15 Pro",
+                   "--preset", "iphone-15-pro",
+                   "--duration-ms", "50"],
+            fixture: fx, log: log
+        )
+        #expect(r.exitCode == 0)
+        let body = try String(contentsOf: log)
+        #expect(body.contains("1179x2556@120"))
+        #expect(body.contains("hiDPI=true"))
+    }
+
+    @Test("virtual create --preset ipad-mini uses iPad mini dimensions")
+    func createPresetIPadMini() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(
+            args: ["virtual", "create",
+                   "--name", "iPad mini",
+                   "--preset", "ipad-mini",
+                   "--duration-ms", "50"],
+            fixture: fx, log: log
+        )
+        #expect(r.exitCode == 0)
+        let body = try String(contentsOf: log)
+        #expect(body.contains("1488x2266@60"))
+    }
+
+    @Test("virtual create --preset unknown exits 2 with helpful error")
+    func createPresetUnknown() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(
+            args: ["virtual", "create",
+                   "--name", "X",
+                   "--preset", "nokia-3310",
+                   "--duration-ms", "50"],
+            fixture: fx, log: log
+        )
+        #expect(r.exitCode == 2)
+        #expect(r.stderr.contains("preset"))
+    }
+
+    @Test("virtual presets lists all known mobile presets")
+    func listPresets() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let log = try makeLogFile()
+        let r = run(args: ["virtual", "presets"], fixture: fx, log: log)
+        #expect(r.exitCode == 0)
+        #expect(r.stdout.contains("iphone-15-pro"))
+        #expect(r.stdout.contains("ipad-mini"))
+        #expect(r.stdout.contains("1179x2556"))
+    }
+
     @Test("virtual create with only --name uses defaults")
     func createDefaults() throws {
         let fx = try CLITestHarness.makeFixture()
