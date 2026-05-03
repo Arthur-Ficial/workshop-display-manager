@@ -129,6 +129,12 @@ final class CyclicArrangementWarperRunner: @unchecked Sendable {
                 if atEdgeCount >= consecutive {
                     CGWarpMouseCursorPosition(t)
                     atEdgeCount = 0
+                    // Give the cursor a few frames at the destination before
+                    // sampling again so we don't immediately re-wrap in the
+                    // opposite direction during a fast continuous drag.
+                    lastLoc = t
+                    Thread.sleep(forTimeInterval: 0.080)
+                    continue
                 }
             } else {
                 atEdgeCount = 0

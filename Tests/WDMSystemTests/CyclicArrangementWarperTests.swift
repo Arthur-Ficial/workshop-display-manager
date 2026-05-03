@@ -74,7 +74,7 @@ struct CyclicArrangementWarperTests {
             location: CGPoint(x: 700, y: 0)
         )
         #expect(pt != nil)
-        #expect(pt!.y > 2030 && pt!.y < 2036)  // just inside bottom's bottom edge
+        #expect(pt!.y > 2025 && pt!.y < 2036)  // just inside bottom's bottom edge
         #expect(pt!.x == 700)
     }
 

@@ -40,8 +40,12 @@ public enum CyclicArrangementWarper {
         displays: [Display],
         location: CGPoint,
         edgeSlop: CGFloat = 1,
-        inset: CGFloat = 2
+        inset: CGFloat = 8
     ) -> CGPoint? {
+        // inset must exceed edgeSlop with a safety margin, otherwise the cursor
+        // lands within the destination's edge-slop band and the next poll
+        // immediately re-wraps in the opposite direction (cycle stutter).
+        precondition(inset > edgeSlop + 2)
         guard displays.count >= 2 else { return nil }
 
         let leftmost   = displays.min { $0.bounds.minX < $1.bounds.minX }!
