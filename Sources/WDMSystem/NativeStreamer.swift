@@ -13,7 +13,8 @@ public final class NativeStreamer: Streamer, @unchecked Sendable {
     public init() {}
 
     public func stream(
-        displayID: UInt32, target: String, mode: StreamMode, durationSec: Int
+        displayID: UInt32, target: String, mode: StreamMode,
+        durationSec: Int, options: StreamOptions
     ) throws {
         guard mode == .hls else {
             throw ProviderError.configurationFailed(
@@ -37,7 +38,8 @@ public final class NativeStreamer: Streamer, @unchecked Sendable {
         Task { @MainActor in
             do {
                 try await Self.runStream(
-                    displayID: displayID, dir: dirURL, durationSec: durationSec
+                    displayID: displayID, dir: dirURL,
+                    durationSec: durationSec, options: options
                 )
             } catch {
                 errBox.set(error)
@@ -52,7 +54,9 @@ public final class NativeStreamer: Streamer, @unchecked Sendable {
     }
 
     @MainActor
-    private static func runStream(displayID: UInt32, dir: URL, durationSec: Int) async throws {
+    private static func runStream(
+        displayID: UInt32, dir: URL, durationSec: Int, options: StreamOptions
+    ) async throws {
         _ = NSApplication.shared.setActivationPolicy(.accessory)
 
         let content = try await SCShareableContent.current
@@ -65,29 +69,38 @@ public final class NativeStreamer: Streamer, @unchecked Sendable {
         let cfg = SCStreamConfiguration()
         cfg.width = Int(scDisplay.width)
         cfg.height = Int(scDisplay.height)
-        cfg.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        cfg.minimumFrameInterval = CMTime(value: 1, timescale: Int32(options.framerate))
         cfg.queueDepth = 5
-        cfg.showsCursor = true
+        cfg.showsCursor = options.showCursor
         cfg.pixelFormat = kCVPixelFormatType_32BGRA
         cfg.colorSpaceName = CGColorSpace.sRGB
         let filter = SCContentFilter(display: scDisplay, excludingWindows: [])
 
-        let segmentor = HLSSegmentor(directoryURL: dir, targetDurationSec: 2)
+        let segmentor = HLSSegmentor(
+            directoryURL: dir, targetDurationSec: options.segmentDurationSec
+        )
         let writer = AVAssetWriter(contentType: .mpeg4Movie)
         writer.shouldOptimizeForNetworkUse = true
         writer.outputFileTypeProfile = .mpeg4AppleHLS
-        writer.preferredOutputSegmentInterval = CMTime(seconds: 2, preferredTimescale: 1)
+        writer.preferredOutputSegmentInterval = CMTime(
+            seconds: Double(options.segmentDurationSec), preferredTimescale: 1
+        )
         writer.initialSegmentStartTime = .zero
         writer.delegate = segmentor
 
         // Keep encoder settings minimal — heavy compressionProperties combined
         // with mpeg4AppleHLS profile triggered VTVideoEncoderMalfunction (-16122).
-        // Width/Height come from the input pixel buffers' actual dimensions.
-        let videoSettings: [String: Any] = [
+        // We DO honor an explicit --bitrate; default is the encoder's choice.
+        var videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: scDisplay.width,
             AVVideoHeightKey: scDisplay.height,
         ]
+        if let kbps = options.bitrateKbps {
+            videoSettings[AVVideoCompressionPropertiesKey] = [
+                AVVideoAverageBitRateKey: kbps * 1000
+            ]
+        }
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = true
         guard writer.canAdd(videoInput) else {

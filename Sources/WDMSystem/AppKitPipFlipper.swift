@@ -151,6 +151,13 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         view.layer?.addSublayer(imageLayer)
         win.contentView = view
         win.makeKeyAndOrderFront(nil)
+        // NSWindow's initial contentRect is sometimes ignored when an
+        // .accessory-policy app spawns a window before AppKit has fully
+        // discovered the multi-display arrangement; the window snaps to
+        // the main display. Force-set the frame after orderFront so the
+        // window lands on the requested destination display. Verified
+        // against issue #4.
+        win.setFrame(frame, display: true)
         if remote {
             win.makeFirstResponder(view)
             win.title = "wdm pip — display \(sourceID) [remote]"
