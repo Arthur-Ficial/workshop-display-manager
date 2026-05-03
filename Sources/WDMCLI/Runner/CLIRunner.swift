@@ -1,6 +1,7 @@
 import Foundation
 import WDMCore
 import WDMSystem
+import WDMKit
 
 public enum CLIRunner {
     public static func run(

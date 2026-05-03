@@ -74,12 +74,11 @@ public enum ScaleCommand {
                 "no mode with logical resolution \(w)x\(h) on display \(id)"
             )
         }
-        let label = snap.display(id: id)?.name ?? "display \(id)"
         return try MutationDispatch.dispatch(
-            deps: deps, args: args,
-            description: "Scaled \(label) to \(chosen.description)"
-        ) {
-            try deps.provider.setMode(displayID: id, mode: chosen, options: .noConfirm)
+            deps: deps, args: args, alias: String(id),
+            description: { "Scaled \($0) to \(chosen.description)" }
+        ) { resolvedID in
+            try deps.provider.setMode(displayID: resolvedID, mode: chosen, options: .noConfirm)
         }
     }
 }

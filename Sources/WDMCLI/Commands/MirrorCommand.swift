@@ -28,13 +28,10 @@ public enum UnmirrorCommand {
         guard let alias = pos.first else {
             throw CLIError.usage("usage: wdm unmirror <id> [--no-confirm]")
         }
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(alias, in: snap)
-        let label = snap.display(id: id)?.name ?? "display \(id)"
         return try MutationDispatch.dispatch(
-            deps: deps, args: args,
-            description: "Stopped mirroring \(label)"
-        ) {
+            deps: deps, args: args, alias: alias,
+            description: { "Stopped mirroring \($0)" }
+        ) { id in
             try deps.provider.unmirror(displayID: id, options: .noConfirm)
         }
     }

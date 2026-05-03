@@ -20,16 +20,13 @@ public enum WorkshopCommand {
             throw CLIError.usage("usage: wdm workshop start --audience <id|main>")
         }
         let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(audience, in: snap)
-
         try deps.profileStore.save(name: snapshotName, snapshot: snap)
         deps.stderr.writeLine("workshop: saved current arrangement to '\(snapshotName)'")
 
-        let label = snap.display(id: id)?.name ?? "display \(id)"
         return try MutationDispatch.dispatch(
-            deps: deps, args: args,
-            description: "Workshop mode: main → \(label)"
-        ) {
+            deps: deps, args: args, alias: audience,
+            description: { "Workshop mode: main → \($0)" }
+        ) { id in
             try deps.provider.setMain(displayID: id, options: .noConfirm)
         }
     }

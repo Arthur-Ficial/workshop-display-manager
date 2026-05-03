@@ -1,43 +1,65 @@
 import WDMSystem
+import WDMKit
 
-/// Helper that wraps any mutating provider call with the safe-transaction cycle
-/// the CLI uses everywhere: snapshot → apply → confirm → revert (if needed).
+/// Thin CLI wrapper around `WDMKit.SafeMutation` / `DisplayMutator`. Parses
+/// the argv flags (`--no-confirm`, `--confirm`), picks the right confirmer
+/// from `CLIDeps`, then delegates the actual snapshot+save-last+safe-tx work
+/// to the lib. Maps the lib's `ApplyResult` to a CLI exit code.
 public enum MutationDispatch {
 
+    /// Direct dispatch — caller has already resolved the display and built
+    /// its own description string. Used by `restore`, `switch`, `cycle`,
+    /// `unmirror` and other commands whose description / id-resolution
+    /// don't fit the alias→id+label mould.
     public static func dispatch(
         deps: CLIDeps,
         args: [String],
         description: String = "",
         apply: () throws -> ApplyResult
     ) throws -> Int32 {
-        // Crash recovery: persist current state to profile 'last' before any mutation.
-        // If the process is killed mid-mutation, the user can `wdm restore last`.
-        let preState = try deps.provider.snapshot()
-        do {
-            try deps.profileStore.save(name: "last", snapshot: preState)
-        } catch {
-            throw CLIError.ioError(
-                "could not save crash-recovery profile 'last': \(error)"
-            )
-        }
-
-        let interactive = !args.contains("--no-confirm")
-        let useNative = args.contains("--confirm")
-        let confirmer: Confirmer
-        if !interactive {
-            confirmer = AutoYesConfirmer()
-        } else if useNative {
-            confirmer = deps.nativeConfirmer
-        } else {
-            confirmer = deps.confirmer
-        }
-        let result = try SafeTransaction.run(
+        let confirmer = pickConfirmer(deps: deps, args: args)
+        let result = try SafeMutation.run(
             provider: deps.provider,
+            profileStore: deps.profileStore,
             confirmer: confirmer,
-            message: description,
-            timeoutSeconds: 15,
+            description: description,
             apply: apply
         )
+        return mapResult(result, deps: deps)
+    }
+
+    /// Alias dispatch — the common case. Resolves the user-facing alias
+    /// (e.g. "main", "1") to a `CGDirectDisplayID` and passes both the id
+    /// and the resolved display name into the closures so each command no
+    /// longer has to repeat `snapshot + DisplayResolver.resolve + label`.
+    public static func dispatch(
+        deps: CLIDeps,
+        args: [String],
+        alias: String,
+        description: (String) -> String,
+        apply: (UInt32) throws -> ApplyResult
+    ) throws -> Int32 {
+        let confirmer = pickConfirmer(deps: deps, args: args)
+        let result = try DisplayMutator.dispatch(
+            provider: deps.provider,
+            profileStore: deps.profileStore,
+            confirmer: confirmer,
+            alias: alias,
+            description: description,
+            apply: apply
+        )
+        return mapResult(result, deps: deps)
+    }
+
+    private static func pickConfirmer(deps: CLIDeps, args: [String]) -> Confirmer {
+        let interactive = !args.contains("--no-confirm")
+        let useNative = args.contains("--confirm")
+        if !interactive { return AutoYesConfirmer() }
+        if useNative   { return deps.nativeConfirmer }
+        return deps.confirmer
+    }
+
+    private static func mapResult(_ result: ApplyResult, deps: CLIDeps) -> Int32 {
         switch result {
         case .applied:    return ExitCodes.success
         case .noChange:   return ExitCodes.success

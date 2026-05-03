@@ -1,5 +1,6 @@
 import Foundation
 import WDMSystem
+import WDMKit
 
 public struct CLIDeps: Sendable {
     public let provider: DisplayProvider

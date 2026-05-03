@@ -8,6 +8,7 @@ let package = Package(
         .executable(name: "wdm", targets: ["wdm"]),
         .library(name: "WDMCore", targets: ["WDMCore"]),
         .library(name: "WDMSystem", targets: ["WDMSystem"]),
+        .library(name: "WDMKit", targets: ["WDMKit"]),
         .library(name: "WDMCLI", targets: ["WDMCLI"]),
     ],
     dependencies: [
@@ -29,8 +30,13 @@ let package = Package(
             path: "Sources/WDMSystem"
         ),
         .target(
-            name: "WDMCLI",
+            name: "WDMKit",
             dependencies: ["WDMCore", "WDMSystem"],
+            path: "Sources/WDMKit"
+        ),
+        .target(
+            name: "WDMCLI",
+            dependencies: ["WDMCore", "WDMSystem", "WDMKit"],
             path: "Sources/WDMCLI"
         ),
         .executableTarget(
