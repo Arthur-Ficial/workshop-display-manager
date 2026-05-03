@@ -90,14 +90,30 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
     public func unmirror(displayID: UInt32, options: ApplyOptions) throws -> ApplyResult {
         try mutate { snap in
             guard let d = snap.display(id: displayID) else { throw ProviderError.displayNotFound(displayID) }
-            if d.mirrorSource == nil { return .noChange }
-            snap = replace(snap, id: displayID) { d in
-                DisplayInfo(
-                    id: d.id, name: d.name, isMain: d.isMain, isOnline: d.isOnline,
-                    mirrorSource: nil,
-                    currentMode: d.currentMode,
-                    origin: d.origin, rotationDegrees: d.rotationDegrees
-                )
+            // Slave path: this display mirrors something, break it.
+            if d.mirrorSource != nil {
+                snap = replace(snap, id: displayID) { d in
+                    DisplayInfo(
+                        id: d.id, name: d.name, isMain: d.isMain, isOnline: d.isOnline,
+                        mirrorSource: nil,
+                        currentMode: d.currentMode,
+                        origin: d.origin, rotationDegrees: d.rotationDegrees
+                    )
+                }
+                return .applied
+            }
+            // Master path: break every mirror targeting this id.
+            let slaveIDs = snap.displays.filter { $0.mirrorSource == displayID }.map { $0.id }
+            if slaveIDs.isEmpty { return .noChange }
+            for slave in slaveIDs {
+                snap = replace(snap, id: slave) { d in
+                    DisplayInfo(
+                        id: d.id, name: d.name, isMain: d.isMain, isOnline: d.isOnline,
+                        mirrorSource: nil,
+                        currentMode: d.currentMode,
+                        origin: d.origin, rotationDegrees: d.rotationDegrees
+                    )
+                }
             }
             return .applied
         }

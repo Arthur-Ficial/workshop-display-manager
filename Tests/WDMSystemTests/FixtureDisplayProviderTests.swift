@@ -135,6 +135,24 @@ struct FixtureDisplayProviderTests {
         #expect(try provider.snapshot().display(id: 2)?.mirrorSource == nil)
     }
 
+    @Test("unmirror by master ID breaks all mirrors targeting it (issue #2)")
+    func unmirrorByMaster() throws {
+        let url = try makeFixtureFile()
+        let provider = try FixtureDisplayProvider(fixtureURL: url)
+        _ = try provider.mirror(source: 1, mirror: 2, options: .noConfirm)
+        let result = try provider.unmirror(displayID: 1, options: .noConfirm)
+        #expect(result == .applied)
+        #expect(try provider.snapshot().display(id: 2)?.mirrorSource == nil)
+    }
+
+    @Test("unmirror on a display with no mirror relation is .noChange")
+    func unmirrorIdempotent() throws {
+        let url = try makeFixtureFile()
+        let provider = try FixtureDisplayProvider(fixtureURL: url)
+        let result = try provider.unmirror(displayID: 1, options: .noConfirm)
+        #expect(result == .noChange)
+    }
+
     @Test("move updates origin")
     func move() throws {
         let url = try makeFixtureFile()

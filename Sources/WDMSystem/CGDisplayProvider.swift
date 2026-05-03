@@ -64,10 +64,23 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
 
     public func unmirror(displayID: UInt32, options: ApplyOptions) throws -> ApplyResult {
         try assertExists(displayID)
-        if CGDisplayMirrorsDisplay(displayID) == 0 { return .noChange }
+        // Slave path: this id is mirroring something — break it.
+        if CGDisplayMirrorsDisplay(displayID) != 0 {
+            return try applyConfig { config in
+                let err = CGConfigureDisplayMirrorOfDisplay(config, displayID, kCGNullDirectDisplay)
+                try Self.check(err, "unmirror.slave")
+            }
+        }
+        // Master path: any online display whose CGDisplayMirrorsDisplay == displayID
+        // is a slave we own. Break each. Mirrored slaves are NOT in the active list,
+        // so we have to enumerate online displays.
+        let slaves = try Self.onlineDisplayIDs().filter { CGDisplayMirrorsDisplay($0) == displayID }
+        if slaves.isEmpty { return .noChange }
         return try applyConfig { config in
-            let err = CGConfigureDisplayMirrorOfDisplay(config, displayID, kCGNullDirectDisplay)
-            try Self.check(err, "unmirror")
+            for slave in slaves {
+                let err = CGConfigureDisplayMirrorOfDisplay(config, slave, kCGNullDirectDisplay)
+                try Self.check(err, "unmirror.master(\(slave))")
+            }
         }
     }
 
@@ -168,6 +181,16 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
         var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
         err = CGGetActiveDisplayList(count, &ids, &count)
         guard err == .success else { throw ProviderError.configurationFailed("CGGetActiveDisplayList(2): \(err.rawValue)") }
+        return ids
+    }
+
+    static func onlineDisplayIDs() throws -> [UInt32] {
+        var count: UInt32 = 0
+        var err = CGGetOnlineDisplayList(0, nil, &count)
+        guard err == .success else { throw ProviderError.configurationFailed("CGGetOnlineDisplayList: \(err.rawValue)") }
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        err = CGGetOnlineDisplayList(count, &ids, &count)
+        guard err == .success else { throw ProviderError.configurationFailed("CGGetOnlineDisplayList(2): \(err.rawValue)") }
         return ids
     }
 

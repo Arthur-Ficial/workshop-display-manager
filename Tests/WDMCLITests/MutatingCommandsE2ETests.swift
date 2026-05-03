@@ -49,6 +49,16 @@ struct MutatingCommandsE2ETests {
         #expect(after.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "")
     }
 
+    @Test("unmirror <masterID> breaks the whole mirror group (issue #2)")
+    func unmirrorByMaster() throws {
+        let fx = try CLITestHarness.makeFixture()
+        _ = CLITestHarness.run(["mirror", "1", "2", "--no-confirm"], fixture: fx)
+        let r = CLITestHarness.run(["unmirror", "1", "--no-confirm"], fixture: fx)
+        #expect(r.exitCode == 0)
+        let after = CLITestHarness.run(["get", "2", "mirror"], fixture: fx)
+        #expect(after.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "")
+    }
+
     @Test("move <id> x y updates origin")
     func move() throws {
         let fx = try CLITestHarness.makeFixture()
