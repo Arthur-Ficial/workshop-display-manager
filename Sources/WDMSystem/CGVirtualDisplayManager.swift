@@ -10,16 +10,13 @@ import WDMCore
 /// instance is retained — `run` blocks the calling thread on the main runloop
 /// (until SIGTERM/SIGINT/SIGHUP or `durationMs` elapses) while keeping the
 /// instance alive, then drops it so WindowServer tears the display down.
-///
-/// Honest unsupported-path: probes via `objc_getClass("CGVirtualDisplay")` at
-/// runtime and refuses with a typed error if the symbol is gone in some
-/// future macOS. Same shape as `IOKitRotation.isSupported`.
 public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Sendable {
 
     private let isSPIAvailable: @Sendable () -> Bool
     private let lock = NSLock()
     private var stopRequested = false
     nonisolated(unsafe) private var display: CGVirtualDisplay?
+    nonisolated(unsafe) private var cursorPortal: VirtualCursorPortal?
     nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
 
     /// Default runtime probe: do the SPI classes still resolve on this macOS?
@@ -50,8 +47,6 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
         }
 
         installSignalHandlers()
-        // Suppress dock icon — workshops spawn many virtual displays and a
-        // "exec" tile per process is noise.
         setAccessoryActivationPolicy()
 
         let descriptor = CGVirtualDisplayDescriptor()
@@ -86,6 +81,14 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
             )
         }
         self.display = display
+        let portal = VirtualCursorPortal(displayID: display.displayID)
+        do {
+            try portal.start()
+        } catch {
+            self.display = nil
+            throw error
+        }
+        self.cursorPortal = portal
 
         if let ms = durationMs {
             let deadline = Date(timeIntervalSinceNow: TimeInterval(ms) / 1000.0)
@@ -97,6 +100,8 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
                 RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
             }
         }
+        self.cursorPortal?.stop()
+        self.cursorPortal = nil
         self.display = nil  // ARC drops it → WindowServer tears it down.
     }
 

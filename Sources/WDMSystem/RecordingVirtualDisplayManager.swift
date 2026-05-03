@@ -17,6 +17,7 @@ public final class RecordingVirtualDisplayManager: VirtualDisplayManager, @unche
         let line =
             "run name=\(spec.name) \(spec.width)x\(spec.height)@\(spec.refreshHz) " +
             "hiDPI=\(spec.hiDPI) " +
+            "cursorPortal=edge-event-tap " +
             "durationMs=\(durationMs.map(String.init) ?? "nil")\n"
         try append(line)
         if let ms = durationMs {

@@ -96,7 +96,7 @@ wdm daemon install                           # auto-restore arrangements at logi
 | `wdm get <id\|main> [field]` | Read one field of one display. Pipe-friendly. |
 | `wdm doctor probe [<id>] [--json]` | Full diagnostic per display — what wdm sees, side-by-side with what you expected. |
 | `wdm doctor disconnect <id> [--duration-ms N]` | Soft-disconnect via `CGDisplayCapture` (public API). Display blanks, other apps stop drawing to it. Release: SIGTERM, or `--duration-ms` elapses. |
-| `wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi]` | **Software-backed virtual display via Apple's `CGVirtualDisplay` SPI.** macOS treats it as a real display — gets a `CGDirectDisplayID`, appears in System Settings → Displays, valid target for `main`/`mode`/`pip`/`flip-overlay`/`save`/`restore`. Lifetime is process-bound (kill to remove). |
+| `wdm virtual create --name <s> [--mode WxH@Hz] [--hidpi]` | **Software-backed virtual display via Apple's `CGVirtualDisplay` SPI.** Gets a `CGDirectDisplayID`, appears in System Settings → Displays, and starts a cursor edge portal so physical mouse movement can cross onto adjacent virtual bounds. If macOS refuses the event tap, `wdm` exits with an error instead of pretending the cursor path works. Lifetime is process-bound (kill to remove). |
 | `wdm switch` | Swap which of two displays is main. <1 second. |
 | `wdm cycle` | Rotate "main" forward across N displays. |
 | `wdm mode <id> <WxH@Hz>` | Set resolution + refresh. Safe-tx wrapped. |
