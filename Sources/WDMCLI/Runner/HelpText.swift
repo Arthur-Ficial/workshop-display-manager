@@ -54,6 +54,9 @@ public enum HelpText {
       ddc brightness|contrast|volume <id> [0..1]   external monitor control via DDC/CI
       ddc input <id> <hdmi1|dp|usbc|...>  switch external monitor input source
       ddc get|set <id> 0xNN [value]       raw VCP read / write
+      rename <id> <name> [--system]       set a friendly name (alias by default;
+                                          --system writes an EDID override plist)
+      rename <id> --remove                drop the alias for a display
       completions <bash|zsh|fish>         shell completion script
       manpage                             groff source for wdm(1)
       version                             print version
