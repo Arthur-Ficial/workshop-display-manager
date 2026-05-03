@@ -3,7 +3,7 @@ import AppKit
 import CoreGraphics
 import CoreImage
 import CoreMedia
-import ScreenCaptureKit
+@preconcurrency import ScreenCaptureKit
 import WDMCore
 
 /// Real overlay flipper. Opens a borderless `NSWindow` covering the target
