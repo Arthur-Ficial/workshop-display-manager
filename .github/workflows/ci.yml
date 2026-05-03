@@ -42,7 +42,12 @@ jobs:
         run: swift build -c release -Xswiftc -warnings-as-errors
 
       - name: Test
-        run: swift test --parallel
+        timeout-minutes: 5
+        # Run serially: the test suite finishes locally in <1s. Earlier CI runs
+        # with `swift test --parallel` hung the whole suite for 20+ minutes —
+        # serial execution lets a hung test surface clearly via the shorter
+        # step-level timeout instead of stalling the whole job.
+        run: swift test
 
       - name: shellcheck install.sh
         run: |
