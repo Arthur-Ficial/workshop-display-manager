@@ -4,6 +4,9 @@ import WDMKit
 /// One-stop route table for WDMWeb. Add a verb here, the server picks it up.
 public enum WDMWebRoutes {
     public static let all: [WDMWebRoute] = [
+        // Visual index — opens in a browser to see the live arrangement
+        WDMWebRoute(method: "GET", pattern: "/", handler: WDMWebIndexHandler.handle),
+
         // Reads
         WDMWebRoute(method: "GET", pattern: "/version", handler: { _, _, _ in
             .okText("wdm \(WDMCore.version)\n")
