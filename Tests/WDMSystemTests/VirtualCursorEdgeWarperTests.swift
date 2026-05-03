@@ -58,4 +58,48 @@ struct VirtualCursorEdgeWarperTests {
         )
         #expect(pt == nil)
     }
+
+    // MARK: - wrap-around (arrangement extreme → opposite extreme)
+
+    @Test("wrap right: BenQ.maxX (rightmost) → virtual at arrangement leftmost")
+    func wrapRight() {
+        let builtIn   = CGRect(x: 0,     y: 0, width: 1470, height: 956)
+        // wrap-virtual on far left, BenQ on far right; not adjacent to each other.
+        let leftVirt  = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
+        let arrangement = builtIn.union(benq).union(leftVirt)
+        let pt = VirtualCursorEdgeWarper.warpTarget(
+            from: benq, to: leftVirt,
+            location: CGPoint(x: 3389, y: 500),
+            arrangement: arrangement
+        )
+        #expect(pt != nil)
+        #expect(pt!.x > leftVirt.minX && pt!.x < leftVirt.maxX)
+        #expect(pt!.y == 500)
+    }
+
+    @Test("wrap left: built-in.minX (leftmost) → virtual at arrangement rightmost")
+    func wrapLeft() {
+        let builtIn = CGRect(x: 0,    y: 0, width: 1470, height: 956)
+        // wrap-virtual on far right, built-in on far left; not adjacent.
+        let rightVirt = CGRect(x: 3000, y: 0, width: 1920, height: 1080)
+        let arrangement = builtIn.union(rightVirt)
+        let pt = VirtualCursorEdgeWarper.warpTarget(
+            from: builtIn, to: rightVirt,
+            location: CGPoint(x: 0, y: 500),
+            arrangement: arrangement
+        )
+        #expect(pt != nil)
+        #expect(pt!.x < rightVirt.maxX && pt!.x > rightVirt.minX)
+    }
+
+    @Test("wrap-around requires arrangement param; without it, no wrap")
+    func wrapNoArrangement() {
+        let leftVirt = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
+        let pt = VirtualCursorEdgeWarper.warpTarget(
+            from: benq, to: leftVirt,
+            location: CGPoint(x: 3389, y: 500)
+            // arrangement nil — only adjacent path is consulted, which fails here
+        )
+        #expect(pt == nil)
+    }
 }

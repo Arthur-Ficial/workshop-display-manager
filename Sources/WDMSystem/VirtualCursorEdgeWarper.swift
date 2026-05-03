@@ -72,8 +72,14 @@ final class VirtualCursorEdgeWarper: @unchecked Sendable {
             }
             let jitter = abs(loc.x - lastLoc.x) <= jitterPx
                 && abs(loc.y - lastLoc.y) <= jitterPx
+            // Compute the union rect of every active display so wrap-around
+            // detection knows where the arrangement extremes are.
+            let arrangement = displays
+                .map(\.bounds)
+                .reduce(CGRect.null) { $0.union($1) }
             if let target = Self.warpTarget(
-                from: current.bounds, to: virtual.bounds, location: loc
+                from: current.bounds, to: virtual.bounds,
+                location: loc, arrangement: arrangement
             ), jitter {
                 atEdgeCount += 1
                 if atEdgeCount >= consecutiveAtEdgeRequired {
@@ -89,9 +95,30 @@ final class VirtualCursorEdgeWarper: @unchecked Sendable {
     }
 
     /// Pure helper exposed for unit tests. Returns the warp destination
-    /// inside `virtual` if `location` is hugging the boundary of `current`
-    /// that touches `virtual`. Nil if no shared edge is being held.
+    /// inside `virtual` if `location` is hugging an edge of `current`
+    /// that either touches `virtual` directly OR makes `virtual` the
+    /// "opposite extremum" of the arrangement — i.e., wrap-around topology.
+    /// Pass the union of all active-display extremes via `arrangement`
+    /// so the wrap variant can fire when current/virtual aren't adjacent.
     static func warpTarget(
+        from current: CGRect,
+        to virtual: CGRect,
+        location: CGPoint,
+        arrangement: CGRect? = nil
+    ) -> CGPoint? {
+        if let direct = adjacentWarp(from: current, to: virtual, location: location) {
+            return direct
+        }
+        if let arr = arrangement,
+           let wrap = wrapAroundWarp(
+                from: current, to: virtual, location: location, arrangement: arr
+           ) {
+            return wrap
+        }
+        return nil
+    }
+
+    private static func adjacentWarp(
         from current: CGRect,
         to virtual: CGRect,
         location: CGPoint
@@ -125,6 +152,39 @@ final class VirtualCursorEdgeWarper: @unchecked Sendable {
            location.x >= max(current.minX, virtual.minX),
            location.x < min(current.maxX, virtual.maxX) {
             return CGPoint(x: location.x, y: virtual.maxY - inset)
+        }
+        return nil
+    }
+
+    /// Wrap-around warp: cursor pushed past the arrangement's outermost
+    /// edge wraps to a virtual sitting at the opposite extremum, even if
+    /// they aren't directly adjacent. Triggers only when:
+    ///   - location is hugging the rightmost edge of an arrangement
+    ///     where the virtual is at the leftmost extreme (or vice-versa);
+    ///   - y-overlap exists between current and virtual.
+    static func wrapAroundWarp(
+        from current: CGRect,
+        to virtual: CGRect,
+        location: CGPoint,
+        arrangement: CGRect
+    ) -> CGPoint? {
+        let edgeSlop: CGFloat = 2
+        let inset: CGFloat = 2
+        // right-edge wrap: current is at the right extreme, virtual at the left.
+        if abs(current.maxX - arrangement.maxX) <= edgeSlop,
+           abs(virtual.minX - arrangement.minX) <= edgeSlop,
+           abs(location.x - (current.maxX - 1)) <= edgeSlop,
+           location.y >= max(current.minY, virtual.minY),
+           location.y < min(current.maxY, virtual.maxY) {
+            return CGPoint(x: virtual.minX + inset, y: location.y)
+        }
+        // left-edge wrap: current is at the left extreme, virtual at the right.
+        if abs(current.minX - arrangement.minX) <= edgeSlop,
+           abs(virtual.maxX - arrangement.maxX) <= edgeSlop,
+           abs(location.x - current.minX) <= edgeSlop,
+           location.y >= max(current.minY, virtual.minY),
+           location.y < min(current.maxY, virtual.maxY) {
+            return CGPoint(x: virtual.maxX - inset, y: location.y)
         }
         return nil
     }
