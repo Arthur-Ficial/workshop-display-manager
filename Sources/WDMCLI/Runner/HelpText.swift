@@ -72,6 +72,16 @@ public enum HelpText {
 
     ENVIRONMENT
       WDM_TEST_FIXTURE              hermetic test backend; path to JSON fixture.
+      WDM_KEYBINDINGS_FILE          override default ~/.config/wdm/keybindings.json
+      WDM_ALIASES_FILE              override default ~/.config/wdm/aliases.json
+      WDM_OVERRIDES_DIR             override system display-overrides dir (rename --system)
+      WDM_LAUNCHAGENTS_DIR          override default ~/Library/LaunchAgents (tests)
+      WDM_HOTKEYS_EXEC              path to wdm executable used by hotkey daemon
+      WDM_TEST_HOTKEYS_LOG          recording hotkey registrar (tests).
+      WDM_TEST_HOTKEYS_FIRE         comma-separated chords to synth-fire (tests).
+      WDM_TEST_HOTKEYS_DISPATCH_LOG recording hotkey dispatcher (tests).
+      WDM_TEST_DDC_LOG              recording DDC provider (tests).
+      WDM_TEST_HDR_LOG              recording HDR provider (tests).
       WDM_PROFILES_DIR              override default ~/.config/wdm/profiles
       WDM_NATIVE_CONFIRMER_STUB     "yes"|"no" — replaces popup with stub (tests).
       WDM_AUTO_CONFIRM=1            replaces stdin prompt with auto-yes.

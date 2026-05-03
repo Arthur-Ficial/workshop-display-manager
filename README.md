@@ -4,9 +4,9 @@
 
 **The native macOS CLI for people who actually use multiple displays.**
 
-`switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · virtual · doctor · sleep` — atomically, with auto-revert if the projector goes black.
+`switch · cycle · mirror · save · restore · brightness · rotate · flip · pip · virtual · doctor · sleep · edid · hotkeys · ddc · rename · scale · hdr` — atomically, with auto-revert if the projector goes black.
 
-[![Tests](https://img.shields.io/badge/tests-193%2F45%20green-brightgreen)](#tests)
+[![Tests](https://img.shields.io/badge/tests-386%2F79%20green-brightgreen)](#tests)
 [![Build](https://img.shields.io/badge/build-warnings--as--errors%20clean-brightgreen)](#building)
 [![macOS](https://img.shields.io/badge/macOS-13%2B-blue)](#install)
 [![Swift](https://img.shields.io/badge/Swift-6-orange)](https://swift.org)
@@ -34,6 +34,11 @@ You're a workshop teacher, conference speaker, hot-desking remote, or just someo
 | `wdm doctor` per-display diagnostics         | ✅  | ❌            | ❌            | ❌              |
 | Issue-#1 (`AppleHPM` panic) `wdm sleep` workaround | ✅ | ❌       | ❌            | ❌              |
 | Crash-recovery `wdm restore last`            | ✅  | ❌            | ❌            | ❌              |
+| Parsed EDID + stable per-display ID          | ✅  | ❌            | partial       | ❌              |
+| Global hotkeys for any wdm verb              | ✅  | ❌            | partial       | ❌              |
+| External-monitor brightness/contrast/input via DDC/CI | ✅ | ❌    | ✅           | ❌              |
+| Display rename (alias + system override)     | ✅  | ❌            | ✅            | ❌              |
+| Per-display HDR toggle                       | ✅  | ❌            | ✅            | partial         |
 | 100% e2e tested, hermetic suite              | ✅  | ❌            | ❌            | n/a             |
 
 ---
