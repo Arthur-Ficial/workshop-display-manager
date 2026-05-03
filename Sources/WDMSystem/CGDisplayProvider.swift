@@ -6,7 +6,10 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
     public init() {}
 
     public func snapshot() throws -> Snapshot {
-        let ids = try Self.activeDisplayIDs()
+        // Iterate ONLINE displays (active ∪ mirror-slaves). Mirrored slaves are
+        // online-but-not-active under Apple's model; including them here lets
+        // `wdm list` and `wdm unmirror <slave>` actually see them. Issue #3.
+        let ids = try Self.onlineDisplayIDs()
         let mainID = CGMainDisplayID()
         let displays = try ids.map { try Self.makeInfo(id: $0, mainID: mainID) }
         return Snapshot(createdAt: Date(), displays: displays)
@@ -167,7 +170,10 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
     }
 
     private func assertExists(_ id: CGDirectDisplayID) throws {
-        guard try Self.activeDisplayIDs().contains(id) else {
+        // Accept any ONLINE display (issue #3). Mirror slaves are online but
+        // not in the active list; commands like `unmirror <slaveID>` still
+        // need to address them.
+        guard try Self.onlineDisplayIDs().contains(id) else {
             throw ProviderError.displayNotFound(id)
         }
     }
