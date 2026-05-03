@@ -51,6 +51,9 @@ public enum HelpText {
       sleep                               sleep the Mac (drains AppleHPM — issue #1)
       hotkeys list|set|delete|reset       configure global keyboard shortcuts
       hotkeys daemon|install|uninstall|status   run / install the listener daemon
+      ddc brightness|contrast|volume <id> [0..1]   external monitor control via DDC/CI
+      ddc input <id> <hdmi1|dp|usbc|...>  switch external monitor input source
+      ddc get|set <id> 0xNN [value]       raw VCP read / write
       completions <bash|zsh|fish>         shell completion script
       manpage                             groff source for wdm(1)
       version                             print version

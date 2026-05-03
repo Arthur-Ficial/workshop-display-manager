@@ -6,6 +6,7 @@ public enum CLIError: Error, Equatable {
     case profileNotFound(String)
     case ioError(String)
     case coreGraphicsError(String)
+    case ddcUnsupported(UInt32)
 
     public var exitCode: Int32 {
         switch self {
@@ -16,6 +17,7 @@ public enum CLIError: Error, Equatable {
         case .profileNotFound:     return ExitCodes.profileNotFound
         case .ioError:             return ExitCodes.ioError
         case .coreGraphicsError:   return ExitCodes.coreGraphicsError
+        case .ddcUnsupported:      return ExitCodes.modeNotSupported
         }
     }
 
@@ -28,6 +30,7 @@ public enum CLIError: Error, Equatable {
         case .profileNotFound(let s):    return "profile not found: \(s)"
         case .ioError(let s):            return "I/O error: \(s)"
         case .coreGraphicsError(let s):  return "CoreGraphics error: \(s)"
+        case .ddcUnsupported(let id):    return "ddc: display \(id) does not expose DDC/CI (built-in display, AirPlay, or this Mac's port doesn't support DDC writes)"
         }
     }
 }
