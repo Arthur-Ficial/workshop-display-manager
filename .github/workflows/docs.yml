@@ -22,9 +22,13 @@ jobs:
             --transform-for-static-hosting \
             --hosting-base-path workshop-display-manager
 
+      - name: Package DocC site (tar to avoid invalid filename chars)
+        run: |
+          tar -czf docc-site.tar.gz -C ./_site .
+
       - name: Upload DocC archive
         uses: actions/upload-artifact@v4
         with:
           name: docc-site
-          path: ./_site
+          path: docc-site.tar.gz
           retention-days: 14
