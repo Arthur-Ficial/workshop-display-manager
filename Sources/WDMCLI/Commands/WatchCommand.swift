@@ -1,19 +1,15 @@
 import Foundation
-import WDMCore
-import WDMSystem
+import WDMKit
 
 public enum WatchCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         let useJSON = args.contains("--json")
         let max = parseMaxEvents(args)
-
-        let stream = deps.eventStream
-        var seen = 0
         let semaphore = DispatchSemaphore(value: 0)
 
         let task = Task {
             do {
-                for try await event in stream.events {
+                try await WDMController.watch(stream: deps.eventStream, max: max) { event in
                     if useJSON {
                         let data = try JSONEncoder().encode(event)
                         if let line = String(data: data, encoding: .utf8) {
@@ -24,8 +20,6 @@ public enum WatchCommand {
                             "\(event.timestamp)  \(event.kind.rawValue)  display=\(event.displayID)"
                         )
                     }
-                    seen += 1
-                    if let max, seen >= max { break }
                 }
             } catch {
                 deps.stderr.writeLine("error: \(error)")

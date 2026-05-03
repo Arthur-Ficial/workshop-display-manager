@@ -1,5 +1,3 @@
-import WDMSystem
-
 public enum RotateCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         let pos = Args.positional(args)
@@ -9,11 +7,10 @@ public enum RotateCommand {
         guard [0, 90, 180, 270].contains(deg) else {
             throw CLIError.usage("rotation must be 0, 90, 180, or 270")
         }
-        return try MutationDispatch.dispatch(
-            deps: deps, args: args, alias: pos[0],
-            description: { "Rotated \($0) to \(deg)°" }
-        ) { id in
-            try deps.provider.rotate(displayID: id, degrees: deg, options: .noConfirm)
-        }
+        let result = try deps.controller.rotate(
+            pos[0], degrees: deg,
+            confirmer: MutationDispatch.pickConfirmer(deps: deps, args: args)
+        )
+        return MutationDispatch.mapResult(result, deps: deps)
     }
 }

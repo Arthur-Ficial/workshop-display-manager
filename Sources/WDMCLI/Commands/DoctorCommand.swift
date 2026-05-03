@@ -1,126 +1,84 @@
 import Foundation
-import WDMCore
-import WDMSystem
+import WDMKit
 
-/// Diagnostics + soft display lifecycle. Single-purpose sub-verbs in true UNIX style.
+/// Diagnostics + soft display lifecycle.
 public enum DoctorCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         let pos = Args.positional(args)
         switch pos.first {
-        case "probe":
-            return try probe(args: args, deps: deps)
-        case "disconnect":
-            return try disconnect(args: args, deps: deps)
-        case nil:
-            deps.stdout.writeLine("usage: wdm doctor <subcommand>")
-            deps.stdout.writeLine("subcommands:")
-            deps.stdout.writeLine("  probe [<id>] [--json]              inspect what wdm sees per display")
-            deps.stdout.writeLine("  disconnect <id> [--duration-ms N]  soft-disconnect via CGDisplayCapture")
-            deps.stdout.writeLine("                                     (release on SIGTERM/SIGINT/SIGHUP or duration)")
-            return ExitCodes.success
-        default:
-            throw CLIError.usage("wdm doctor: unknown subcommand '\(pos[0])'")
+        case "probe":      return try probe(args: args, deps: deps)
+        case "disconnect": return try disconnect(args: args, deps: deps)
+        case nil:          return printUsage(deps: deps)
+        default:           throw WDMError.usage("wdm doctor: unknown subcommand '\(pos[0])'")
         }
     }
 
-    // MARK: - probe
+    private static func printUsage(deps: CLIDeps) -> Int32 {
+        deps.stdout.writeLine("usage: wdm doctor <subcommand>")
+        deps.stdout.writeLine("subcommands:")
+        deps.stdout.writeLine("  probe [<id>] [--json]              inspect what wdm sees per display")
+        deps.stdout.writeLine("  disconnect <id> [--duration-ms N]  soft-disconnect via CGDisplayCapture")
+        deps.stdout.writeLine("                                     (release on SIGTERM/SIGINT/SIGHUP or duration)")
+        return ExitCodes.success
+    }
 
     private static func probe(args: [String], deps: CLIDeps) throws -> Int32 {
-        let useJSON = args.contains("--json")
-        let snap = try deps.provider.snapshot()
-
         let pos = Args.positional(args)
-        let displays: [DisplayInfo]
-        if pos.count >= 2 {
-            let id = try DisplayResolver.resolve(pos[1], in: snap)
-            guard let d = snap.display(id: id) else {
-                throw ProviderError.displayNotFound(id)
-            }
-            displays = [d]
+        let alias = pos.count >= 2 ? pos[1] : nil
+        let reports = try deps.controller.doctorProbe(alias: alias)
+        if args.contains("--json") {
+            deps.stdout.write(try JSONFormatter.encode(reports))
         } else {
-            displays = snap.displays
-        }
-
-        if useJSON {
-            let payload = displays.map { d -> [String: Any] in
-                [
-                    "id": Int(d.id),
-                    "name": d.name as Any,
-                    "isMain": d.isMain,
-                    "isOnline": d.isOnline,
-                    "mirrorSource": d.mirrorSource.map(Int.init) as Any,
-                    "mode": [
-                        "width": d.currentMode.width,
-                        "height": d.currentMode.height,
-                        "refreshHz": d.currentMode.refreshHz,
-                    ],
-                    "origin": ["x": d.origin.x, "y": d.origin.y],
-                    "rotationDegrees": d.rotationDegrees,
-                ]
-            }
-            let data = try JSONSerialization.data(withJSONObject: payload,
-                                                  options: [.prettyPrinted, .sortedKeys])
-            if let s = String(data: data, encoding: .utf8) { deps.stdout.write(s) }
-            return ExitCodes.success
-        }
-
-        for d in displays {
-            deps.stdout.writeLine("--- display \(d.id) ---")
-            deps.stdout.writeLine("  name:     \(d.name ?? "(unnamed)")")
-            deps.stdout.writeLine("  online:   \(d.isOnline ? "yes" : "no")")
-            deps.stdout.writeLine("  main:     \(d.isMain ? "yes" : "no")")
-            deps.stdout.writeLine("  mode:     \(d.currentMode.width)x\(d.currentMode.height)@\(d.currentMode.refreshHz)")
-            deps.stdout.writeLine("  origin:   (\(d.origin.x), \(d.origin.y))")
-            deps.stdout.writeLine("  rotation: \(d.rotationDegrees)°")
-            if let src = d.mirrorSource {
-                deps.stdout.writeLine("  mirror:   source=\(src)")
-            } else {
-                deps.stdout.writeLine("  mirror:   none")
-            }
+            for report in reports { writeHumanReport(report, deps: deps) }
         }
         return ExitCodes.success
     }
 
-    // MARK: - disconnect (soft-disconnect via CGDisplayCapture)
+    private static func writeHumanReport(_ d: WDMController.DoctorReport, deps: CLIDeps) {
+        deps.stdout.writeLine("--- display \(d.displayID) ---")
+        deps.stdout.writeLine("  name:     \(d.name ?? "(unnamed)")")
+        deps.stdout.writeLine("  online:   \(d.isOnline ? "yes" : "no")")
+        deps.stdout.writeLine("  main:     \(d.isMain ? "yes" : "no")")
+        deps.stdout.writeLine("  mode:     \(d.mode.width)x\(d.mode.height)@\(d.mode.refreshHz)")
+        deps.stdout.writeLine("  origin:   (\(d.origin.x), \(d.origin.y))")
+        deps.stdout.writeLine("  rotation: \(d.rotationDegrees)°")
+        if let src = d.mirrorSource {
+            deps.stdout.writeLine("  mirror:   source=\(src)")
+        } else {
+            deps.stdout.writeLine("  mirror:   none")
+        }
+    }
 
     private static func disconnect(args: [String], deps: CLIDeps) throws -> Int32 {
         let pos = Args.positional(args)
         guard pos.count >= 2 else {
-            throw CLIError.usage("usage: wdm doctor disconnect <id> [--duration-ms N]")
+            throw WDMError.usage("usage: wdm doctor disconnect <id> [--duration-ms N]")
         }
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(pos[1], in: snap)
-        guard snap.display(id: id) != nil else {
-            throw ProviderError.displayNotFound(id)
-        }
-        let durationMs = Args.flagInt(args, name: "--duration-ms")
-
-        try deps.displayCapturer.capture(id)
-        defer { try? deps.displayCapturer.release(id) }
-
+        let plan = WDMController.DoctorDisconnectPlan(
+            alias: pos[1], durationMs: Args.flagInt(args, name: "--duration-ms")
+        )
         deps.stderr.writeLine(
-            "wdm: display \(id) captured (soft-disconnect). " +
+            "wdm: display \(pos[1]) captured (soft-disconnect). " +
             "Release: SIGTERM/SIGINT/SIGHUP, or wait for --duration-ms."
         )
-
-        let stopFlag = AtomicFlag()
-        let sources = installSignalHandlers { stopFlag.set() }
+        let stopFlag = SignalStopFlag()
+        let sources = SignalStopFlag.installSignalHandlers { stopFlag.set() }
         defer { _ = sources }
-
-        if let ms = durationMs {
-            let deadline = Date(timeIntervalSinceNow: TimeInterval(ms) / 1000.0)
-            while Date() < deadline && !stopFlag.get() {
-                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.05))
-            }
-        } else {
-            while !stopFlag.get() {
-                RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
-            }
-        }
+        try deps.controller.doctorDisconnect(
+            plan: plan, using: deps.displayCapturer, shouldStop: { stopFlag.get() }
+        )
         return ExitCodes.success
     }
+}
 
-    private static func installSignalHandlers(_ onSignal: @escaping () -> Void) -> [DispatchSourceSignal] {
+/// Shared signal-handler helper for blocking commands.
+final class SignalStopFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    func set() { lock.withLock { flag = true } }
+    func get() -> Bool { lock.withLock { flag } }
+
+    static func installSignalHandlers(_ onSignal: @escaping () -> Void) -> [DispatchSourceSignal] {
         signal(SIGINT, SIG_IGN)
         signal(SIGTERM, SIG_IGN)
         signal(SIGHUP, SIG_IGN)
@@ -131,11 +89,4 @@ public enum DoctorCommand {
             return src
         }
     }
-}
-
-private final class AtomicFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var flag = false
-    func set() { lock.withLock { flag = true } }
-    func get() -> Bool { lock.withLock { flag } }
 }

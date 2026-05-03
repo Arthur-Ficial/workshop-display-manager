@@ -1,6 +1,4 @@
 import Foundation
-import WDMCore
-import WDMSystem
 
 public enum ScreenshotCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
@@ -11,10 +9,9 @@ public enum ScreenshotCommand {
         guard let outPath = Args.flagString(args, name: "--out"), !outPath.isEmpty else {
             throw CLIError.usage("usage: wdm screenshot <id|main> --out <path>")
         }
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(alias, in: snap)
+        let id = try deps.controller.get(alias).id
         let url = URL(fileURLWithPath: outPath)
-        try deps.screenshotter.capture(displayID: id, to: url)
+        try deps.controller.screenshot(alias, to: url, using: deps.screenshotter)
         deps.stderr.writeLine("wdm: captured display \(id) → \(url.path)")
         return ExitCodes.success
     }

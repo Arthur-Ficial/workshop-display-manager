@@ -1,40 +1,24 @@
 import Foundation
-import WDMCore
-import WDMSystem
+import WDMKit
 
 /// `wdm edid <id> [--raw|--json]` — dump the parsed Extended Display
-/// Identification Data for a display. Foundation for stable per-display
-/// identity that survives reboot, replug, and port changes.
+/// Identification Data for a display.
 public enum EDIDCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         let positional = Args.positional(args)
-        let raw = args.contains("--raw")
-        let json = args.contains("--json")
         guard let alias = positional.first else {
-            throw CLIError.usage("usage: wdm edid <id|main> [--raw|--json]")
+            throw WDMError.usage("usage: wdm edid <id|main> [--raw|--json]")
         }
-        let snapshot = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(alias, in: snapshot)
-        let edid: EDID
-        do {
-            edid = try deps.provider.edid(for: id)
-        } catch ProviderError.edidUnavailable(let i) {
-            deps.stderr.writeLine(
-                "wdm edid: no EDID for display \(i) " +
-                "(virtual display, AirPlay receiver, or driver does not expose it)"
-            )
-            return ExitCodes.modeNotSupported
-        }
+        let edid = try deps.controller.edid(alias)
+        let id = try deps.controller.get(alias).id
 
-        if raw {
+        if args.contains("--raw") {
             deps.stdout.writeLine(formatHex(edid.raw))
-            return ExitCodes.success
+        } else if args.contains("--json") {
+            deps.stdout.write(try encodeJSON(edid))
+        } else {
+            deps.stdout.write(formatHuman(edid, displayID: id))
         }
-        if json {
-            deps.stdout.write(try Self.encodeJSON(edid))
-            return ExitCodes.success
-        }
-        deps.stdout.write(formatHuman(edid, displayID: id))
         return ExitCodes.success
     }
 
@@ -63,7 +47,6 @@ public enum EDIDCommand {
     }
 
     private static func encodeJSON(_ e: EDID) throws -> String {
-        // Hand-roll so the byte array doesn't bloat the output unless --raw is asked.
         let dict: [String: Any] = [
             "manufacturerID": e.manufacturerID,
             "productCode": Int(e.productCode),

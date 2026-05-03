@@ -1,4 +1,3 @@
-import WDMSystem
 import WDMKit
 
 /// Thin CLI wrapper around `WDMKit.SafeMutation` / `DisplayMutator`. Parses
@@ -51,7 +50,7 @@ public enum MutationDispatch {
         return mapResult(result, deps: deps)
     }
 
-    private static func pickConfirmer(deps: CLIDeps, args: [String]) -> Confirmer {
+    public static func pickConfirmer(deps: CLIDeps, args: [String]) -> Confirmer {
         let interactive = !args.contains("--no-confirm")
         let useNative = args.contains("--confirm")
         if !interactive { return AutoYesConfirmer() }
@@ -59,7 +58,7 @@ public enum MutationDispatch {
         return deps.confirmer
     }
 
-    private static func mapResult(_ result: ApplyResult, deps: CLIDeps) -> Int32 {
+    public static func mapResult(_ result: ApplyResult, deps: CLIDeps) -> Int32 {
         switch result {
         case .applied:    return ExitCodes.success
         case .noChange:   return ExitCodes.success

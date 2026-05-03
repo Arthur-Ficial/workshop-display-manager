@@ -1,6 +1,4 @@
 import Foundation
-import WDMCore
-import WDMSystem
 
 public enum StreamCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
@@ -31,8 +29,7 @@ public enum StreamCommand {
         }
 
         let options = try parseOptions(args)
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(alias, in: snap)
+        let id = try deps.controller.get(alias).id
 
         let json = args.contains("--json")
         let quiet = args.contains("--quiet")
@@ -42,9 +39,9 @@ public enum StreamCommand {
                 "wdm: streaming display \(id) for \(dur)s via \(mode.rawValue) → \(target)"
             )
         }
-        try deps.streamer.stream(
-            displayID: id, target: target, mode: mode,
-            durationSec: dur, options: options
+        try deps.controller.stream(
+            alias, target: target, mode: mode, durationSec: dur,
+            options: options, using: deps.streamer
         )
         if !quiet {
             deps.stderr.writeLine("wdm: stream complete")

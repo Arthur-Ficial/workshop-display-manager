@@ -1,60 +1,55 @@
-import Foundation
-import WDMCore
-import WDMSystem
+import WDMKit
 
 public enum PipCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         let pos = Args.positional(args)
         guard let srcToken = pos.first else {
-            throw CLIError.usage(
+            throw WDMError.usage(
                 "usage: wdm pip <src> [--on <dst>] [--size WxH] [--flip <axis>] [--duration-ms N]"
             )
         }
-        let snap = try deps.provider.snapshot()
-        let srcID = try DisplayResolver.resolve(srcToken, in: snap)
-        let dstID: UInt32
-        if let dstToken = Args.flagString(args, name: "--on") {
-            dstID = try DisplayResolver.resolve(dstToken, in: snap)
-        } else {
-            guard let main = snap.main?.id else {
-                throw CLIError.usage("pip: no main display found and no --on specified")
-            }
-            dstID = main
-        }
-        let size: PipSize
-        if let token = Args.flagString(args, name: "--size") {
-            guard let parsed = PipSize.parse(token) else {
-                throw CLIError.usage("pip: --size must be WxH (e.g. 1280x720), got '\(token)'")
-            }
-            size = parsed
-        } else {
-            size = .defaultSize
-        }
-        let flip: Flip
-        if let token = Args.flagString(args, name: "--flip") {
-            guard let parsed = Flip.parse(token) else {
-                throw CLIError.usage("pip: --flip must be one of none|horizontal|vertical|both|h|v|hv|off, got '\(token)'")
-            }
-            flip = parsed
-        } else {
-            flip = .none
-        }
-        let durationMs = Args.flagInt(args, name: "--duration-ms")
-        let position: PipPosition?
-        if let xs = Args.flagString(args, name: "--x"),
-           let ys = Args.flagString(args, name: "--y"),
-           let xi = Int(xs), let yi = Int(ys) {
-            position = PipPosition(x: xi, y: yi)
-        } else {
-            position = nil
-        }
-        let remote = args.contains("--remote")
-
-        try deps.pipFlipper.run(
-            sourceID: srcID, destinationID: dstID,
-            size: size, position: position, flip: flip, durationMs: durationMs,
-            remoteControl: remote
-        )
+        let plan = try buildPlan(srcToken: srcToken, args: args)
+        try deps.controller.pip(plan: plan, using: deps.pipFlipper)
         return ExitCodes.success
+    }
+
+    private static func buildPlan(srcToken: String, args: [String]) throws -> WDMController.PipPlan {
+        let size = try parseSize(args)
+        let flip = try parseFlip(args)
+        let position = parsePosition(args)
+        return WDMController.PipPlan(
+            sourceAlias: srcToken,
+            destinationAlias: Args.flagString(args, name: "--on"),
+            size: size,
+            position: position,
+            flip: flip,
+            durationMs: Args.flagInt(args, name: "--duration-ms"),
+            remoteControl: args.contains("--remote")
+        )
+    }
+
+    private static func parseSize(_ args: [String]) throws -> PipSize {
+        guard let token = Args.flagString(args, name: "--size") else { return .defaultSize }
+        guard let parsed = PipSize.parse(token) else {
+            throw WDMError.usage("pip: --size must be WxH (e.g. 1280x720), got '\(token)'")
+        }
+        return parsed
+    }
+
+    private static func parseFlip(_ args: [String]) throws -> Flip {
+        guard let token = Args.flagString(args, name: "--flip") else { return .none }
+        guard let parsed = Flip.parse(token) else {
+            throw WDMError.usage(
+                "pip: --flip must be one of none|horizontal|vertical|both|h|v|hv|off, got '\(token)'"
+            )
+        }
+        return parsed
+    }
+
+    private static func parsePosition(_ args: [String]) -> PipPosition? {
+        guard let xs = Args.flagString(args, name: "--x"),
+              let ys = Args.flagString(args, name: "--y"),
+              let xi = Int(xs), let yi = Int(ys) else { return nil }
+        return PipPosition(x: xi, y: yi)
     }
 }

@@ -1,6 +1,4 @@
 import Foundation
-import WDMCore
-import WDMSystem
 
 public enum RecordCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
@@ -15,11 +13,10 @@ public enum RecordCommand {
               let dur = Int(durStr), dur > 0 else {
             throw CLIError.usage("usage: wdm record <id|main> --out <path> --duration <seconds>")
         }
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(alias, in: snap)
+        let id = try deps.controller.get(alias).id
         let url = URL(fileURLWithPath: outPath)
         deps.stderr.writeLine("wdm: recording display \(id) for \(dur)s → \(url.path)")
-        try deps.recorder.record(displayID: id, to: url, durationSec: dur)
+        try deps.controller.record(alias, to: url, durationSec: dur, using: deps.recorder)
         deps.stderr.writeLine("wdm: recording complete")
         return ExitCodes.success
     }

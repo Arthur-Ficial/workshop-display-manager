@@ -10,6 +10,8 @@ let package = Package(
         .library(name: "WDMSystem", targets: ["WDMSystem"]),
         .library(name: "WDMKit", targets: ["WDMKit"]),
         .library(name: "WDMCLI", targets: ["WDMCLI"]),
+        .library(name: "WDMWeb", targets: ["WDMWeb"]),
+        .executable(name: "wdm-web", targets: ["wdm-web"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6"),
@@ -44,6 +46,21 @@ let package = Package(
             dependencies: ["WDMCLI"],
             path: "Sources/wdm"
         ),
+        .target(
+            name: "WDMWeb",
+            dependencies: ["WDMKit"],
+            path: "Sources/WDMWeb"
+        ),
+        .executableTarget(
+            name: "wdm-web",
+            dependencies: ["WDMWeb"],
+            path: "Sources/wdm-web"
+        ),
+        .testTarget(
+            name: "WDMWebTests",
+            dependencies: ["WDMWeb"],
+            path: "Tests/WDMWebTests"
+        ),
         .testTarget(
             name: "WDMCoreTests",
             dependencies: ["WDMCore"],
@@ -53,6 +70,11 @@ let package = Package(
             name: "WDMSystemTests",
             dependencies: ["WDMCore", "WDMSystem"],
             path: "Tests/WDMSystemTests"
+        ),
+        .testTarget(
+            name: "WDMKitTests",
+            dependencies: ["WDMCore", "WDMSystem", "WDMKit"],
+            path: "Tests/WDMKitTests"
         ),
         .testTarget(
             name: "WDMCLITests",

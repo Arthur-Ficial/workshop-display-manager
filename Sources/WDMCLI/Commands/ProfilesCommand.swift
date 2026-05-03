@@ -5,7 +5,7 @@ public enum ProfilesCommand {
             return try remove(args: args, deps: deps)
         }
         let useJSON = args.contains("--json")
-        let names = try deps.profileStore.list()
+        let names = try deps.controller.profiles()
         if useJSON {
             deps.stdout.write(try JSONFormatter.encode(names))
         } else {
@@ -20,7 +20,7 @@ public enum ProfilesCommand {
             throw CLIError.usage("usage: wdm profiles remove <name>")
         }
         let name = pos[1]
-        try deps.profileStore.remove(name: name)
+        try deps.controller.removeProfile(name)
         deps.stderr.writeLine("removed: \(name)")
         return ExitCodes.success
     }

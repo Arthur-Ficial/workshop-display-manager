@@ -1,5 +1,4 @@
 import WDMCore
-import WDMSystem
 
 public enum FlipCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
@@ -9,11 +8,10 @@ public enum FlipCommand {
                 "usage: wdm flip <id> <none|horizontal|vertical|both|h|v|hv|off> [--no-confirm]"
             )
         }
-        return try MutationDispatch.dispatch(
-            deps: deps, args: args, alias: pos[0],
-            description: { "Flipped \($0) (\(flip.rawValue))" }
-        ) { id in
-            try deps.provider.setFlip(displayID: id, flip: flip, options: .noConfirm)
-        }
+        let result = try deps.controller.flip(
+            pos[0], flip: flip,
+            confirmer: MutationDispatch.pickConfirmer(deps: deps, args: args)
+        )
+        return MutationDispatch.mapResult(result, deps: deps)
     }
 }

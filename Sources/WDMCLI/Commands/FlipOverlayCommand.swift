@@ -1,6 +1,5 @@
 import Foundation
 import WDMCore
-import WDMSystem
 
 public enum FlipOverlayCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
@@ -10,11 +9,11 @@ public enum FlipOverlayCommand {
                 "usage: wdm flip-overlay <id> <none|horizontal|vertical|both|h|v|hv|off> [--duration-ms N]"
             )
         }
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(pos[0], in: snap)
         let durationMs = Args.flagInt(args, name: "--duration-ms")
 
-        try deps.overlayFlipper.run(displayID: id, flip: flip, durationMs: durationMs)
+        try deps.controller.flipOverlay(
+            pos[0], flip: flip, durationMs: durationMs, using: deps.overlayFlipper
+        )
         return ExitCodes.success
     }
 }

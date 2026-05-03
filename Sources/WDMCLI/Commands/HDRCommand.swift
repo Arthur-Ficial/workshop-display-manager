@@ -1,6 +1,4 @@
 import Foundation
-import WDMCore
-import WDMSystem
 
 /// `wdm hdr <id> [on|off]` — read or toggle HDR on a display.
 public enum HDRCommand {
@@ -9,13 +7,12 @@ public enum HDRCommand {
         guard let alias = pos.first else {
             throw CLIError.usage("usage: wdm hdr <id|main> [on|off]")
         }
-        let snap = try deps.provider.snapshot()
-        let id = try DisplayResolver.resolve(alias, in: snap)
+        let id = try deps.controller.get(alias).id
         let provider = HDRProviderFactory.make(env: deps.processEnv)
 
         if pos.count == 1 {
             do {
-                let state = try provider.isHDREnabled(displayID: id)
+                let state = try deps.controller.hdr(alias, using: provider)
                 guard let s = state else {
                     deps.stderr.writeLine(
                         "hdr: display \(id) does not support HDR (non-HDR panel, " +
@@ -25,7 +22,7 @@ public enum HDRCommand {
                 }
                 deps.stdout.writeLine(s ? "on" : "off")
                 return ExitCodes.success
-            } catch HDRError.unsupported {
+            } catch WDMError.modeNotSupported {
                 deps.stderr.writeLine("hdr: display \(id) does not support HDR")
                 return ExitCodes.modeNotSupported
             }
@@ -39,8 +36,8 @@ public enum HDRCommand {
             throw CLIError.usage("hdr: value must be on|off")
         }
         do {
-            try provider.setHDR(displayID: id, enabled: value)
-        } catch HDRError.unsupported {
+            try deps.controller.setHDR(alias, enabled: value, using: provider)
+        } catch WDMError.modeNotSupported {
             deps.stderr.writeLine("hdr: display \(id) does not support HDR")
             return ExitCodes.modeNotSupported
         }

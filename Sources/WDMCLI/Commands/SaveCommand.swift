@@ -11,8 +11,7 @@ public enum SaveCommand {
         guard let name = positional.first else {
             throw CLIError.usage("usage: wdm save <name> | wdm save --auto")
         }
-        let snap = try deps.provider.snapshot()
-        try deps.profileStore.save(name: name, snapshot: snap)
+        try deps.controller.saveProfile(name)
         deps.stderr.writeLine("saved profile '\(name)'")
         return ExitCodes.success
     }
