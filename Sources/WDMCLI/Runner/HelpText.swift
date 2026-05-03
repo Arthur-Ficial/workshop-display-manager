@@ -8,6 +8,7 @@ public enum HelpText {
     COMMANDS
       list [--json]                       enumerate displays
       get <id|main> [field] [--json]      read one field of one display
+      edid <id|main> [--raw|--json]       parsed EDID + stable per-display identity
       modes <id|main> [--json]            list available modes
       mode <id> <WxH@Hz> [--no-confirm]   set display mode (safe-tx)
       main <id> [--no-confirm]            set primary display (safe-tx)

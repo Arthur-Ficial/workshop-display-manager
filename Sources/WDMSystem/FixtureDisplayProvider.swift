@@ -201,7 +201,8 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
                 snapshot: state.snapshot,
                 availableModes: state.availableModes,
                 brightness: newTable,
-                flip: state.flip
+                flip: state.flip,
+                edid: state.edid
             )
             try persist()
             return .applied
@@ -235,10 +236,27 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
                 snapshot: state.snapshot,
                 availableModes: state.availableModes,
                 brightness: state.brightness,
-                flip: table.isEmpty ? nil : table
+                flip: table.isEmpty ? nil : table,
+                edid: state.edid
             )
             try persist()
             return .applied
+        }
+    }
+
+    public func edid(for displayID: UInt32) throws -> EDID {
+        try lock.withLock {
+            guard state.snapshot.display(id: displayID) != nil else {
+                throw ProviderError.displayNotFound(displayID)
+            }
+            guard let b64 = state.edid?[String(displayID)],
+                  let data = Data(base64Encoded: b64) else {
+                throw ProviderError.edidUnavailable(displayID)
+            }
+            guard let parsed = EDID.parse(Array(data)) else {
+                throw ProviderError.edidUnavailable(displayID)
+            }
+            return parsed
         }
     }
 
@@ -253,7 +271,8 @@ public final class FixtureDisplayProvider: DisplayProvider, @unchecked Sendable 
                     snapshot: snap,
                     availableModes: state.availableModes,
                     brightness: state.brightness,
-                    flip: state.flip
+                    flip: state.flip,
+                    edid: state.edid
                 )
                 try persist()
             }
@@ -281,4 +300,6 @@ struct FixtureFile: Codable, Sendable {
     var availableModes: [String: [Mode]]
     var brightness: [String: Float?]?
     var flip: [String: Flip]?
+    /// Per-display EDID, base64-encoded so the fixture stays human-editable JSON.
+    var edid: [String: String]?
 }

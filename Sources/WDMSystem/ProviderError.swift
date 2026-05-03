@@ -6,4 +6,5 @@ public enum ProviderError: Error, Equatable, Sendable {
     case brightnessOutOfRange(Float)
     case configurationFailed(String)
     case ioError(String)
+    case edidUnavailable(UInt32)
 }

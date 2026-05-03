@@ -33,4 +33,9 @@ public protocol DisplayProvider: Sendable {
     @discardableResult func setFlip(
         displayID: UInt32, flip: Flip, options: ApplyOptions
     ) throws -> ApplyResult
+
+    /// Read the parsed EDID for a display. Throws `edidUnavailable` when the
+    /// display does not expose EDID (virtual displays, AirPlay receivers,
+    /// some software-backed surfaces), or `displayNotFound` for an unknown id.
+    func edid(for displayID: UInt32) throws -> EDID
 }

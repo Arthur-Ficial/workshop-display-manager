@@ -152,6 +152,15 @@ public final class CGDisplayProvider: DisplayProvider, @unchecked Sendable {
         return .applied
     }
 
+    public func edid(for displayID: UInt32) throws -> EDID {
+        try assertExists(displayID)
+        guard let bytes = IOKitEDID.read(displayID),
+              let parsed = EDID.parse(bytes) else {
+            throw ProviderError.edidUnavailable(displayID)
+        }
+        return parsed
+    }
+
     // MARK: - apply with auto-revert on CG-side failure
 
     private func applyConfig(_ block: (CGDisplayConfigRef) throws -> Void) throws -> ApplyResult {

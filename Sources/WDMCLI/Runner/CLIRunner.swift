@@ -108,6 +108,7 @@ public enum CLIRunner {
             case "follow":   return try FollowCommand.run(args: rest, deps: deps)
             case "bind":     return try BindCommand.run(args: rest, deps: deps)
             case "switch":   return try SwitchCommand.run(args: rest, deps: deps)
+            case "edid":     return try EDIDCommand.run(args: rest, deps: deps)
             case "cycle":    return try CycleCommand.run(args: rest, deps: deps)
             case "brightness": return try BrightnessCommand.run(args: rest, deps: deps)
             case "completions": return try CompletionsCommand.run(args: rest, deps: deps)
@@ -154,6 +155,9 @@ public enum CLIRunner {
         case .ioError(let s):
             stderr.writeLine("error: \(s)")
             return ExitCodes.ioError
+        case .edidUnavailable(let id):
+            stderr.writeLine("error: no EDID for display \(id)")
+            return ExitCodes.modeNotSupported
         }
     }
 }
