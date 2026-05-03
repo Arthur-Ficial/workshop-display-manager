@@ -4,6 +4,15 @@ import WDMSystem
 
 public enum DaemonCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
+        if args.contains("--help") || args.contains("-h") {
+            deps.stderr.writeLine("usage: wdm daemon [--max-events N]")
+            deps.stderr.writeLine("       wdm daemon install [--to <path>] [--exec <path>]")
+            deps.stderr.writeLine("Listens on display reconfiguration events; on each event,")
+            deps.stderr.writeLine("if a saved auto profile (~/.config/wdm/profiles/auto/<hash>.json)")
+            deps.stderr.writeLine("matches the new display set, restores it. Stops with --max-events,")
+            deps.stderr.writeLine("SIGTERM, or SIGINT.")
+            return ExitCodes.success
+        }
         let pos = Args.positional(args)
         if pos.first == "install" {
             return try install(args: args, deps: deps)

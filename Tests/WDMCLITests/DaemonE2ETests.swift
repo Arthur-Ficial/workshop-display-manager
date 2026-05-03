@@ -69,6 +69,23 @@ struct DaemonE2ETests {
         #expect(after.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "1")
     }
 
+    @Test("daemon --help exits 0 with usage (issue #5)")
+    func helpFlag() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let pd = try tempProfilesDir()
+        let r = run(["daemon", "--help"], fixture: fx, profilesDir: pd)
+        #expect(r.exitCode == 0)
+        #expect(r.stderr.contains("daemon"))
+    }
+
+    @Test("daemon -h exits 0 with usage")
+    func helpDashH() throws {
+        let fx = try CLITestHarness.makeFixture()
+        let pd = try tempProfilesDir()
+        let r = run(["daemon", "-h"], fixture: fx, profilesDir: pd)
+        #expect(r.exitCode == 0)
+    }
+
     @Test("daemon install --to <path> writes a LaunchAgent plist")
     func install() throws {
         let fx = try CLITestHarness.makeFixture()
