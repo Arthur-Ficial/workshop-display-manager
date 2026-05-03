@@ -17,6 +17,7 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
     private var stopRequested = false
     nonisolated(unsafe) private var display: CGVirtualDisplay?
     nonisolated(unsafe) private var cursorPortal: VirtualCursorPortal?
+    nonisolated(unsafe) private var cursorWarper: VirtualCursorEdgeWarper?
     nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
 
     /// Default runtime probe: do the SPI classes still resolve on this macOS?
@@ -89,6 +90,14 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
             throw error
         }
         self.cursorPortal = portal
+        // Polling fallback: WindowServer clamps the cursor at active-display
+        // edges before the event tap sees the over-edge delta, so the portal
+        // alone isn't enough to make a real mouse drag cross into the virtual.
+        // This 60Hz watcher detects the "stuck at edge for ≥3 samples" pattern
+        // and warps across.
+        let warper = VirtualCursorEdgeWarper(displayID: display.displayID)
+        warper.start()
+        self.cursorWarper = warper
 
         if let ms = durationMs {
             let deadline = Date(timeIntervalSinceNow: TimeInterval(ms) / 1000.0)
