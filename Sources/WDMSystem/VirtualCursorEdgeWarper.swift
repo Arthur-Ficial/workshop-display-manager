@@ -48,6 +48,11 @@ final class VirtualCursorEdgeWarper: @unchecked Sendable {
         var atEdgeCount = 0
         var lastLoc: CGPoint = .zero
         let interval = TimeInterval(pollIntervalMs) / 1000.0
+        // Real HID input jitters by 1-2px even when the user's finger is
+        // pressed against the trackpad edge — exact-equality breaks the
+        // detector. Tolerance: any movement within `jitterPx` counts as
+        // "still hugging the edge".
+        let jitterPx: CGFloat = 3
         while !lock.withLock({ stopRequested }) {
             let loc = CGEvent(source: nil)?.location ?? .zero
             let displays = Self.activeDisplays()
@@ -65,9 +70,11 @@ final class VirtualCursorEdgeWarper: @unchecked Sendable {
                 Thread.sleep(forTimeInterval: interval)
                 continue
             }
+            let jitter = abs(loc.x - lastLoc.x) <= jitterPx
+                && abs(loc.y - lastLoc.y) <= jitterPx
             if let target = Self.warpTarget(
                 from: current.bounds, to: virtual.bounds, location: loc
-            ), loc == lastLoc {
+            ), jitter {
                 atEdgeCount += 1
                 if atEdgeCount >= consecutiveAtEdgeRequired {
                     CGWarpMouseCursorPosition(target)
