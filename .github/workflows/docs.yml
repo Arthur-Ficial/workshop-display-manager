@@ -7,12 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -28,17 +22,9 @@ jobs:
             --transform-for-static-hosting \
             --hosting-base-path workshop-display-manager
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload DocC archive
+        uses: actions/upload-artifact@v4
         with:
+          name: docc-site
           path: ./_site
-
-  deploy:
-    needs: build
-    runs-on: macos-15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          retention-days: 14
