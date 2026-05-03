@@ -78,6 +78,26 @@ struct MutatingCommandsE2ETests {
         #expect(r.exitCode == 2)
     }
 
+    @Test("wrap-around topology: BenQ shown on BOTH sides via mirrored virtual")
+    func wrapAroundTopology() throws {
+        // Three-display fixture: built-in (1) at (0,0); BenQ (2) at (2560,0);
+        // virtual (3) at (-1920,0) — left of built-in. After `mirror 2 3` the
+        // virtual reflects BenQ's framebuffer, so the user can reach BenQ
+        // content by mousing LEFT off built-in or RIGHT off built-in.
+        let fx = try CLITestHarness.makeFixture(threeDisplayFixture)
+        // Move virtual into the wrap-left position.
+        _ = CLITestHarness.run(["move", "3", "-1920", "0", "--no-confirm"], fixture: fx)
+        // Mirror BenQ → virtual (the wrap-left clone).
+        let m = CLITestHarness.run(["mirror", "2", "3", "--no-confirm"], fixture: fx)
+        #expect(m.exitCode == 0)
+        // Virtual now mirrors BenQ.
+        let g = CLITestHarness.run(["get", "3", "mirror"], fixture: fx)
+        #expect(g.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "2")
+        // Virtual is left of built-in (origin <0).
+        let o = CLITestHarness.run(["get", "3", "origin"], fixture: fx)
+        #expect(o.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "-1920,0")
+    }
+
     private var threeDisplayFixture: String {
         """
         {
