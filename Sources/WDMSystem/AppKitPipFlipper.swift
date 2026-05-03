@@ -174,7 +174,7 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         Task.detached(priority: .userInitiated) {
             while !stopBox.flagged() {
                 await sink.tick(displayID: dID)
-                try? await Task.sleep(nanoseconds: 100_000_000)  // 10 Hz
+                try? await Task.sleep(nanoseconds: 16_666_666)  // 60 Hz
             }
         }
     }
@@ -242,54 +242,69 @@ private final class PollerStopBox: @unchecked Sendable {
     func flagged() -> Bool { lock.withLock { stopped } }
 }
 
-private final class PipPollingSink: NSObject, @unchecked Sendable {
+final class PipPollingSink: NSObject, @unchecked Sendable {
     nonisolated(unsafe) let layer: CALayer
-    nonisolated(unsafe) private var cachedIndex: Int?
-    private let tmpURL: URL
     init(layer: CALayer) {
         self.layer = layer
-        self.tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent(
-            "wdm-pip-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString).png"
-        )
     }
     func tick(displayID: CGDirectDisplayID) async {
-        // Shell out to /usr/sbin/screencapture — the same OS-bundled tool the
-        // Screenshotter uses. The async SCK path (`SCShareableContent.current`
-        // + `SCScreenshotManager.captureImage`) leaks continuations under
-        // multi-PIP load on macOS 26 and renders blank frames; the OS tool
-        // sidesteps that. ~10 Hz process spawn is fine on Apple Silicon.
-        let idx: Int
-        if let cached = cachedIndex {
-            idx = cached
-        } else {
-            do {
-                idx = try ScreenCaptureDisplayIndex.screencaptureIndex(displayID: displayID)
-            } catch {
-                return
-            }
-            cachedIndex = idx
+        // Native, in-process capture — replaces the previous shell-out to
+        // `/usr/sbin/screencapture`. Process spawn was ~50-100 ms per frame
+        // on Apple Silicon, capping the PIP at ~10 fps. CGDisplayCreateImage
+        // is in-process (~5-10 ms), giving us 30-60 fps headroom. The cursor
+        // is composited on top because CGDisplayCreateImage captures the
+        // framebuffer without it.
+        guard let frame = CGDisplayCreateImage(displayID) else { return }
+        let composed = PipPollingSink.compositeCursor(onto: frame, displayID: displayID)
+        let l = self.layer
+        DispatchQueue.main.async {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            l.contents = composed
+            CATransaction.commit()
         }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-D", "\(idx)", "-x", "-t", "png", tmpURL.path]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return }
-            guard let src = CGImageSourceCreateWithURL(tmpURL as CFURL, nil),
-                  let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return }
-            let l = self.layer
-            DispatchQueue.main.async {
-                CATransaction.begin()
-                CATransaction.setDisableActions(true)
-                l.contents = cg
-                CATransaction.commit()
-            }
-        } catch {
-            // Silent — next tick retries.
-        }
+    }
+
+    /// Composite the current system cursor onto the captured framebuffer
+    /// image, but only if the cursor is currently inside the source display.
+    /// Returns the input unchanged if no cursor is on this display.
+    static func compositeCursor(
+        onto frame: CGImage, displayID: CGDirectDisplayID
+    ) -> CGImage {
+        let bounds = CGDisplayBounds(displayID)
+        let cursor = CGEvent(source: nil)?.location ?? .zero
+        guard bounds.contains(cursor) else { return frame }
+
+        let cursorImage = NSCursor.current.image
+        let hotspot = NSCursor.current.hotSpot
+        guard let cursorCG = cursorImage.cgImage(
+            forProposedRect: nil, context: nil, hints: nil
+        ) else { return frame }
+
+        let pixelW = frame.width
+        let pixelH = frame.height
+        guard let ctx = CGContext(
+            data: nil, width: pixelW, height: pixelH,
+            bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return frame }
+        ctx.draw(frame, in: CGRect(x: 0, y: 0, width: pixelW, height: pixelH))
+
+        let scale = CGFloat(pixelW) / bounds.width
+        let local = CGPoint(
+            x: cursor.x - bounds.origin.x,
+            y: cursor.y - bounds.origin.y
+        )
+        let cursorW = cursorImage.size.width * scale
+        let cursorH = cursorImage.size.height * scale
+        let drawX = (local.x - hotspot.x) * scale
+        // CGContext is bottom-left; CG display coords are top-left. Flip y.
+        let drawY = CGFloat(pixelH) - (local.y - hotspot.y) * scale - cursorH
+        ctx.draw(cursorCG, in: CGRect(
+            x: drawX, y: drawY, width: cursorW, height: cursorH
+        ))
+        return ctx.makeImage() ?? frame
     }
 }
 
