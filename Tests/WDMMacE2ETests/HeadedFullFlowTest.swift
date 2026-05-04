@@ -26,14 +26,20 @@ struct HeadedFullFlowTest {
         let tree = try await api.snapshot()
         try #require(tree.nodes.contains { $0.remoteID == "titlebar.tab.stage" })
 
-        log("[3/12] click each TITLEBAR TAB slowly + screenshot each transition")
-        // Tabs are state-changing — the active tab gets a glass background.
-        // Slow + screenshot each so the user sees each one highlight in turn.
+        log("[3/12] click each TITLEBAR TAB + assert state ACTUALLY CHANGED")
+        // Real state-change assertion: snapshot before, click, snapshot
+        // after, assert the underlying SwiftUI tree's `version` increased
+        // (proves the action handler ran, not just that AXPress returned ok).
         for label in ["titlebar.tab.stage", "titlebar.tab.profiles", "titlebar.tab.recordings"] {
+            let before = try await api.snapshot()
             let r = try await api.clickRemoteID(label)
             #expect(r["ok"] as? Bool == true, "click \(label) -> \(r)")
-            log("        ✓ /ui/click \(label) — tab now active")
-            try await Task.sleep(nanoseconds: 700_000_000)  // ← visible to a human
+            try await Task.sleep(nanoseconds: 250_000_000)  // re-render
+            let after = try await api.snapshot()
+            #expect(after.version > before.version,
+                    "click \(label) did not change snapshot version (was \(before.version), still \(after.version)) — SwiftUI action probably did not fire")
+            log("        ✓ /ui/click \(label) — version \(before.version) → \(after.version)")
+            try await Task.sleep(nanoseconds: 450_000_000)  // visible pause
             let png = try await api.screenshot(window: "Workshop Display Manager")
             try png.write(to: outDir.appendingPathComponent("tab-\(label).png"))
         }
