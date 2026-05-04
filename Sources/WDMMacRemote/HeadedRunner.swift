@@ -72,15 +72,38 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         //     in WDMMac chrome layer additional Liquid Glass on top.
         win.isOpaque = false
         win.backgroundColor = .clear
-        let vfx = NSVisualEffectView()
-        vfx.material = .windowBackground
-        vfx.blendingMode = .behindWindow
-        vfx.state = .active
-        vfx.autoresizingMask = [.width, .height]
-        host.frame = vfx.bounds
-        host.autoresizingMask = [.width, .height]
-        vfx.addSubview(host)
-        win.contentView = vfx
+        // SwiftUI's .frame(minWidth:minHeight:) doesn't propagate to NSWindow
+        // when hosted via NSHostingView, so set the constraint explicitly.
+        win.contentMinSize = NSSize(width: 520, height: 360)
+
+        // Tahoe Liquid Glass — the real one. NSGlassEffectView (macOS 26+)
+        // is Apple's dedicated AppKit primitive for the dynamic-glass material
+        // that picks up tint, blurs content behind, and reacts to surrounding
+        // colour. NOT the same as the legacy NSVisualEffectView. Fallback to
+        // NSVisualEffectView with .windowBackground for macOS 13–15.
+        let backdrop: NSView
+        if #available(macOS 26.0, *) {
+            let glass = NSGlassEffectView()
+            glass.style = .regular
+            glass.cornerRadius = 0
+            glass.contentView = host
+            backdrop = glass
+        } else {
+            let vfx = NSVisualEffectView()
+            vfx.material = .windowBackground
+            vfx.blendingMode = .behindWindow
+            vfx.state = .active
+            host.translatesAutoresizingMaskIntoConstraints = false
+            vfx.addSubview(host)
+            NSLayoutConstraint.activate([
+                host.leadingAnchor.constraint(equalTo: vfx.leadingAnchor),
+                host.trailingAnchor.constraint(equalTo: vfx.trailingAnchor),
+                host.topAnchor.constraint(equalTo: vfx.topAnchor),
+                host.bottomAnchor.constraint(equalTo: vfx.bottomAnchor),
+            ])
+            backdrop = vfx
+        }
+        win.contentView = backdrop
         win.makeKeyAndOrderFront(nil)
         self.window = win
 
