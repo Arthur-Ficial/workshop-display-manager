@@ -1,6 +1,7 @@
 import Foundation
 import AppKit
 import SwiftUI
+import Combine
 import WDMMac
 import WDMRemoteControl
 
@@ -32,10 +33,13 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
     let registry: RemoteRegistry
     let adapter: WDMMacRemoteAdapter
     let args: MacArgs
+    let appearance = AppearanceStore.shared
     var window: NSWindow?
+    var settingsWindow: NSWindow?
     var server: RemoteControlServer?
     var runner: WDMMacRemoteRunner?
     var vm: DisplaysListVM?
+    private var appearanceSink: AnyCancellable?
 
     init(deps: WDMMacAppDeps, registry: RemoteRegistry,
          adapter: WDMMacRemoteAdapter, args: MacArgs) {
@@ -60,10 +64,9 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         win.titlebarAppearsTransparent = true
         win.titleVisibility = .visible
         win.isMovableByWindowBackground = true
-        // Design briefing's wdm.html is a dark-themed app — neon-green
-        // accents on near-black panels. Force dark appearance so the chrome
-        // matches the spec regardless of system Appearance setting.
-        win.appearance = NSAppearance(named: .darkAqua)
+        // Initial appearance from AppearanceStore (persisted in UserDefaults).
+        // Default = nil = follow system Appearance. Light/Dark force aqua/darkAqua.
+        win.appearance = appearance.mode.nsAppearance
 
         // Tahoe Liquid Glass for a manually-created NSWindow:
         //   - Window is transparent (isOpaque=false, backgroundColor=clear)
@@ -107,6 +110,52 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         self.window = win
 
         if args.remote { startRemote() }
+
+        // Live appearance updates: when the user picks Light/Dark/System
+        // in Settings, push to the window without restart.
+        appearanceSink = appearance.$mode.sink { [weak self] new in
+            self?.window?.appearance = new.nsAppearance
+            self?.settingsWindow?.appearance = new.nsAppearance
+        }
+
+        installSettingsMenu()
+    }
+
+    private func installSettingsMenu() {
+        let mainMenu = NSApp.mainMenu ?? NSMenu()
+        if NSApp.mainMenu == nil { NSApp.mainMenu = mainMenu }
+        let appMenuItem = mainMenu.items.first ?? {
+            let m = NSMenuItem()
+            m.submenu = NSMenu(title: "")
+            mainMenu.addItem(m)
+            return m
+        }()
+        let appMenu = appMenuItem.submenu ?? NSMenu()
+        appMenu.addItem(.separator())
+        let item = NSMenuItem(title: "Settings…",
+                              action: #selector(openSettings),
+                              keyEquivalent: ",")
+        item.target = self
+        appMenu.addItem(item)
+    }
+
+    @objc func openSettings() {
+        if let w = settingsWindow {
+            w.makeKeyAndOrderFront(nil); return
+        }
+        let view = SettingsView(appearance: appearance)
+        let host = NSHostingView(rootView: view)
+        let w = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 360),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered, defer: false
+        )
+        w.title = "Settings"
+        w.contentView = host
+        w.appearance = appearance.mode.nsAppearance
+        w.center()
+        w.makeKeyAndOrderFront(nil)
+        settingsWindow = w
     }
 
     private func startRemote() {
