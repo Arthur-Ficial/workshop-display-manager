@@ -1,22 +1,46 @@
 import Foundation
+import AppKit
 import WDMRemoteControl
 
-/// Adapts the in-process `RemoteRegistry` to the `RemoteControllable` protocol.
-/// One adapter per `wdm-mac` process; passed to `RemoteControlServer`.
+/// Adapts the WDMMac frontend to the `RemoteControllable` protocol. Two
+/// snapshot strategies, used in order:
+///
+///   1. AccessibilityWalker — when a headed window is attached, walk
+///      its NSAccessibility tree to expose EVERY element with an
+///      `.accessibilityIdentifier`. This is how the GUI becomes 100%
+///      remote-controllable without per-view registration plumbing.
+///   2. RemoteRegistry — fallback for headless mode where no NSWindow
+///      exists. The VM populates the registry with display tiles via
+///      WDMMacRemoteRunner.
+///
+/// `attach(window:)` is called by HeadedRunner once the NSWindow is up.
 public final class WDMMacRemoteAdapter: RemoteControllable, @unchecked Sendable {
     public let registry: RemoteRegistry
+    private let walker = AccessibilityWalker()
+    private weak var attachedWindow: NSWindow?
 
     public init(registry: RemoteRegistry) {
         self.registry = registry
     }
 
+    @MainActor
+    public func attach(window: NSWindow) {
+        self.attachedWindow = window
+    }
+
     public func snapshot(interactive: Bool) throws -> SceneTree {
-        // M1: every registered element is interactive — the filter is a no-op
-        // until we register decorative nodes. Honest about scope.
+        if attachedWindow != nil {
+            return runOnMain { [walker, attachedWindow] in
+                walker.snapshot(rootWindow: attachedWindow, interactive: interactive)
+            }
+        }
         return registry.currentTree()
     }
 
     public func dispatch(_ action: RemoteAction) throws -> ActionResult {
+        if attachedWindow != nil {
+            return runOnMain { [walker] in walker.dispatch(action) }
+        }
         let version = registry.snapshotVersion()
         switch action {
         case .click(let ref):
@@ -26,7 +50,17 @@ public final class WDMMacRemoteAdapter: RemoteControllable, @unchecked Sendable 
             onClick()
             return .ok(snapshotVersion: registry.snapshotVersion())
         default:
-            return .unsupported(snapshotVersion: version, reason: "M1 dispatches click only")
+            return .unsupported(snapshotVersion: version, reason: "M2 dispatches click only")
         }
+    }
+
+    /// Bridge from the server's background queue onto the main actor. The
+    /// AccessibilityWalker is `@MainActor` so all calls into it must hop.
+    /// Synchronous so the route handler stays linear.
+    private func runOnMain<T: Sendable>(_ body: @MainActor @escaping () -> T) -> T {
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated { body() }
+        }
+        return DispatchQueue.main.sync { MainActor.assumeIsolated { body() } }
     }
 }

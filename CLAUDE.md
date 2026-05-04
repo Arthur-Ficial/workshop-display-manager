@@ -241,10 +241,27 @@ mirrors the `agent-browser` surface 1:1 (e.g. `wdm-mac-control snapshot
 -i`, `wdm-mac-control click @e2`). Pure unix-pipe demos must work end-
 to-end with no GUI scripting.
 
-**Test rule.** Every UI feature has a hermetic e2e test that drives the
-feature through the remote API only — no in-process shortcut, no view-
-model unit test as a substitute. A UI feature without a remote-driven
-e2e test does not exist. Same weight as the CLI iron law.
+**Test rule (TDD + visibly-demonstrable e2e).** Every new UI feature
+follows three steps in order, no exceptions:
+
+1. **RED** — write the failing remote-driven e2e test FIRST. The test
+   spawns `wdm-mac --remote --headless` (or attaches via the state file
+   in headed mode), drives the feature through the remote API only
+   (`/ui/snapshot`, `/ui/click`, `/ui/dispatch`), and asserts on the
+   resulting state. No in-process shortcut. No view-model unit test as a
+   substitute.
+2. **GREEN** — write the minimum SwiftUI / Kit code to make the test
+   pass. Every interactive element must declare a stable
+   `.accessibilityIdentifier` so the AccessibilityWalker picks it up.
+3. **DEMO** — the feature ships with a one-line `make` recipe (or
+   commented `wdm-mac-control` pipeline at the bottom of the test) that
+   reproduces the e2e flow on the developer's machine in front of the
+   user. The user must be able to SEE it work — not just trust a green
+   tick. The smoke output is part of the deliverable.
+
+A UI feature without all three is not done. Same weight as the CLI iron
+law. The agent-browser-style remote API (`snapshot` is JSON state,
+`click @ref` mutates) is the SOLE acceptable test interface for the GUI.
 
 **Render-layer rule (DRY).** GUI views are a *render layer* over
 `WDMKit` — they hold presentation state only (selection, expanded panes,

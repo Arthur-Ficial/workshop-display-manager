@@ -109,6 +109,10 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         win.makeKeyAndOrderFront(nil)
         self.window = win
 
+        // Attach the live window so the AccessibilityWalker can walk its
+        // a11y tree and expose every interactive element to the remote API.
+        adapter.attach(window: win)
+
         if args.remote { startRemote() }
 
         // Live appearance updates: when the user picks Light/Dark/System
