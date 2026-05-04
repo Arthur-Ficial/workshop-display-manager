@@ -15,8 +15,8 @@ public struct WDMMacScene: Scene {
 
     public var body: some Scene {
         WindowGroup("Workshop Display Manager") {
-            ContentView(vm: vm, onSelect: onSelect)
+            AppFrameView(vm: vm, onSelect: onSelect)
         }
-        .defaultSize(width: 760, height: 520)
+        .defaultSize(width: 1100, height: 680)
     }
 }

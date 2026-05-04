@@ -49,10 +49,10 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         let runner = WDMMacRemoteRunner(registry: registry, vm: vm)
         self.vm = vm
         self.runner = runner
-        let content = ContentView(vm: vm) { remoteID in vm.select(remoteID: remoteID) }
+        let content = AppFrameView(vm: vm) { remoteID in vm.select(remoteID: remoteID) }
         let host = NSHostingView(rootView: content)
         let win = NSWindow(
-            contentRect: NSRect(x: 200, y: 200, width: 760, height: 520),
+            contentRect: NSRect(x: 160, y: 160, width: 1100, height: 680),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
@@ -60,6 +60,10 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         win.titlebarAppearsTransparent = true
         win.titleVisibility = .visible
         win.isMovableByWindowBackground = true
+        // Design briefing's wdm.html is a dark-themed app — neon-green
+        // accents on near-black panels. Force dark appearance so the chrome
+        // matches the spec regardless of system Appearance setting.
+        win.appearance = NSAppearance(named: .darkAqua)
 
         // Tahoe Liquid Glass for a manually-created NSWindow:
         //   - Window is transparent (isOpaque=false, backgroundColor=clear)
@@ -74,7 +78,8 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         win.backgroundColor = .clear
         // SwiftUI's .frame(minWidth:minHeight:) doesn't propagate to NSWindow
         // when hosted via NSHostingView, so set the constraint explicitly.
-        win.contentMinSize = NSSize(width: 520, height: 360)
+        win.contentMinSize = NSSize(width: 920, height: 560)
+        win.setContentSize(NSSize(width: 1100, height: 680))
 
         // Half-transparent Liquid Glass backdrop. Per cmux issue #2459 and the
         // Apple Developer Forum thread on transparent SwiftUI windows:
