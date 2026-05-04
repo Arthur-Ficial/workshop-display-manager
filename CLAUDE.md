@@ -190,6 +190,62 @@ Frontend code is NOT allowed to:
 sibling target depending only on `WDMKit`. You should be able to drive every
 existing verb without touching any other module.
 
+### AI-controllable frontends — non-negotiable for every GUI / web frontend
+
+Every visual frontend (WDMMac today, WDMWeb's `--remote` later, every
+future GUI / MCP server / IDE plugin) MUST expose every user interaction
+over a localhost remote-control API. The reference shape is Vercel's
+`agent-browser`: a typed accessibility-style scene snapshot is the
+**primary** state surface, PNG screenshots are optional, events stream
+live over SSE.
+
+**Routes** (full spec in
+`docs/superpowers/specs/2026-05-04-ai-controllable-gui-design.md`):
+
+- `GET /ui/snapshot[?interactive=1]` — JSON scene tree, stable `@e1`-style
+  refs per launch. The primary state surface — same role as
+  `agent-browser snapshot -i`.
+- `GET /ui/state` — typed app-level state (selection, sheets, toasts,
+  safe-tx, recordings).
+- `GET /ui/events` — SSE stream of every state mutation. Mandatory; the
+  AI must not need to poll.
+- `GET /ui/screenshot[?ref=@e2]` — PNG of the window or one element.
+  Optional convenience.
+- `GET /ui/diff/snapshot` — per-client diff vs previous snapshot.
+- `POST /ui/click|dblclick|hover|focus|scroll|scrollintoview|drag|fill|type|press|select|check|uncheck`
+  — every action a human can perform with mouse / keyboard.
+
+**Contract.** The protocol lives in `WDMRemoteControl`
+(`RemoteControllable`). The HTTP+SSE server (`RemoteControlServer`) is
+shared. Each frontend ships a thin adapter (`WDMMacRemoteAdapter`,
+future `WDMWebRemoteAdapter`).
+
+**Defaults.** Off. A frontend launched without `--remote` opens NO
+listener and writes NO token. With `--remote`: bind `127.0.0.1` only,
+per-launch bearer token written to `~/.config/wdm/remote.json` (0600), no
+TLS, headed by default, `--headless` for offscreen rendering (hermetic
+tests + future MCP).
+
+**Visual feedback (mandatory).** Every action triggers a glass-effect
+halo over the target element with the verb label, ~600 ms fade. Local
+human always sees what the AI just did. `--no-halo` disables (intended
+for video capture only).
+
+**Element identity.** Every interactive element declares a stable
+`.remoteID("<area>.<thing>")` at view-declaration time (aliased to
+`.accessibilityIdentifier`). Auto-generated runtime IDs are forbidden —
+they re-shuffle on re-render and break the snapshot contract.
+
+**Companion CLI.** Every visual frontend ships a sibling executable that
+mirrors the `agent-browser` surface 1:1 (e.g. `wdm-mac-control snapshot
+-i`, `wdm-mac-control click @e2`). Pure unix-pipe demos must work end-
+to-end with no GUI scripting.
+
+**Test rule.** Every UI feature has a hermetic e2e test that drives the
+feature through the remote API only — no in-process shortcut, no view-
+model unit test as a substitute. A UI feature without a remote-driven
+e2e test does not exist. Same weight as the CLI iron law.
+
 ### Frontend status
 
 - **CLI (`wdm`) — primary, shipped.** All flow-of-business decisions are made

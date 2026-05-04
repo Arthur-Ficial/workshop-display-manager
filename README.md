@@ -288,6 +288,10 @@ curl -s -X POST http://127.0.0.1:8080/arrangement \
                                                                  # === wdm arrange set @-
 ```
 
+### AI-controllable GUI (planned: `wdm-mac --remote`)
+
+The forthcoming Mac GUI (`wdm-mac`, see [meta #8](https://github.com/Arthur-Ficial/workshop-display-manager/issues/8) and [meta #99](https://github.com/Arthur-Ficial/workshop-display-manager/issues/99)) ships every interaction over a localhost API modelled on Vercel's `agent-browser` — `GET /ui/snapshot` is the primary machine-readable state surface, `GET /ui/events` is a live SSE stream, `POST /ui/click|scroll|drag|fill|…` covers every action a human can perform, and a halo overlay shows the local user what the AI just did. Off by default; `wdm-mac --remote` opens `127.0.0.1` with a per-launch token. Full contract in [`CLAUDE.md` § AI-controllable frontends](CLAUDE.md) and [`docs/superpowers/specs/2026-05-04-ai-controllable-gui-design.md`](docs/superpowers/specs/2026-05-04-ai-controllable-gui-design.md).
+
 ---
 
 ## Tests
