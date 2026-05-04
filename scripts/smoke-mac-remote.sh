@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Hermetic end-to-end smoke for wdm-mac --remote --headless.
-# Drives the GUI's snapshot + click endpoints through the wdm-mac-control
-# companion CLI — i.e. the exact path an AI agent would take.
+# Hermetic e2e smoke for wdm-mac --remote --headless via wdm-mac-control.
+# Drives the same flow an AI agent would. Now built on scripts/lib/wdm-mac.sh.
 set -euo pipefail
 
+source "$(dirname "$0")/lib/wdm-mac.sh"
+
 DIR=$(mktemp -d -t wdm-mac-smoke-XXXX)
-trap 'rm -rf "$DIR"; [ -n "${PID:-}" ] && kill "$PID" 2>/dev/null || true' EXIT
+trap 'rm -rf "$DIR"; wdm_kill' EXIT
 
 cat > "$DIR/fixture.json" <<'EOF'
 {
@@ -29,11 +30,11 @@ EOF
 
 export HOME="$DIR"
 export WDM_TEST_FIXTURE="$DIR/fixture.json"
+export WDM_REMOTE_STATE_FILE="$DIR/remote.json"
 BIN=.build/debug
 
 echo "==> launching wdm-mac --remote --headless"
-"$BIN/wdm-mac" --remote --headless 2>"$DIR/server.log" &
-PID=$!
+"$BIN/wdm-mac" --remote --headless --state-file "$DIR/remote.json" 2>"$DIR/server.log" &
 sleep 0.5
 echo "    server: $(cat "$DIR/server.log")"
 echo

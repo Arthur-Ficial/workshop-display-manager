@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test smoke smoke-mac-remote lint-glass lint-glass-env app-mac app-mac-release install clean fmt release
+.PHONY: build test smoke smoke-mac-remote demo-settings lint-glass lint-glass-env lint-remote-coverage app-mac app-mac-release install clean fmt release
 
 build:
 	$(SWIFT) build
@@ -18,6 +18,11 @@ test:
 smoke-mac-remote: build
 	@bash scripts/smoke-mac-remote.sh
 
+# Visible end-to-end demo: open the GUI, open Settings, flip
+# System → Light → Dark, screenshot each step. Uses scripts/lib/wdm-mac.sh.
+demo-settings:
+	@bash scripts/demo-settings-flip.sh /tmp/wdm-demo
+
 # Forbids non-Liquid-Glass chrome in Sources/WDMMac/. Catches Material.thinMaterial,
 # .ultraThickMaterial, solid Color backgrounds on chrome, and files under Views/
 # that don't reference at least one Liquid Glass primitive.
@@ -29,6 +34,14 @@ lint-glass:
 # SwiftUI Glass struct, NSBezelStyleGlass.
 lint-glass-env:
 	@bash scripts/lint-liquid-glass-env.sh
+
+# Forbids GUI elements that aren't reachable from an automated e2e test.
+# Every Button/Picker/Toggle in WDMMac must declare .accessibilityIdentifier;
+# every accessibilityIdentifier must be referenced from a test or smoke;
+# every window the app opens must have a close-button test
+# (wdm_close_window).
+lint-remote-coverage:
+	@bash scripts/lint-remote-coverage.sh
 
 # Wraps the wdm-mac executable in a real .app bundle with an Info.plist
 # that opts into Liquid Glass (LSMinimumSystemVersion=26.0, no
