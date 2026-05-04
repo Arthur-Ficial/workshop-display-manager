@@ -76,34 +76,28 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         // when hosted via NSHostingView, so set the constraint explicitly.
         win.contentMinSize = NSSize(width: 520, height: 360)
 
-        // Tahoe Liquid Glass — the real one. NSGlassEffectView (macOS 26+)
-        // is Apple's dedicated AppKit primitive for the dynamic-glass material
-        // that picks up tint, blurs content behind, and reacts to surrounding
-        // colour. NOT the same as the legacy NSVisualEffectView. Fallback to
-        // NSVisualEffectView with .windowBackground for macOS 13–15.
-        let backdrop: NSView
-        if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView()
-            glass.style = .regular
-            glass.cornerRadius = 0
-            glass.contentView = host
-            backdrop = glass
-        } else {
-            let vfx = NSVisualEffectView()
-            vfx.material = .windowBackground
-            vfx.blendingMode = .behindWindow
-            vfx.state = .active
-            host.translatesAutoresizingMaskIntoConstraints = false
-            vfx.addSubview(host)
-            NSLayoutConstraint.activate([
-                host.leadingAnchor.constraint(equalTo: vfx.leadingAnchor),
-                host.trailingAnchor.constraint(equalTo: vfx.trailingAnchor),
-                host.topAnchor.constraint(equalTo: vfx.topAnchor),
-                host.bottomAnchor.constraint(equalTo: vfx.bottomAnchor),
-            ])
-            backdrop = vfx
-        }
-        win.contentView = backdrop
+        // Half-transparent Liquid Glass backdrop. Per cmux issue #2459 and the
+        // Apple Developer Forum thread on transparent SwiftUI windows:
+        // NSGlassEffectView is currently buggy with hosted SwiftUI content
+        // (blank / incorrectly tinted). The reliable path on macOS 26 is
+        // NSVisualEffectView with `material = .sidebar` (more translucent
+        // than .windowBackground) and `blendingMode = .behindWindow` — that
+        // pulls pixels from the desktop & windows behind, giving the proper
+        // see-through-frosted look that on Tahoe gets the system's Liquid
+        // Glass treatment automatically.
+        let vfx = NSVisualEffectView()
+        vfx.material = .sidebar
+        vfx.blendingMode = .behindWindow
+        vfx.state = .active
+        host.translatesAutoresizingMaskIntoConstraints = false
+        vfx.addSubview(host)
+        NSLayoutConstraint.activate([
+            host.leadingAnchor.constraint(equalTo: vfx.leadingAnchor),
+            host.trailingAnchor.constraint(equalTo: vfx.trailingAnchor),
+            host.topAnchor.constraint(equalTo: vfx.topAnchor),
+            host.bottomAnchor.constraint(equalTo: vfx.bottomAnchor),
+        ])
+        win.contentView = vfx
         win.makeKeyAndOrderFront(nil)
         self.window = win
 

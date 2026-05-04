@@ -12,10 +12,11 @@ public struct ContentView: View {
     }
 
     public var body: some View {
-        // Liquid Glass: NO opaque backdrop. The NSWindow is configured
-        // transparent in HeadedRunner so the desktop shows through; inner
-        // chrome surfaces use `.glassEffect()` which then layers system
-        // glass over the see-through window.
+        // No opaque backdrop — HeadedRunner's NSVisualEffectView (material
+        // .sidebar, blendingMode .behindWindow) supplies the half-transparent
+        // frosted backdrop that shows the desktop through. SwiftUI content
+        // sits on top; .glassEffect() on cards layers further glass on
+        // whatever's behind the card (the desktop, blurred).
         VStack(spacing: 18) {
             HStack {
                 Text("Workshop Display Manager")
@@ -33,10 +34,6 @@ public struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 520, minHeight: 360)
-        // Window backdrop is supplied by HeadedRunner's NSVisualEffectView
-        // (material=.windowBackground, blendingMode=.behindWindow). No
-        // .containerBackground here — that requires SwiftUI's WindowGroup
-        // and silently no-ops on a manually-created NSWindow.
     }
 
     @ViewBuilder

@@ -69,17 +69,34 @@ let package = Package(
         .target(
             name: "WDMMac",
             dependencies: ["WDMKit"],
-            path: "Sources/WDMMac"
+            path: "Sources/WDMMac",
+            swiftSettings: [
+                // Per-target deployment bump: WDMMac uses macOS 26 Liquid Glass
+                // APIs (NSGlassEffectView, .glassEffect, .buttonStyle(.glass)).
+                // Other libs (WDMCore, WDMKit, …) stay at the package's .v13.
+                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
+            ]
         ),
         .target(
             name: "WDMMacRemote",
             dependencies: ["WDMMac", "WDMRemoteControl"],
-            path: "Sources/WDMMacRemote"
+            path: "Sources/WDMMacRemote",
+            swiftSettings: [
+                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
+            ]
         ),
         .executableTarget(
             name: "wdm-mac",
             dependencies: ["WDMMac", "WDMMacRemote"],
-            path: "Sources/wdm-mac"
+            path: "Sources/wdm-mac",
+            swiftSettings: [
+                // The binary's LC_BUILD_VERSION must say macOS 26 for the OS
+                // to grant the launched app Liquid Glass chrome treatment.
+                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
+            ],
+            linkerSettings: [
+                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
+            ]
         ),
         .executableTarget(
             name: "wdm-mac-control",
