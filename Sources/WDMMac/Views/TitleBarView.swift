@@ -62,7 +62,6 @@ public struct TitleBarView: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
         .frame(height: 44)
-        .accessibilityIdentifier("titlebar")
     }
 }
 

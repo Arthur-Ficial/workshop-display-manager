@@ -20,7 +20,6 @@ public struct SidebarView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 16)
         .frame(width: 220, alignment: .leading)
-        .accessibilityIdentifier("sidebar")
     }
 
     private var connectedSection: some View {

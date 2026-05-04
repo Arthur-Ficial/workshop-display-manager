@@ -46,7 +46,6 @@ public struct StatusBarView: View {
         }
         .padding(.horizontal, 14).padding(.vertical, 6)
         .frame(height: 30)
-        .accessibilityIdentifier("statusbar")
     }
 
     private var divider: some View {

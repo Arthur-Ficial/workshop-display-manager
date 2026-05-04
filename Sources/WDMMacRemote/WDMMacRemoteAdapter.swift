@@ -38,6 +38,11 @@ public final class WDMMacRemoteAdapter: RemoteControllable, @unchecked Sendable 
     }
 
     public func dispatch(_ action: RemoteAction) throws -> ActionResult {
+        // closeWindow goes through NSApp directly — works for any window the
+        // app owns (main + Settings + future modals), no AX walk needed.
+        if case .closeWindow(let name) = action {
+            return runOnMain { Self.closeWindow(named: name) }
+        }
         if attachedWindow != nil {
             return runOnMain { [walker] in walker.dispatch(action) }
         }
@@ -62,5 +67,14 @@ public final class WDMMacRemoteAdapter: RemoteControllable, @unchecked Sendable 
             return MainActor.assumeIsolated { body() }
         }
         return DispatchQueue.main.sync { MainActor.assumeIsolated { body() } }
+    }
+
+    @MainActor
+    static func closeWindow(named name: String) -> ActionResult {
+        guard let window = NSApp.windows.first(where: { $0.title == name && $0.isVisible }) else {
+            return .staleRef(snapshotVersion: 0)
+        }
+        window.performClose(nil)
+        return .ok(snapshotVersion: 0)
     }
 }

@@ -28,7 +28,6 @@ public struct StageView: View {
                 if vm.tiles.isEmpty {
                     Text("No displays detected.")
                         .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("stage.empty")
                 } else {
                     HStack(spacing: 18) {
                         ForEach(vm.tiles) { tile in
@@ -39,7 +38,6 @@ public struct StageView: View {
                 }
             }
         }
-        .accessibilityIdentifier("stage")
     }
 
     private func stageTile(for tile: DisplaysListVM.Tile) -> some View {

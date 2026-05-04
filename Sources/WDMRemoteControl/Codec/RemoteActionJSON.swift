@@ -40,6 +40,9 @@ public enum RemoteActionJSON {
         case "fill":
             guard let text = obj["text"] as? String else { throw DecodeError.missingKey("text") }
             return .fill(ref: try ref(obj), text: text)
+        case "closeWindow":
+            guard let name = obj["name"] as? String else { throw DecodeError.missingKey("name") }
+            return .closeWindow(name: name)
         default: throw DecodeError.unknownAction(action)
         }
     }

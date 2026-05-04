@@ -12,17 +12,9 @@ import Foundation
 @Suite("Headed: titlebar tabs clickable through wdm-mac-control")
 struct HeadedTabClickTests {
     @Test func tabsClickableViaRemoteAPI() async throws {
-        guard ProcessInfo.processInfo.environment["WDM_HEADED_E2E"] == "1" else {
-            return // opt-in only
-        }
-        let env = try makeHeadedEnv()
-        let proc = try spawnHeaded(env: env)
-        defer { proc.terminate() }
-
-        let port = try waitForPort(stateFile: env.stateFile)
-        // Wait a moment for the SwiftUI tree to populate.
-        try await Task.sleep(nanoseconds: 1_000_000_000)
-
+        guard ProcessInfo.processInfo.environment["WDM_HEADED_E2E"] == "1" else { return }
+        let inst = try await MainActor.run { try HeadedAppInstance.shared() }
+        let port = inst.port
         let snap = try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
         let tree = try SceneTreeJSON.decode(snap)
         let tabRefs = ["Stage", "Profiles", "Recordings"].compactMap { label in
@@ -52,17 +44,29 @@ func makeHeadedEnv() throws -> HeadedEnv {
     return HeadedEnv(dir: dir, stateFile: dir.appendingPathComponent("remote.json"))
 }
 
+/// Kill the wdm-mac process referenced by the state file (the real long-
+/// running process — not the short-lived `/usr/bin/open` proxy).
+func killHeaded(env: HeadedEnv) {
+    if let data = try? Data(contentsOf: env.stateFile),
+       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+       let pid = json["pid"] as? Int32 {
+        kill(pid, SIGTERM)
+    }
+}
+
 func spawnHeaded(env: HeadedEnv) throws -> Process {
-    // Headed needs the .app bundle so macOS gives it a real window.
+    // Headed needs the .app bundle launched via `open -a` so LaunchServices
+    // registers the app as a proper session — without that, NSApp's menu bar
+    // (Settings…, etc.) doesn't appear in the AX tree.
     let app = ProcessInfo.processInfo.environment["WDM_MAC_APP"]
         ?? "\(FileManager.default.currentDirectoryPath)/.build/debug/WDMMac.app"
-    let exe = URL(fileURLWithPath: app).appendingPathComponent("Contents/MacOS/wdm-mac")
     let proc = Process()
-    proc.executableURL = exe
-    proc.arguments = ["--remote", "--state-file", env.stateFile.path]
+    proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    proc.arguments = ["-a", app, "--args", "--remote", "--state-file", env.stateFile.path]
     proc.environment = ["HOME": env.dir.path, "PATH": "/usr/bin:/bin"]
     proc.standardOutput = FileHandle.nullDevice
     proc.standardError = FileHandle.nullDevice
     try proc.run()
+    proc.waitUntilExit()  // `open` exits quickly after launching the app
     return proc
 }

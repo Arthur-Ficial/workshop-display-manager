@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test smoke smoke-mac-remote demo-settings lint-glass lint-glass-env lint-remote-coverage app-mac app-mac-release install clean fmt release
+.PHONY: build test release smoke smoke-mac-remote lint-glass lint-glass-env lint-remote-coverage app-mac app-mac-release install clean
 
 build:
 	$(SWIFT) build
@@ -17,11 +17,6 @@ test:
 # tears down. Output is what an AI would see.
 smoke-mac-remote: build
 	@bash scripts/smoke-mac-remote.sh
-
-# Visible end-to-end demo: open the GUI, open Settings, flip
-# System → Light → Dark, screenshot each step. Uses scripts/lib/wdm-mac.sh.
-demo-settings:
-	@bash scripts/demo-settings-flip.sh /tmp/wdm-demo
 
 # Forbids non-Liquid-Glass chrome in Sources/WDMMac/. Catches Material.thinMaterial,
 # .ultraThickMaterial, solid Color backgrounds on chrome, and files under Views/

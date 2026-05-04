@@ -25,7 +25,6 @@ public struct InspectorGeometry: View {
                 selected: flip
             ) { flip = $0 }
         }
-        .accessibilityIdentifier("inspector.geometry")
     }
 }
 

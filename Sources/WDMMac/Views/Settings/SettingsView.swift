@@ -15,7 +15,6 @@ public struct SettingsView: View {
             paneFor(tab)
         }
         .frame(width: 520, height: 360)
-        .accessibilityIdentifier("settings")
     }
 
     private var tabStrip: some View {

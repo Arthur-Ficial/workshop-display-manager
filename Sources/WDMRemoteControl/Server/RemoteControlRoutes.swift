@@ -16,6 +16,8 @@ public enum RemoteControlRoutes {
             return snapshot(target: target, query: query(p))
         case ("POST", "/ui/click"):
             return clickFromBody(request.body, target: target)
+        case ("POST", "/ui/closeWindow"):
+            return closeWindowFromBody(request.body, target: target)
         case ("POST", "/ui/dispatch"):
             return rawDispatch(request.body, target: target)
         default:
@@ -44,6 +46,14 @@ public enum RemoteControlRoutes {
             return .error(status: 400, message: "click body needs {\"ref\":\"@e<n>\"}")
         }
         return run(action: .click(ref: ref), target: target)
+    }
+
+    private static func closeWindowFromBody(_ body: Data, target: RemoteControllable) -> RemoteResponse {
+        guard let obj = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let name = obj["name"] as? String else {
+            return .error(status: 400, message: "closeWindow body needs {\"name\":\"…\"}")
+        }
+        return run(action: .closeWindow(name: name), target: target)
     }
 
     private static func rawDispatch(_ body: Data, target: RemoteControllable) -> RemoteResponse {

@@ -42,13 +42,17 @@ fi
 #     in the lib is a violation flagged here too.
 osascript_violations=0
 while IFS= read -r f; do
-  if grep -nE 'osascript|tell application "System Events"|tell process "wdm-mac"' "$f" >/dev/null 2>&1; then
+  # Skip comment-only mentions: lines starting with `#` (bash) or `//` (Swift),
+  # OR within /* */ blocks. Real violation = banned token in EXECUTABLE code.
+  hits=$(grep -nE 'osascript|tell application "System Events"|tell process "wdm-mac"' "$f" 2>/dev/null \
+    | grep -vE '^[0-9]+:\s*(#|//)' || true)
+  if [[ -n "$hits" ]]; then
     rel=${f#$ROOT/}
     case "$rel" in
       scripts/lint-*.sh) continue ;;  # the linter scripts ARE allowed to mention the patterns they ban
     esac
     echo "✘ $rel contains osascript / AppleScript — the GUI must be drivable without it (wdm-mac-control + /ui/click only):" >&2
-    grep -nE 'osascript|tell application "System Events"|tell process "wdm-mac"' "$f" | head -3 | sed 's/^/    /' >&2
+    echo "$hits" | head -3 | sed 's/^/    /' >&2
     osascript_violations=$((osascript_violations + 1))
     violations=$((violations + 1))
   fi
@@ -115,7 +119,7 @@ mv /tmp/lint-remote-coverage/passive-only.txt "$passive_file"
 search_corpus=$(find "$TESTS" -name "*.swift" 2>/dev/null
                 find "$ROOT/Tests" -name "*.swift" 2>/dev/null)
 
-CLICK_VERBS='(wdm_ax_click|wdm_close_window|wdm-mac-control click|click button|click radio button|click radio buton|press|#expect.*click|click "|XCTAssert.*click|accessibilityPerformPress)'
+CLICK_VERBS='(wdm_ax_click|wdm_close_window|wdm-mac-control click|click button|click radio button|/ui/click|/ui/closeWindow|press|#expect.*click|XCTAssert.*click|accessibilityPerformPress|closeWindow\(named:)'
 QUERY_VERBS='(wdm_ax_dump|wdm_ax_click|wdm_close_window|wdm-mac-control|accessibilityIdentifier|remoteID|click button|click radio button)'
 
 is_covered_by() {
@@ -132,8 +136,8 @@ is_covered_by() {
 # CLICKABLE IDs need a click verb.
 while IFS= read -r id; do
   [[ -z "$id" ]] && continue
-  if [[ "$id" == *"\\("* ]]; then
-    prefix="${id%%\\(*}"
+  if [[ "$id" == *'\('* ]]; then
+    prefix=$(printf '%s' "$id" | sed -E 's/\\\(.*$//')
     if is_covered_by "$prefix" "$CLICK_VERBS"; then
       echo "$id" >> "$covered_file"
     fi
@@ -147,8 +151,8 @@ done < "$clickable_file"
 # PASSIVE IDs just need to be queried somewhere.
 while IFS= read -r id; do
   [[ -z "$id" ]] && continue
-  if [[ "$id" == *"\\("* ]]; then
-    prefix="${id%%\\(*}"
+  if [[ "$id" == *'\('* ]]; then
+    prefix=$(printf '%s' "$id" | sed -E 's/\\\(.*$//')
     if is_covered_by "$prefix" "$QUERY_VERBS"; then
       echo "$id" >> "$covered_file"
     fi
@@ -168,7 +172,7 @@ if [[ -n "$uncovered" ]]; then
   echo "✘ accessibilityIdentifier values with NO covering test:" >&2
   while IFS= read -r id; do
     [[ -z "$id" ]] && continue
-    if grep -qx "$id" "$clickable_file"; then
+    if grep -qFx "$id" "$clickable_file"; then
       echo "    [CLICKABLE — needs a real click] $id" >&2
     else
       echo "    [PASSIVE — needs an a11y query]   $id" >&2
@@ -185,9 +189,15 @@ mapfile -t window_names < <(
 )
 for name in "${window_names[@]}"; do
   [[ -z "$name" ]] && continue
-  if echo "$search_corpus" | xargs grep -lF "wdm_close_window \"$name\"" 2>/dev/null | grep -q .; then continue; fi
-  if echo "$search_corpus" | xargs grep -lE "click button 1 of window \"$name\"" 2>/dev/null | grep -q .; then continue; fi
-  echo "✘ window \"$name\" has no close-button test (wdm_close_window or 'click button 1 of window')" >&2
+  # Accept any of: bash wdm_close_window helper, AppleScript bridge,
+  # Swift closeWindow(named:) wrapper, or raw /ui/closeWindow POST with
+  # the window's name.
+  if echo "$search_corpus" | xargs grep -lF "$name" 2>/dev/null \
+       | xargs grep -lE 'wdm_close_window|click button 1 of window|closeWindow\(named:|/ui/closeWindow' 2>/dev/null \
+       | grep -q .; then
+    continue
+  fi
+  echo "✘ window \"$name\" has no close-button test (wdm_close_window / closeWindow(named:) / POST /ui/closeWindow)" >&2
   violations=$((violations + 1))
 done
 

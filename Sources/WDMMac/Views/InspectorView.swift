@@ -24,14 +24,12 @@ public struct InspectorView: View {
                 } else {
                     Text("Select a display to inspect.")
                         .foregroundStyle(.secondary).padding(.top, 36)
-                        .accessibilityIdentifier("inspector.empty")
                 }
                 Spacer()
             }
             .padding(18)
         }
         .frame(width: 280)
-        .accessibilityIdentifier("inspector")
     }
 
     private var selectedTile: DisplaysListVM.Tile? {

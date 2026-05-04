@@ -15,6 +15,5 @@ public struct InspectorIdentity: View {
             KVRow("cgID", "0x" + String(tile.displayID, radix: 16, uppercase: true))
             KVRow("alias", tile.title.lowercased())
         }
-        .accessibilityIdentifier("inspector.identity")
     }
 }

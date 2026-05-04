@@ -17,6 +17,7 @@ public enum RemoteAction: Sendable, Equatable {
     case select(ref: Ref, value: String)
     case check(ref: Ref)
     case uncheck(ref: Ref)
+    case closeWindow(name: String)
 }
 
 public enum ScrollDirection: String, Sendable, Codable {

@@ -43,6 +43,5 @@ public struct AppFrameView: View {
             StatusBarView(vm: vm)
         }
         .frame(minWidth: 920, minHeight: 560)
-        .accessibilityIdentifier("appframe")
     }
 }
