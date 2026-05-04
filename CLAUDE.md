@@ -246,6 +246,28 @@ feature through the remote API only — no in-process shortcut, no view-
 model unit test as a substitute. A UI feature without a remote-driven
 e2e test does not exist. Same weight as the CLI iron law.
 
+**Render-layer rule (DRY).** GUI views are a *render layer* over
+`WDMKit` — they hold presentation state only (selection, expanded panes,
+hover targets). All business logic, validation, sequencing, IO, and
+side effects live in `WDMController` ops. A view file that constructs a
+`DisplayProvider`, opens a file, runs a process, or branches on
+hardware quirks is a defect — push the logic into `WDMKit` and call it
+from the view.
+
+**Unix-CLI parity (non-negotiable).** Every GUI feature is also doable
+from the unix shell via `wdm <verb>`. The order is always: (1) add the
+Kit op, (2) wire the CLI verb, (3) wire the GUI control. If a GUI
+needs to do something there's no `wdm` verb for, the Kit op is missing
+— stop and add the verb first. The litmus test:
+
+```sh
+# every GUI interaction reproducible from a pipe, no exceptions
+wdm <verb> ... | jq ... | wdm <other-verb> @-
+```
+
+If a GUI button has no shell-only equivalent, it's an SSOT violation
+and the lib is incomplete.
+
 ### Frontend status
 
 - **CLI (`wdm`) — primary, shipped.** All flow-of-business decisions are made

@@ -12,6 +12,11 @@ let package = Package(
         .library(name: "WDMCLI", targets: ["WDMCLI"]),
         .library(name: "WDMWeb", targets: ["WDMWeb"]),
         .executable(name: "wdm-web", targets: ["wdm-web"]),
+        .library(name: "WDMRemoteControl", targets: ["WDMRemoteControl"]),
+        .library(name: "WDMMac", targets: ["WDMMac"]),
+        .library(name: "WDMMacRemote", targets: ["WDMMacRemote"]),
+        .executable(name: "wdm-mac", targets: ["wdm-mac"]),
+        .executable(name: "wdm-mac-control", targets: ["wdm-mac-control"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6"),
@@ -56,6 +61,31 @@ let package = Package(
             dependencies: ["WDMWeb"],
             path: "Sources/wdm-web"
         ),
+        .target(
+            name: "WDMRemoteControl",
+            dependencies: ["WDMKit"],
+            path: "Sources/WDMRemoteControl"
+        ),
+        .target(
+            name: "WDMMac",
+            dependencies: ["WDMKit"],
+            path: "Sources/WDMMac"
+        ),
+        .target(
+            name: "WDMMacRemote",
+            dependencies: ["WDMMac", "WDMRemoteControl"],
+            path: "Sources/WDMMacRemote"
+        ),
+        .executableTarget(
+            name: "wdm-mac",
+            dependencies: ["WDMMac", "WDMMacRemote"],
+            path: "Sources/wdm-mac"
+        ),
+        .executableTarget(
+            name: "wdm-mac-control",
+            dependencies: ["WDMRemoteControl"],
+            path: "Sources/wdm-mac-control"
+        ),
         .testTarget(
             name: "WDMWebTests",
             dependencies: ["WDMWeb"],
@@ -80,6 +110,21 @@ let package = Package(
             name: "WDMCLITests",
             dependencies: ["WDMCore", "WDMSystem", "WDMCLI"],
             path: "Tests/WDMCLITests"
+        ),
+        .testTarget(
+            name: "WDMRemoteControlTests",
+            dependencies: ["WDMRemoteControl"],
+            path: "Tests/WDMRemoteControlTests"
+        ),
+        .testTarget(
+            name: "WDMMacRemoteTests",
+            dependencies: ["WDMMacRemote"],
+            path: "Tests/WDMMacRemoteTests"
+        ),
+        .testTarget(
+            name: "WDMMacE2ETests",
+            dependencies: ["WDMMac", "WDMMacRemote", "WDMRemoteControl"],
+            path: "Tests/WDMMacE2ETests"
         ),
     ]
 )
