@@ -1,61 +1,33 @@
 import Foundation
 import AppKit
+import ApplicationServices
 import WDMRemoteControl
 
-/// Walks the NSAccessibility tree of a hosted SwiftUI window and emits a
-/// flat `SceneTree` of every element carrying an `.accessibilityIdentifier`.
-/// SwiftUI views in NSHostingView are NOT NSView subviews — they appear
-/// only via `accessibilityChildren()`, so the walker uses the AX
-/// informal protocol throughout (no NSView casts).
+/// Walks our OWN process's accessibility tree via the system AX framework
+/// (`AXUIElementCreateApplication(getpid())` + `AXUIElementCopyAttributeValue`).
+/// Going through the system AX subsystem (rather than calling
+/// `accessibilityChildren()` on NSObject directly) forces SwiftUI to
+/// populate the AX tree under NSHostingView — which it lazily refuses to
+/// do for in-process Cocoa traversal.
+///
+/// This is the path that makes `wdm-mac-control click @eN` actually work
+/// for every SwiftUI Button/Picker/Toggle in the app, no AppleScript bridge.
 @MainActor
 public final class AccessibilityWalker {
-    public private(set) var refToElement: [Ref: AnyObject] = [:]
+    public private(set) var refToElement: [Ref: AXUIElement] = [:]
     private var version: Int = 0
+    private lazy var appElement: AXUIElement = {
+        AXUIElementCreateApplication(getpid())
+    }()
 
     public nonisolated init() {}
 
     public func snapshot(rootWindow: NSWindow?, interactive: Bool) -> SceneTree {
         version += 1
         refToElement.removeAll(keepingCapacity: true)
-        guard let win = rootWindow else {
-            return SceneTree(version: version, nodes: [])
-        }
         var counter = 0
-        // Start from the NSWindow itself — its accessibilityChildren()
-        // expands into the SwiftUI tree, including proxy AX elements that
-        // aren't NSView subviews.
-        let nodes = walk(element: win, counter: &counter, interactive: interactive)
-        if ProcessInfo.processInfo.environment["WDM_AX_DEBUG"] == "1" {
-            dumpTree(element: win, depth: 0)
-        }
+        let nodes = walk(element: appElement, counter: &counter, interactive: interactive)
         return SceneTree(version: version, nodes: nodes)
-    }
-
-    // KNOWN LIMITATION (M2): SwiftUI's NSHostingView only expands its
-    // accessibility children when the system AX framework queries it
-    // (AppleScript / VoiceOver / AccessibilityInspector). In-process
-    // traversal via NSObject's accessibilityChildren() returns nil.
-    //
-    // Fix path: create an AXUIElement for our own pid via
-    //   AXUIElementCreateApplication(getpid())
-    // and walk via AXUIElementCopyAttributeValue(_, kAXChildrenAttribute, _).
-    // Going through the system AX subsystem forces SwiftUI to populate.
-    //
-    // Tracked as Epic 17 follow-up; for M2 the registry-based path covers
-    // the displays.tile.* identifiers used by the existing e2e tests.
-
-    private func dumpTree(element: AnyObject, depth: Int) {
-        let id = ax_string(element, "accessibilityIdentifier") ?? ""
-        let role = ax_string(element, "accessibilityRole") ?? ""
-        let label = ax_string(element, "accessibilityLabel") ?? ""
-        let pad = String(repeating: "  ", count: depth)
-        let cls = String(describing: type(of: element))
-        FileHandle.standardError.write(Data(
-            "\(pad)[\(cls)] role=\(role) id='\(id)' label='\(label)'\n".utf8))
-        if depth > 20 { return }
-        if let kids = ax_children(element) {
-            for kid in kids { dumpTree(element: kid, depth: depth + 1) }
-        }
     }
 
     public func dispatch(_ action: RemoteAction) -> ActionResult {
@@ -64,22 +36,21 @@ public final class AccessibilityWalker {
             guard let target = refToElement[ref] else {
                 return .staleRef(snapshotVersion: version)
             }
-            let sel = NSSelectorFromString("accessibilityPerformPress")
-            if let obj = target as? NSObject, obj.responds(to: sel) {
-                _ = obj.perform(sel)
-                return .ok(snapshotVersion: version)
-            }
+            let err = AXUIElementPerformAction(target, kAXPressAction as CFString)
+            if err == .success { return .ok(snapshotVersion: version) }
             return .unsupported(snapshotVersion: version,
-                                reason: "AX target does not support press")
+                                reason: "AXPress failed: \(err.rawValue)")
         default:
             return .unsupported(snapshotVersion: version, reason: "M2 supports click only")
         }
     }
 
-    private func walk(element: AnyObject, counter: inout Int, interactive: Bool) -> [SceneNode] {
-        let id = ax_string(element, "accessibilityIdentifier") ?? ""
-        let role = ax_string(element, "accessibilityRole") ?? ""
-        let label = ax_string(element, "accessibilityLabel")
+    private func walk(element: AXUIElement, counter: inout Int, interactive: Bool) -> [SceneNode] {
+        let id = ax_string(element, kAXIdentifierAttribute) ?? ""
+        let role = ax_string(element, kAXRoleAttribute) ?? ""
+        let label = ax_string(element, kAXTitleAttribute)
+            ?? ax_string(element, kAXDescriptionAttribute)
+        let value = ax_string(element, kAXValueAttribute)
         let isInteractive = role == "AXButton" || role == "AXRadioButton"
             || role == "AXCheckBox" || role == "AXPopUpButton"
 
@@ -95,9 +66,12 @@ public final class AccessibilityWalker {
             counter += 1
             let ref = Ref(index: counter)
             refToElement[ref] = element
+            let bounds = ax_frame(element)
             return [SceneNode(
                 ref: ref, remoteID: id, role: shortRole(role),
-                label: label,
+                label: label, value: value,
+                bounds: bounds.map { NodeBounds(x: $0.origin.x, y: $0.origin.y,
+                                                 w: $0.width, h: $0.height) },
                 state: NodeState(enabled: true),
                 children: []
             )] + children
@@ -105,23 +79,39 @@ public final class AccessibilityWalker {
         return children
     }
 
-    /// Loose @objc dispatch — works for both NSView subclasses (which
-    /// implement NSAccessibility natively) and SwiftUI proxy objects
-    /// (which expose AX via the informal protocol).
-    private func ax_string(_ obj: AnyObject, _ method: String) -> String? {
-        let sel = NSSelectorFromString(method)
-        guard let nsobj = obj as? NSObject, nsobj.responds(to: sel) else { return nil }
-        let result = nsobj.perform(sel)?.takeUnretainedValue()
-        if let s = result as? String { return s }
-        if let role = result as? NSAccessibility.Role { return role.rawValue }
+    private func ax_string(_ element: AXUIElement, _ attr: String) -> String? {
+        var raw: CFTypeRef?
+        let err = AXUIElementCopyAttributeValue(element, attr as CFString, &raw)
+        guard err == .success, let value = raw else { return nil }
+        if let s = value as? String { return s }
         return nil
     }
 
-    private func ax_children(_ obj: AnyObject) -> [AnyObject]? {
-        let sel = NSSelectorFromString("accessibilityChildren")
-        guard let nsobj = obj as? NSObject, nsobj.responds(to: sel) else { return nil }
-        let result = nsobj.perform(sel)?.takeUnretainedValue()
-        return result as? [AnyObject]
+    private func ax_children(_ element: AXUIElement) -> [AXUIElement]? {
+        var raw: CFTypeRef?
+        let err = AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &raw)
+        guard err == .success, let value = raw else { return nil }
+        return value as? [AXUIElement]
+    }
+
+    private func ax_frame(_ element: AXUIElement) -> CGRect? {
+        var posRaw: CFTypeRef?
+        var sizeRaw: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &posRaw) == .success,
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRaw) == .success else {
+            return nil
+        }
+        var pos = CGPoint.zero
+        var size = CGSize.zero
+        if let p = posRaw {
+            // swiftlint:disable:next force_cast
+            AXValueGetValue(p as! AXValue, .cgPoint, &pos)
+        }
+        if let s = sizeRaw {
+            // swiftlint:disable:next force_cast
+            AXValueGetValue(s as! AXValue, .cgSize, &size)
+        }
+        return CGRect(origin: pos, size: size)
     }
 
     private func shortRole(_ ax: String) -> String {
@@ -134,6 +124,9 @@ public final class AccessibilityWalker {
         case "AXCheckBox": "checkbox"
         case "AXGroup": "group"
         case "AXImage": "image"
+        case "AXScrollArea": "scroll"
+        case "AXWindow": "window"
+        case "AXApplication": "app"
         case "": "unknown"
         default: ax.replacingOccurrences(of: "AX", with: "").lowercased()
         }

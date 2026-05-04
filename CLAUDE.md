@@ -241,6 +241,32 @@ mirrors the `agent-browser` surface 1:1 (e.g. `wdm-mac-control snapshot
 -i`, `wdm-mac-control click @e2`). Pure unix-pipe demos must work end-
 to-end with no GUI scripting.
 
+**Tests are 100% truthful — non-negotiable.** A test that "passes" must
+prove the actual feature works. Specifically:
+
+- A bash smoke is a **demo**, not a test. Smokes don't count as e2e
+  coverage. Real coverage = real Swift tests under
+  `Tests/WDMMacE2ETests/` with assertions.
+- Listing an `accessibilityIdentifier` value as a string literal is NOT
+  coverage. The ID must appear inside an actual click verb
+  (`wdm-mac-control click`, `/ui/click` POST,
+  `AXUIElementPerformAction`). The lint
+  `make lint-remote-coverage` enforces this.
+- The remote API and the in-process AX walker are the SOLE acceptable
+  test interfaces for the GUI. **Zero osascript / AppleScript / `tell
+  application "System Events"`** anywhere under `Tests/`, `scripts/`,
+  or `Sources/` (other than the linter scripts themselves which mention
+  the banned patterns to ban them). The lint checks this too.
+- `|| true` in a smoke that swallows a click failure is a lint-level
+  defect: it lets coverage pass while clicks fall through. Forbidden.
+- An e2e test that exits 0 without verifying observable state change is
+  not a test. After a click, snapshot again and assert the new state.
+
+If a UI element exists, an e2e test for it must exist. If there is no
+test, the element must not exist. There is no third option. The lint
+explodes loudly when this is violated — that explosion is the desired
+behaviour, not a problem to silence.
+
 **Test rule (TDD + visibly-demonstrable e2e).** Every new UI feature
 follows three steps in order, no exceptions:
 

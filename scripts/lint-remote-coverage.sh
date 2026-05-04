@@ -28,6 +28,32 @@ if [[ ! -d "$TARGET" ]]; then
   exit 0
 fi
 
+# --- Check 0: NO osascript / AppleScript ANYWHERE under tests/, smokes/,
+# OR the helper lib. The whole point of the remote API is that the GUI is
+# agent-controllable WITHOUT an AppleScript bridge — every click goes
+# through wdm-mac-control / the in-process AX walker via /ui/click. A lint
+# that whitelisted the lib was lying to itself: smokes that source the
+# lib then use wdm_ax_click are still depending on osascript.
+#
+# Whitelist limited to:
+#   - scripts/lint-*.sh themselves (this file may grep for the pattern)
+#   - scripts/lib/wdm-mac.sh ONLY for helpers that wrap the binary
+#     (wdm_remote_curl etc.). Any wdm_ax_* / wdm_keystroke / wdm_window_geom
+#     in the lib is a violation flagged here too.
+osascript_violations=0
+while IFS= read -r f; do
+  if grep -nE 'osascript|tell application "System Events"|tell process "wdm-mac"' "$f" >/dev/null 2>&1; then
+    rel=${f#$ROOT/}
+    case "$rel" in
+      scripts/lint-*.sh) continue ;;  # the linter scripts ARE allowed to mention the patterns they ban
+    esac
+    echo "✘ $rel contains osascript / AppleScript — the GUI must be drivable without it (wdm-mac-control + /ui/click only):" >&2
+    grep -nE 'osascript|tell application "System Events"|tell process "wdm-mac"' "$f" | head -3 | sed 's/^/    /' >&2
+    osascript_violations=$((osascript_violations + 1))
+    violations=$((violations + 1))
+  fi
+done < <(find "$TESTS" "$SMOKES" -type f \( -name "*.sh" -o -name "*.swift" \) 2>/dev/null)
+
 INTERACTIVE_PATTERN='\<(Button|Picker|Toggle|TextField|SecureField|Stepper|Menu)\>'
 
 # --- Check 1: every interactive element file declares an
@@ -82,9 +108,11 @@ sort -u "$passive_file" -o "$passive_file"
 comm -23 "$passive_file" "$clickable_file" > /tmp/lint-remote-coverage/passive-only.txt
 mv /tmp/lint-remote-coverage/passive-only.txt "$passive_file"
 
-# --- Build search corpus: tests + smokes that mention click verbs.
+# --- Build search corpus: ONLY Swift e2e tests. Bash smokes are demos
+# (visible runs) — they're not tests. A lint that accepted smokes as
+# coverage is gameable: anyone can list IDs in a comment. Real coverage
+# requires real assertions in real Swift e2e tests.
 search_corpus=$(find "$TESTS" -name "*.swift" 2>/dev/null
-                find "$SMOKES" -name "*.sh" 2>/dev/null
                 find "$ROOT/Tests" -name "*.swift" 2>/dev/null)
 
 CLICK_VERBS='(wdm_ax_click|wdm_close_window|wdm-mac-control click|click button|click radio button|click radio buton|press|#expect.*click|click "|XCTAssert.*click|accessibilityPerformPress)'
