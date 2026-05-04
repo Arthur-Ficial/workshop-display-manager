@@ -12,7 +12,7 @@
 #   - NSBezelStyleGlass present in NSButtonCell.h
 #
 # Run: make lint-glass-env
-set -euo pipefail
+set -uo pipefail   # not -e: optional checks below are allowed to fail without aborting
 
 fail=0
 ok()   { printf "  ✓ %s\n" "$*"; }
