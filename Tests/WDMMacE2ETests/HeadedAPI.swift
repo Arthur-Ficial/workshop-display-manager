@@ -36,13 +36,15 @@ struct HeadedAPI {
         try await post("/ui/click", #"{"ref":"\#(ref.rawValue)"}"#)
     }
 
-    /// `POST /ui/click` for the first node matching `remoteID`. Throws if
-    /// no matching button exists in the current snapshot.
+    /// `POST /ui/click` for the first clickable node matching `remoteID`.
+    /// Accepts any pressable role: button, radio, popup, checkbox.
+    /// Throws if no matching node exists in the current snapshot.
     @discardableResult
     func clickRemoteID(_ remoteID: String) async throws -> [String: Any] {
+        let pressable: Set<String> = ["button", "radio", "popup", "checkbox"]
         let tree = try await snapshot()
         guard let node = tree.nodes.first(where: {
-            $0.remoteID == remoteID && $0.role == "button"
+            $0.remoteID == remoteID && pressable.contains($0.role)
         }) else {
             throw HeadedTestError.noButton(remoteID: remoteID)
         }
