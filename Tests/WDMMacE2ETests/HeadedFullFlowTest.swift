@@ -26,11 +26,20 @@ struct HeadedFullFlowTest {
         let tree = try await api.snapshot()
         try #require(tree.nodes.contains { $0.remoteID == "titlebar.tab.stage" })
 
-        log("[3/12] click EVERY clickable remoteID in the main window")
-        // Ordered: tabs first, then sidebar, stage, inspector controls,
-        // statusbar toggles. Same list HeadedClickCoverageTests asserts on.
+        log("[3/12] click each TITLEBAR TAB slowly + screenshot each transition")
+        // Tabs are state-changing — the active tab gets a glass background.
+        // Slow + screenshot each so the user sees each one highlight in turn.
+        for label in ["titlebar.tab.stage", "titlebar.tab.profiles", "titlebar.tab.recordings"] {
+            let r = try await api.clickRemoteID(label)
+            #expect(r["ok"] as? Bool == true, "click \(label) -> \(r)")
+            log("        ✓ /ui/click \(label) — tab now active")
+            try await Task.sleep(nanoseconds: 700_000_000)  // ← visible to a human
+            let png = try await api.screenshot(window: "Workshop Display Manager")
+            try png.write(to: outDir.appendingPathComponent("tab-\(label).png"))
+        }
+
+        log("[4/12] click EVERY OTHER clickable remoteID (sidebar, stage, inspector, statusbar)")
         let clickList: [String] = [
-            "titlebar.tab.stage", "titlebar.tab.profiles", "titlebar.tab.recordings",
             "titlebar.profile",
             "displays.tile.1", "stage.tile.1",
             "sidebar.virtual.add",
@@ -45,11 +54,9 @@ struct HeadedFullFlowTest {
             let r = try await api.clickRemoteID(id)
             #expect(r["ok"] as? Bool == true, "click \(id) -> \(r)")
             log("        ✓ /ui/click \(id)")
-            try await Task.sleep(nanoseconds: 100_000_000)
+            try await Task.sleep(nanoseconds: 250_000_000)  // visible but quicker
         }
-        log("    \(clickList.count) elements clicked via /ui/click")
-
-        log("[4/12] (subsumed into step 3 — every clickable was hit)")
+        log("    \(3 + clickList.count) elements clicked via /ui/click")
 
         log("[5/12] /ui/screenshot Workshop Display Manager → main.png")
         let mainPng = try await api.screenshot(window: "Workshop Display Manager")

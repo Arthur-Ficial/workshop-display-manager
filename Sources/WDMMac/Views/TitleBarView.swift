@@ -31,9 +31,14 @@ public struct TitleBarView: View {
                             Text(t.title).font(.system(size: 12, weight: .medium))
                         }
                         .padding(.horizontal, 10).padding(.vertical, 5)
+                        .foregroundStyle(t == tab ? Color.green : Color.primary)
                         .background {
                             RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(t == tab ? .white.opacity(0.10) : .clear)
+                                .fill(t == tab ? Color.green.opacity(0.18) : Color.clear)
+                        }
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .stroke(t == tab ? Color.green : Color.clear, lineWidth: 1.5)
                         }
                     }
                     .buttonStyle(.plain)
