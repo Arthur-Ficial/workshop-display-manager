@@ -43,6 +43,22 @@ public enum RemoteActionJSON {
         case "closeWindow":
             guard let name = obj["name"] as? String else { throw DecodeError.missingKey("name") }
             return .closeWindow(name: name)
+        case "raiseWindow":
+            guard let name = obj["name"] as? String else { throw DecodeError.missingKey("name") }
+            return .raiseWindow(name: name)
+        case "keystroke":
+            guard let key = obj["key"] as? String else { throw DecodeError.missingKey("key") }
+            let mods = obj["modifiers"] as? [String] ?? []
+            return .keystroke(key: key, modifiers: mods)
+        case "screenshot":
+            return .screenshot(window: obj["window"] as? String)
+        case "waitForRemoteID":
+            guard let remoteID = obj["remoteID"] as? String else { throw DecodeError.missingKey("remoteID") }
+            let timeoutMs = obj["timeoutMs"] as? Int ?? 2000
+            return .waitForRemoteID(remoteID: remoteID, timeoutMs: timeoutMs)
+        case "invokeMenu":
+            guard let selector = obj["selector"] as? String else { throw DecodeError.missingKey("selector") }
+            return .invokeMenu(selector: selector)
         default: throw DecodeError.unknownAction(action)
         }
     }

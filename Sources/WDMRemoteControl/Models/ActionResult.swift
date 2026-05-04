@@ -27,4 +27,11 @@ public struct ActionResult: Hashable, Sendable, Codable {
         .init(ok: false, snapshotVersion: snapshotVersion,
               error: "unsupported", reason: reason)
     }
+
+    /// Convenience for actions that return data (screenshot bytes, snapshot
+    /// version after wait, etc.) — uses `reason` as the payload slot to
+    /// keep the wire schema small.
+    public static func okWithData(snapshotVersion: Int, payload: String) -> ActionResult {
+        .init(ok: true, snapshotVersion: snapshotVersion, error: nil, reason: payload)
+    }
 }

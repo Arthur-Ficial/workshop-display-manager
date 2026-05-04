@@ -18,6 +18,11 @@ public enum RemoteAction: Sendable, Equatable {
     case check(ref: Ref)
     case uncheck(ref: Ref)
     case closeWindow(name: String)
+    case raiseWindow(name: String)
+    case keystroke(key: String, modifiers: [String])
+    case screenshot(window: String?)  // nil → main window
+    case waitForRemoteID(remoteID: String, timeoutMs: Int)
+    case invokeMenu(selector: String)
 }
 
 public enum ScrollDirection: String, Sendable, Codable {
