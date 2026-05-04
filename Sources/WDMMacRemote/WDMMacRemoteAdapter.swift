@@ -148,14 +148,38 @@ public final class WDMMacRemoteAdapter: RemoteControllable, @unchecked Sendable 
         guard let window, let view = window.contentView else {
             return .staleRef(snapshotVersion: 0)
         }
-        // NSView.cacheDisplay → bitmap. In-process; doesn't need
-        // ScreenCaptureKit + the system permission prompt that the new
-        // CGWindowListCreateImage replacement requires on macOS 26.
+        // In-process screenshot via CALayer.render(in:) — captures the
+        // SwiftUI layer tree directly, no /usr/sbin/screencapture
+        // subprocess (which would trigger macOS TCC and prompt the user
+        // for Screen Recording permission every launch).
+        //
+        // Trade-off: SwiftUI subtrees that haven't been rasterized into
+        // their backing layer yet may be missing from the output. The
+        // primary state surface is /ui/snapshot (the AX scene tree) —
+        // screenshots are a secondary convenience for AI agents that
+        // want to see, not just read.
         let bounds = view.bounds
-        guard let rep = view.bitmapImageRepForCachingDisplay(in: bounds) else {
-            return .unsupported(snapshotVersion: 0, reason: "bitmapImageRepForCachingDisplay nil")
+        let scale = window.backingScaleFactor
+        let pxW = Int(bounds.width * scale)
+        let pxH = Int(bounds.height * scale)
+        guard pxW > 0, pxH > 0,
+              let cs = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: nil, width: pxW, height: pxH,
+                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return .unsupported(snapshotVersion: 0, reason: "CGContext alloc failed")
         }
-        view.cacheDisplay(in: bounds, to: rep)
+        ctx.scaleBy(x: scale, y: scale)
+        if let layer = view.layer {
+            layer.render(in: ctx)
+        }
+        // CGContext is bottom-left origin → flip the resulting image
+        // so it reads top-left like every other PNG.
+        guard let cgImage = ctx.makeImage() else {
+            return .unsupported(snapshotVersion: 0, reason: "context makeImage failed")
+        }
+        let rep = NSBitmapImageRep(cgImage: cgImage)
         guard let pngData = rep.representation(using: .png, properties: [:]) else {
             return .unsupported(snapshotVersion: 0, reason: "PNG encoding failed")
         }

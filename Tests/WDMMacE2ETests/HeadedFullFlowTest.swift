@@ -2,109 +2,98 @@ import Testing
 import Foundation
 @testable import WDMRemoteControl
 
-/// One-shot end-to-end demo: spawns the headed `wdm-mac.app`, then drives
-/// the entire UI through the remote API in a single ordered sequence —
-/// no AppleScript, no parallel test scheduling weirdness, no shared
-/// instance fragility. Last step closes the main window through the API.
+/// One-shot end-to-end demo: drives the entire UI through `/ui/*` in a
+/// single ordered sequence and ends by closing the main window. Watch
+/// the visible app on screen — every click + appearance flip + screenshot
+/// you see comes from a /ui/* call. No osascript anywhere.
 ///
-/// Run via:
-///   swift test --filter HeadedFullFlowTest \
-///     -- --serialized
-///   (env: WDM_HEADED_E2E=1 WDM_MAC_APP=/path/to/WDMMac.app)
-///
-/// Watch the visible app on screen while it runs — every click + keystroke
-/// + screenshot you see comes from a /ui/* call.
+/// Gated behind WDM_HEADED_E2E=1 + WDM_HEADED_FULL=1 so it runs in
+/// isolation (the close-app step terminates the shared instance).
 @Suite("Headed full-flow: every action via /ui/*, close last")
 struct HeadedFullFlowTest {
     @Test func driveEverythingAndQuit() async throws {
-        guard ProcessInfo.processInfo.environment["WDM_HEADED_E2E"] == "1",
+        guard headedEnabled(),
               ProcessInfo.processInfo.environment["WDM_HEADED_FULL"] == "1"
         else { return }
-
-        let env = try makeHeadedEnv()
-        _ = try spawnHeaded(env: env)
-        let port = try waitForPort(stateFile: env.stateFile)
-        let api = APIClient(port: port)
-
-        // Give SwiftUI a beat to populate its AX tree.
-        try await Task.sleep(nanoseconds: 1_500_000_000)
-
-        log("[1/9] raise the main window via /ui/raiseWindow")
-        try await api.post("/ui/raiseWindow", #"{"name":"Workshop Display Manager"}"#)
-
-        log("[2/9] snapshot — assert all expected IDs present via /ui/snapshot")
-        var tree = try await api.snapshot()
-        let buttons = Dictionary(grouping: tree.nodes.filter { $0.role == "button" },
-                                 by: \.remoteID).mapValues { $0.first! }
-        try #require(buttons["titlebar.tab.stage"] != nil, "titlebar tabs visible")
-
-        log("[3/9] click each titlebar tab via /ui/click")
-        for label in ["titlebar.tab.stage", "titlebar.tab.profiles", "titlebar.tab.recordings"] {
-            let ref = buttons[label]!.ref.rawValue
-            try await api.post("/ui/click", #"{"ref":"\#(ref)"}"#)
-            try await Task.sleep(nanoseconds: 250_000_000)
-        }
-
-        log("[4/9] click each rotation segment + flip segment in the inspector")
-        tree = try await api.snapshot()
-        let inspectorButtons = tree.nodes.filter { $0.role == "button"
-            && ($0.remoteID.hasPrefix("inspector.rotate.") || $0.remoteID.hasPrefix("inspector.flip.")) }
-        for n in inspectorButtons {
-            try await api.post("/ui/click", #"{"ref":"\#(n.ref.rawValue)"}"#)
-            try await Task.sleep(nanoseconds: 120_000_000)
-        }
-
-        log("[5/9] open Settings via /ui/invokeMenu {selector: openSettings}")
-        try await api.post("/ui/invokeMenu", #"{"selector":"openSettings"}"#)
-
-        log("[6/9] wait for settings.appearance.picker via /ui/wait")
-        try await api.post("/ui/wait",
-                           #"{"remoteID":"settings.appearance.picker","timeoutMs":3000}"#)
-
-        log("[7/9] take a screenshot of the Settings window via /ui/screenshot")
-        let png = try await api.getRaw("/ui/screenshot?window=Settings")
+        let api = try await MainActor.run { try sharedHeadedAPI() }
         let outDir = URL(fileURLWithPath: "/tmp/wdm-fullflow")
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
-        try png.write(to: outDir.appendingPathComponent("settings.png"))
-        log("    saved /tmp/wdm-fullflow/settings.png (\(png.count) bytes)")
 
-        log("[8/9] close Settings via /ui/closeWindow")
-        try await api.post("/ui/closeWindow", #"{"name":"Settings"}"#)
-        try await Task.sleep(nanoseconds: 400_000_000)
+        log("[1/12] /ui/raiseWindow Workshop Display Manager")
+        try await api.raiseWindow(named: "Workshop Display Manager")
 
-        log("[9/9] close the main window via /ui/closeWindow — app quits")
-        try await api.post("/ui/closeWindow", #"{"name":"Workshop Display Manager"}"#)
+        log("[2/12] /ui/snapshot — assert all expected IDs present")
+        let tree = try await api.snapshot()
+        try #require(tree.nodes.contains { $0.remoteID == "titlebar.tab.stage" })
 
-        log("✓ full flow completed — every action went through /ui/*")
+        log("[3/12] click each titlebar tab via /ui/click")
+        for label in ["titlebar.tab.stage", "titlebar.tab.profiles", "titlebar.tab.recordings"] {
+            let r = try await api.clickRemoteID(label)
+            #expect(r["ok"] as? Bool == true, "click \(label) -> \(r)")
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+
+        log("[4/12] click rotation + flip segments")
+        for id in ["inspector.rotate.0", "inspector.rotate.90", "inspector.rotate.180",
+                   "inspector.rotate.270", "inspector.flip.none", "inspector.flip.h",
+                   "inspector.flip.v"] {
+            let r = try await api.clickRemoteID(id)
+            #expect(r["ok"] as? Bool == true, "click \(id) -> \(r)")
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        log("[5/12] /ui/screenshot Workshop Display Manager → main.png")
+        let mainPng = try await api.screenshot(window: "Workshop Display Manager")
+        try mainPng.write(to: outDir.appendingPathComponent("main.png"))
+        log("    \(mainPng.count) bytes")
+
+        log("[6/12] /ui/invokeMenu openSettings")
+        let openR = try await api.invokeMenu("openSettings")
+        #expect(openR["ok"] as? Bool == true, "invokeMenu openSettings -> \(openR)")
+
+        log("[7/12] /ui/wait for settings.appearance.system; screenshot Settings")
+        let waitR = try await api.waitFor(remoteID: "settings.appearance.system")
+        #expect(waitR["ok"] as? Bool == true, "wait for Settings -> \(waitR)")
+        try (try await api.screenshot(window: "Settings"))
+            .write(to: outDir.appendingPathComponent("settings-initial.png"))
+
+        log("[8/12] flip → LIGHT")
+        try await flipAppearance(api: api, to: "settings.appearance.light",
+                                 outFile: outDir.appendingPathComponent("after-light.png"))
+
+        log("[9/12] flip → DARK")
+        try await flipAppearance(api: api, to: "settings.appearance.dark",
+                                 outFile: outDir.appendingPathComponent("after-dark.png"))
+
+        log("[10/12] flip → SYSTEM")
+        try await flipAppearance(api: api, to: "settings.appearance.system",
+                                 outFile: outDir.appendingPathComponent("after-system.png"))
+
+        log("[11/12] close Settings via /ui/closeWindow")
+        let closeS = try await api.closeWindow(named: "Settings")
+        #expect(closeS["ok"] as? Bool == true)
+
+        log("[12/12] close Workshop Display Manager via /ui/closeWindow — app quits")
+        let closeM = try await api.closeWindow(named: "Workshop Display Manager")
+        #expect(closeM["ok"] as? Bool == true)
+
+        log("✓ full flow completed — every action via /ui/*")
+    }
+
+    private func flipAppearance(api: HeadedAPI, to remoteID: String, outFile: URL) async throws {
+        // Picker segments may take a beat to render after the previous click —
+        // wait for the segment to be in the snapshot before clicking it.
+        let waited = try await api.waitFor(remoteID: remoteID, timeoutMs: 2000)
+        #expect(waited["ok"] as? Bool == true, "wait for \(remoteID) -> \(waited)")
+        let r = try await api.clickRemoteID(remoteID)
+        #expect(r["ok"] as? Bool == true, "click \(remoteID) -> \(r)")
+        try await Task.sleep(nanoseconds: 350_000_000)
+        let png = try await api.screenshot(window: "Settings")
+        try png.write(to: outFile)
+        log("    saved \(outFile.path) (\(png.count) bytes)")
     }
 
     private func log(_ s: String) {
         FileHandle.standardError.write(Data("    \(s)\n".utf8))
-    }
-}
-
-/// Tiny URLSession wrapper so the test reads top-to-bottom.
-private struct APIClient {
-    let port: UInt16
-    private var base: String { "http://127.0.0.1:\(port)" }
-
-    func snapshot() async throws -> SceneTree {
-        let data = try await getRaw("/ui/snapshot")
-        return try SceneTreeJSON.decode(data)
-    }
-
-    @discardableResult
-    func post(_ path: String, _ jsonBody: String) async throws -> Data {
-        var req = URLRequest(url: URL(string: "\(base)\(path)")!)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = Data(jsonBody.utf8)
-        let (data, _) = try await URLSession.shared.data(for: req)
-        return data
-    }
-
-    func getRaw(_ path: String) async throws -> Data {
-        let (data, _) = try await URLSession.shared.data(from: URL(string: "\(base)\(path)")!)
-        return data
     }
 }

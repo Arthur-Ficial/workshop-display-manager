@@ -120,30 +120,42 @@ search_corpus=$(find "$TESTS" -name "*.swift" 2>/dev/null
                 find "$ROOT/Tests" -name "*.swift" 2>/dev/null)
 
 CLICK_VERBS='(wdm_ax_click|wdm_close_window|wdm-mac-control click|click button|click radio button|/ui/click|/ui/closeWindow|press|#expect.*click|XCTAssert.*click|accessibilityPerformPress|closeWindow\(named:)'
+ASSERT_VERBS='(#expect|XCTAssert|try #require|#require)'
 QUERY_VERBS='(wdm_ax_dump|wdm_ax_click|wdm_close_window|wdm-mac-control|accessibilityIdentifier|remoteID|click button|click radio button)'
 
 is_covered_by() {
   local id="$1" verbs="$2"
-  # Use grep -F via two passes: first filter files containing the literal id,
-  # then grep -E for the verb on those same files. Sidesteps regex-escape
-  # hell with interpolated ids that contain '(' ')'.
   local hits
   hits=$(echo "$search_corpus" | xargs grep -lF "$id" 2>/dev/null || true)
   [[ -z "$hits" ]] && return 1
   echo "$hits" | xargs grep -lE "$verbs" 2>/dev/null | grep -q .
 }
 
-# CLICKABLE IDs need a click verb.
+# Stronger check for CLICKABLE ids: the test file must contain (a) the id
+# literal, (b) a click verb, AND (c) an assertion. Without (c) the test
+# could click and never check that anything happened — the user calls
+# this out: "the lint must have caught this; there was a test missing
+# that did not test it." Now it does.
+is_clickable_covered() {
+  local id="$1"
+  local hits
+  hits=$(echo "$search_corpus" | xargs grep -lF "$id" 2>/dev/null || true)
+  [[ -z "$hits" ]] && return 1
+  echo "$hits" | xargs grep -lE "$CLICK_VERBS" 2>/dev/null \
+    | xargs grep -lE "$ASSERT_VERBS" 2>/dev/null | grep -q .
+}
+
+# CLICKABLE IDs need a click verb AND an assertion in the same file.
 while IFS= read -r id; do
   [[ -z "$id" ]] && continue
   if [[ "$id" == *'\('* ]]; then
     prefix=$(printf '%s' "$id" | sed -E 's/\\\(.*$//')
-    if is_covered_by "$prefix" "$CLICK_VERBS"; then
+    if is_clickable_covered "$prefix"; then
       echo "$id" >> "$covered_file"
     fi
     continue
   fi
-  if is_covered_by "$id" "$CLICK_VERBS"; then
+  if is_clickable_covered "$id"; then
     echo "$id" >> "$covered_file"
   fi
 done < "$clickable_file"

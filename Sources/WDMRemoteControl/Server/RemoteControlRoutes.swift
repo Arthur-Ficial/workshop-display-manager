@@ -112,11 +112,9 @@ public enum RemoteControlRoutes {
         var out: [String: String] = [:]
         for pair in q.split(separator: "&") {
             let kv = pair.split(separator: "=", maxSplits: 1)
-            if kv.count == 2 {
-                out[String(kv[0])] = String(kv[1])
-            } else {
-                out[String(kv[0])] = ""
-            }
+            let key = String(kv[0]).removingPercentEncoding ?? String(kv[0])
+            let val = kv.count == 2 ? (String(kv[1]).removingPercentEncoding ?? String(kv[1])) : ""
+            out[key] = val
         }
         return out
     }
