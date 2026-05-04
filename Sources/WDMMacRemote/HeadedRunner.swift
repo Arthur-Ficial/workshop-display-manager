@@ -53,10 +53,19 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         let host = NSHostingView(rootView: content)
         let win = NSWindow(
             contentRect: NSRect(x: 200, y: 200, width: 760, height: 520),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered, defer: false
         )
         win.title = "Workshop Display Manager"
+        win.titlebarAppearsTransparent = true
+        win.titleVisibility = .visible
+        win.isMovableByWindowBackground = true
+        // Critical for Liquid Glass: window must be transparent so glass
+        // surfaces inside (`.glassEffect`, `.containerBackground(_:for:.window)`)
+        // can blur the desktop and adjacent windows. An opaque window means
+        // glass blurs nothing → looks like a flat tinted material.
+        win.isOpaque = false
+        win.backgroundColor = .clear
         win.contentView = host
         win.makeKeyAndOrderFront(nil)
         self.window = win

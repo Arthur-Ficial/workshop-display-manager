@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test smoke smoke-mac-remote install clean fmt release
+.PHONY: build test smoke smoke-mac-remote lint-glass install clean fmt release
 
 build:
 	$(SWIFT) build
@@ -17,6 +17,12 @@ test:
 # tears down. Output is what an AI would see.
 smoke-mac-remote: build
 	@bash scripts/smoke-mac-remote.sh
+
+# Forbids non-Liquid-Glass chrome in Sources/WDMMac/. Catches Material.thinMaterial,
+# .ultraThickMaterial, solid Color backgrounds on chrome, and files under Views/
+# that don't reference at least one Liquid Glass primitive.
+lint-glass:
+	@bash scripts/lint-liquid-glass.sh
 
 smoke: release
 	WDM_REAL_HARDWARE=1 .build/release/wdm list

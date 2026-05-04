@@ -12,32 +12,28 @@ public struct ContentView: View {
     }
 
     public var body: some View {
-        ZStack {
-            // Faux-Tahoe atmospheric backdrop (the chrome behind the glass).
-            LinearGradient(
-                colors: [Color(.sRGB, red: 0.94, green: 0.95, blue: 0.97, opacity: 1),
-                         Color(.sRGB, red: 0.86, green: 0.89, blue: 0.94, opacity: 1)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            ).ignoresSafeArea()
-
-            VStack(spacing: 18) {
-                HStack {
-                    Text("Workshop Display Manager")
-                        .font(.system(size: 22, weight: .semibold))
-                    Spacer()
-                    Text("\(vm.tiles.count) display\(vm.tiles.count == 1 ? "" : "s")")
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityIdentifier("titlebar")
-
-                tilesContainer
-                    .accessibilityIdentifier("displays.list")
-
+        // Liquid Glass: NO opaque backdrop. The NSWindow is configured
+        // transparent in HeadedRunner so the desktop shows through; inner
+        // chrome surfaces use `.glassEffect()` which then layers system
+        // glass over the see-through window.
+        VStack(spacing: 18) {
+            HStack {
+                Text("Workshop Display Manager")
+                    .font(.system(size: 22, weight: .semibold))
                 Spacer()
+                Text("\(vm.tiles.count) display\(vm.tiles.count == 1 ? "" : "s")")
+                    .foregroundStyle(.secondary)
             }
-            .padding(24)
+            .accessibilityIdentifier("titlebar")
+
+            tilesContainer
+                .accessibilityIdentifier("displays.list")
+
+            Spacer()
         }
+        .padding(24)
         .frame(minWidth: 520, minHeight: 360)
+        .modifier(WindowGlassBackground())
     }
 
     @ViewBuilder

@@ -47,3 +47,18 @@ extension View {
     /// Apply Liquid Glass button style (with plain fallback on older macOS).
     public func liquidGlassButton() -> some View { modifier(LiquidGlassButtonStyle()) }
 }
+
+/// Window-level Liquid Glass surface. On macOS 26 the system promotes
+/// `.containerBackground(.regularMaterial, for: .window)` to real Tahoe
+/// Liquid Glass — combined with a transparent `NSWindow` (configured by
+/// HeadedRunner) the chrome shows the desktop through.
+public struct WindowGlassBackground: ViewModifier {
+    public init() {}
+    public func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.containerBackground(.regularMaterial, for: .window)
+        } else {
+            content.background(.regularMaterial)
+        }
+    }
+}
