@@ -22,10 +22,26 @@ struct HeadedCloseWindowTests {
                 "closing a non-existent window should report stale-ref, got \(absent)")
 
         // 2. The endpoint accepts a real window name too — but we DON'T
-        //    fire it here because that would terminate the shared instance.
-        //    The companion CLI's `wdm-mac-control close-window <name>`
-        //    exercises that path manually; tests treat the close as the
-        //    final step of HeadedSettingsTests once it's serialized.
+        //    fire it here because that would terminate the shared instance
+        //    used by the other Headed tests. The full close path is
+        //    exercised by the dedicated test below (gated behind
+        //    WDM_HEADED_CLOSE_E2E=1 so it only runs in isolation).
+    }
+
+    /// Closes the actual `Workshop Display Manager` window via
+    /// `closeWindow(named: "Workshop Display Manager")` and asserts
+    /// the API returns ok:true. Gated behind `WDM_HEADED_CLOSE_E2E=1`
+    /// because it terminates the shared HeadedAppInstance — only run
+    /// it when no other Headed tests are scheduled.
+    @Test func closesMainWindowExclusive() async throws {
+        guard ProcessInfo.processInfo.environment["WDM_HEADED_E2E"] == "1",
+              ProcessInfo.processInfo.environment["WDM_HEADED_CLOSE_E2E"] == "1"
+        else { return }
+        let inst = try await MainActor.run { try HeadedAppInstance.shared() }
+        let port = inst.port
+        let result = try await closeWindow(named: "Workshop Display Manager", port: port)
+        #expect(result["ok"] as? Bool == true,
+                "closeWindow(named: \"Workshop Display Manager\") returned \(result)")
     }
 
     private func closeWindow(named name: String, port: UInt16) async throws -> [String: Any] {
