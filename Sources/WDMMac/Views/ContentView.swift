@@ -33,7 +33,10 @@ public struct ContentView: View {
         }
         .padding(24)
         .frame(minWidth: 520, minHeight: 360)
-        .modifier(WindowGlassBackground())
+        // Window backdrop is supplied by HeadedRunner's NSVisualEffectView
+        // (material=.windowBackground, blendingMode=.behindWindow). No
+        // .containerBackground here — that requires SwiftUI's WindowGroup
+        // and silently no-ops on a manually-created NSWindow.
     }
 
     @ViewBuilder

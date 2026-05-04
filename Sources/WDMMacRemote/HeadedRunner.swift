@@ -60,13 +60,27 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         win.titlebarAppearsTransparent = true
         win.titleVisibility = .visible
         win.isMovableByWindowBackground = true
-        // Critical for Liquid Glass: window must be transparent so glass
-        // surfaces inside (`.glassEffect`, `.containerBackground(_:for:.window)`)
-        // can blur the desktop and adjacent windows. An opaque window means
-        // glass blurs nothing → looks like a flat tinted material.
+
+        // Tahoe Liquid Glass for a manually-created NSWindow:
+        //   - Window is transparent (isOpaque=false, backgroundColor=clear)
+        //   - An NSVisualEffectView with material=.windowBackground +
+        //     blendingMode=.behindWindow paints the system's frosted backdrop
+        //     blurring the desktop & windows behind it.
+        //   - On macOS 26 the system promotes this material to real Liquid
+        //     Glass automatically; on macOS 13–15 it's the legacy material.
+        //   - The SwiftUI content sits in front; inner `.glassEffect()` calls
+        //     in WDMMac chrome layer additional Liquid Glass on top.
         win.isOpaque = false
         win.backgroundColor = .clear
-        win.contentView = host
+        let vfx = NSVisualEffectView()
+        vfx.material = .windowBackground
+        vfx.blendingMode = .behindWindow
+        vfx.state = .active
+        vfx.autoresizingMask = [.width, .height]
+        host.frame = vfx.bounds
+        host.autoresizingMask = [.width, .height]
+        vfx.addSubview(host)
+        win.contentView = vfx
         win.makeKeyAndOrderFront(nil)
         self.window = win
 
