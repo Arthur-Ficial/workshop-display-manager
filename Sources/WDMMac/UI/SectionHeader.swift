@@ -18,7 +18,9 @@ public struct SectionHeader<Trailing: View>: View {
     public var body: some View {
         HStack(spacing: 6) {
             SectionLabel(title)
-            if let count { CountChip(count: count) }
+            // Hide the count chip when zero — "VIRTUAL 0" was visual
+            // debt; the empty-state hint already communicates "none yet".
+            if let count, count > 0 { CountChip(count: count) }
             Spacer()
             trailing()
         }
