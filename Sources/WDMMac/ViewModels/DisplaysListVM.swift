@@ -144,12 +144,17 @@ public final class DisplaysListVM: ObservableObject {
 
     /// Apply a SOFTWARE overlay flip via the same in-process Kit op
     /// the CLI uses (`controller.flipOverlay` → `AppKitOverlayFlipper`).
-    /// Runs on the main actor because the flipper's run-loop pump and
-    /// activation-policy switch require main-thread context. The UI
-    /// freezes for the 600 ms duration of the flip — that's the
-    /// intended behaviour: the *screen* is the user feedback during
-    /// the flip; pumping more SwiftUI updates over the top would just
-    /// fight the overlay.
+    ///
+    /// Runs on a DETACHED background thread, NOT on the main actor.
+    /// AppKitOverlayFlipper.run() pumps its own RunLoop synchronously
+    /// for `durationMs` and internally schedules
+    /// `Task { @MainActor in startStream() }` which it then waits on
+    /// via semaphore. If we called it from `Task { @MainActor in … }`,
+    /// the inner Task could never run because main actor would be
+    /// held by our outer Task — instant deadlock. The detached path
+    /// runs on a background thread; the flipper's internal main-thread
+    /// dispatches drive the AppKit window correctly, and the
+    /// background thread's RunLoop pump satisfies the run() contract.
     public func applyFlip(displayID: UInt32, flip: Flip) {
         flipSelection[String(displayID)] = flip
         guard flip != .none else {
@@ -159,24 +164,17 @@ public final class DisplaysListVM: ObservableObject {
         let alias = String(displayID)
         let captureFlipper = overlayFlipper
         let captureController = controller
-        // Schedule on main actor; SwiftUI's run loop will drive the
-        // flipper's internal pump. Synchronous `try` block bounded by
-        // the 600 ms `durationMs`.
-        Task { @MainActor [weak self] in
+        Task.detached { [weak self] in
             do {
                 try captureController.flipOverlay(alias, flip: flip,
                                                   durationMs: 600,
                                                   using: captureFlipper)
-                self?.lastError = nil
+                await MainActor.run { [weak self] in self?.lastError = nil }
             } catch {
-                // Use \(error) (case name + payload) instead of
-                // .localizedDescription — the latter is generic
-                // ("The operation couldn't be completed") and hides
-                // the actual cause string. We need the cause in the
-                // visible UI so the user can recognise "Screen
-                // Recording denied" / "permission denied" / etc.
-                self?.lastError = "Flip overlay failed: \(error). If this mentions 'Screen Recording', grant WDMMac.app permission in System Settings → Privacy & Security → Screen Recording, then quit & relaunch."
+                let msg = "Flip overlay failed: \(error). If this mentions 'Screen Recording', grant WDMMac.app permission in System Settings → Privacy & Security → Screen Recording, then quit & relaunch."
+                await MainActor.run { [weak self] in self?.lastError = msg }
             }
+            _ = self  // silence weak-self-unused warning when self is nil
         }
     }
 
