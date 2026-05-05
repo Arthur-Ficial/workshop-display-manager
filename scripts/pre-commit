@@ -40,6 +40,9 @@ bash scripts/lint-file-size.sh
 echo "pre-commit: lint-function-size..."
 bash scripts/lint-function-size.sh
 
+echo "pre-commit: lint-cyclomatic-complexity..."
+bash scripts/lint-cyclomatic-complexity.sh
+
 echo "pre-commit: lint-github-tickets (soft)..."
 bash scripts/lint-github-tickets.sh
 

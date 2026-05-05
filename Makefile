@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size golden-goal app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size lint-cyclomatic-complexity golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -98,6 +98,13 @@ lint-file-size:
 # track each one.
 lint-function-size:
 	@bash scripts/lint-function-size.sh
+
+# Forbids any function with cyclomatic complexity > 7 (CLAUDE.md
+# "SUPER MODULAR"). Counts if/case/while/for/&&/||/?:/catch/guard
+# branches. Existing offenders carry temporary entries in
+# docs/cyclomatic-whitelist.md.
+lint-cyclomatic-complexity:
+	@bash scripts/lint-cyclomatic-complexity.sh
 
 # Acceptance ledger for the ship-ready goal. 10 lines of evidence:
 # release build, swift test, headed e2e, every lint, codesign,

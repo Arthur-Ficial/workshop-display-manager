@@ -38,6 +38,11 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-function-size.sh")
     }
 
+    @Test("No Swift function with cyclomatic complexity > 7 (whitelist for refactor backlog)")
+    func cyclomaticComplexity() throws {
+        try Self.runLint(named: "lint-cyclomatic-complexity.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")
