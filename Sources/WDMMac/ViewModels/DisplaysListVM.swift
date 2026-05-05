@@ -29,6 +29,11 @@ public final class DisplaysListVM: ObservableObject {
         /// arrangement changes (after a drag-end commits).
         public let originX: Int
         public let originY: Int
+        /// Current brightness 0..1 — nil if the display has no DDC/CI or
+        /// software-readable brightness (most external monitors). The
+        /// Inspector's brightness section refuses to render a slider when
+        /// nil, per CLAUDE.md's honest-unsupported-path policy.
+        public let brightness: Float?
         public var isSelected: Bool
 
         public var id: String { remoteID }
@@ -116,6 +121,7 @@ public final class DisplaysListVM: ObservableObject {
                     heightPx: d.currentMode.height,
                     originX: d.origin.x,
                     originY: d.origin.y,
+                    brightness: tryBrightness(displayID: d.id),
                     isSelected: d.id == displayIDFor(remoteID: selectedRemoteID)
                 )
             }
@@ -124,6 +130,25 @@ public final class DisplaysListVM: ObservableObject {
             lastError = "\(error)"
             tiles = []
         }
+    }
+
+    /// Best-effort brightness read; nil on any error or unsupported display.
+    /// Honest-unsupported-path: never lies and never invents a value.
+    private func tryBrightness(displayID: UInt32) -> Float? {
+        do { return try controller.brightness(String(displayID)) } catch { return nil }
+    }
+
+    /// Set brightness for one display via the same Kit op the CLI's
+    /// `wdm brightness <id> <value>` exposes. Refreshes the tile list
+    /// so the new value flows to the Inspector + remote registry.
+    public func setBrightness(displayID: UInt32, value: Float) {
+        do {
+            _ = try controller.brightness(String(displayID), value: value, confirmer: AutoYesConfirmer())
+            lastError = nil
+        } catch {
+            lastError = "\(error)"
+        }
+        reload()
     }
 
     private func displayIDFor(remoteID: String?) -> UInt32? {

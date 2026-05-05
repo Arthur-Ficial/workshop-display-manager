@@ -49,6 +49,45 @@ public final class WDMMacRemoteRunner {
             entries.append((displaysID, entry))
             entries.append((stageID, entry))
         }
+        // INSPECTOR — brightness section, surfaced for the currently-
+        // selected display only (mirrors the SwiftUI Inspector). For
+        // supported displays: a passive `inspector.brightness.value`
+        // text node carrying the current 0..1 value, plus four preset
+        // click points (.025/.050/.075/.100) routed to setBrightness.
+        // For unsupported displays: a single `inspector.brightness.unavailable`
+        // text node — honest refusal per CLAUDE.md.
+        let selectedTile = tiles.first { $0.remoteID == selected } ?? tiles.first
+        if let tile = selectedTile {
+            if let level = tile.brightness {
+                let value = String(format: "%.2f", level)
+                entries.append(("inspector.brightness.value", RemoteRegistry.Entry(
+                    role: "text", label: "Brightness", value: value,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: nil
+                )))
+                let displayID = tile.displayID
+                for preset in [25, 50, 75, 100] {
+                    let presetID = "inspector.brightness.value.\(String(format: "%03d", preset))"
+                    let presetValue = Float(preset) / 100.0
+                    let click: @Sendable () -> Void = { [vm] in
+                        Task { @MainActor in vm.setBrightness(displayID: displayID, value: presetValue) }
+                    }
+                    entries.append((presetID, RemoteRegistry.Entry(
+                        role: "button", label: "\(preset)%", value: nil,
+                        state: NodeState(selected: false, enabled: true),
+                        onClick: click
+                    )))
+                }
+            } else {
+                entries.append(("inspector.brightness.unavailable", RemoteRegistry.Entry(
+                    role: "text", label: "Brightness control unavailable on this display.",
+                    value: nil,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: nil
+                )))
+            }
+        }
+
         // PROFILES section header `+` button — saves the current arrangement
         // as `snapshot-<timestamp>` and refreshes the sidebar.
         let saveID = "sidebar.profiles.add"

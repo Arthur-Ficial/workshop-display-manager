@@ -166,6 +166,7 @@ Conventions:
 - Run `make test` green before commit. Run `make release` warnings-as-errors clean before release.
 - Pass through `WDMController` for every verb. Frontends format only.
 - Land each feature with its e2e test in the same commit.
+- **Every feature ships with a *visual* headed e2e remote-control test, not just headless.** The headless registry path proves the wiring; only the headed `WDM_HEADED_E2E=1` path proves SwiftUI actually lays out the controls a human sees and that AppKit's accessibility tree exposes them. A feature that passes only the headless suite has not been demonstrated to work — see CLAUDE.md "Tests are 100% truthful — non-negotiable" and the three-step RED → GREEN → DEMO rule. The test must drive the feature through the live `/ui/*` HTTP API the same way `wdm-mac-control` does, and assert observable state change post-click. No osascript, no AppleScript, no `tell application "System Events"` anywhere under `Tests/`.
 
 ### Ask first
 - Adding a runtime dependency (anything beyond `swift-argument-parser`).

@@ -261,6 +261,28 @@ prove the actual feature works. Specifically:
   defect: it lets coverage pass while clicks fall through. Forbidden.
 - An e2e test that exits 0 without verifying observable state change is
   not a test. After a click, snapshot again and assert the new state.
+- **A test that doesn't actually run is not a real test.** Writing the
+  test file and watching the suite report "0 executed" because of a
+  guard / env-var / `make` target you never invoke = the test does not
+  exist. Every e2e suite must be runnable from a single command on the
+  developer's machine, and that command must be invoked before the
+  feature is considered done. Specifically:
+    - Headless e2e (`HeadlessXxxTests`): must run by default in
+      `swift test` / `make test`. If a test is gated behind an env-var
+      that defaults off, the gate is wrong — make it run by default.
+    - Headed e2e (`HeadedXxxTests`): gated behind `WDM_HEADED_E2E=1`,
+      runnable via `make e2e-fullflow` (or a focused `make` target).
+      The feature is not done until that target has been run AND the
+      suite passed AND the developer (or AI) watched the visible
+      window do the thing on the user's screen.
+    - Any test that "passes" because the body early-returns on a
+      missing env var is a hidden no-op. The skipped state must be
+      visible — printed on stderr, counted separately, surfaced by the
+      test runner — never silently green.
+  "Wrote the test, didn't run it" violates the iron law just as hard
+  as "wrote the code without a failing test first." Tests are not
+  artifacts; they are evidence — and evidence you don't collect
+  doesn't exist.
 
 If a UI element exists, an e2e test for it must exist. If there is no
 test, the element must not exist. There is no third option. The lint

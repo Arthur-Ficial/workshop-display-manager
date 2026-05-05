@@ -14,6 +14,8 @@ struct HeadedClickCoverageTests {
         "inspector.mode.dropdown",
         "inspector.rotate.0", "inspector.rotate.90", "inspector.rotate.180", "inspector.rotate.270",
         "inspector.flip.none", "inspector.flip.h", "inspector.flip.v",
+        "inspector.brightness.value.025", "inspector.brightness.value.050",
+        "inspector.brightness.value.075", "inspector.brightness.value.100",
         "inspector.action.makeMain", "inspector.action.pip", "inspector.action.record",
         "inspector.action.reset", "inspector.action.advanced",
         "statusbar.toggle.watch", "statusbar.toggle.advanced",

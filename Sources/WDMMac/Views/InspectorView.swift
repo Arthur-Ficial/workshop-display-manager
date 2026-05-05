@@ -19,6 +19,8 @@ public struct InspectorView: View {
                     InspectorIdentity(tile: tile)
                     SectionLabel("GEOMETRY")
                     InspectorGeometry(vm: vm, tile: tile)
+                    SectionLabel("BRIGHTNESS")
+                    InspectorBrightness(vm: vm, tile: tile)
                     SectionLabel("ACTIONS")
                     InspectorActions()
                 } else {
