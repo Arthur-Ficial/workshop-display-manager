@@ -33,6 +33,11 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-file-size.sh")
     }
 
+    @Test("No Swift function > 30 lines (whitelist for refactor backlog)")
+    func functionSize() throws {
+        try Self.runLint(named: "lint-function-size.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")

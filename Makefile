@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size golden-goal app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -91,6 +91,13 @@ lint-every-verb-has-e2e:
 # while refactor-backlog issues track each one.
 lint-file-size:
 	@bash scripts/lint-file-size.sh
+
+# Forbids any Swift function/init/deinit > 30 lines (CLAUDE.md
+# "SUPER MODULAR"). Existing offenders carry a temporary entry in
+# docs/function-size-whitelist.md while refactor-backlog issues
+# track each one.
+lint-function-size:
+	@bash scripts/lint-function-size.sh
 
 # Acceptance ledger for the ship-ready goal. 10 lines of evidence:
 # release build, swift test, headed e2e, every lint, codesign,
