@@ -35,6 +35,7 @@ public final class DisplaysListVM: ObservableObject {
     }
 
     @Published public private(set) var tiles: [Tile] = []
+    @Published public private(set) var profiles: [String] = []
     @Published public private(set) var selectedRemoteID: String?
     @Published public private(set) var lastError: String?
     @Published public internal(set) var flipSelection: [String: Flip] = [:]
@@ -54,6 +55,17 @@ public final class DisplaysListVM: ObservableObject {
         observer?.cancel()
         observer = controller.observeReconfigurations { [weak self] _ in
             Task { @MainActor in self?.reload() }
+        }
+    }
+
+    /// Live read of saved profile names — drives the sidebar PROFILES section.
+    /// Sorted alphabetically by ProfileStore so the order is stable across runs.
+    public func reloadProfiles() {
+        do {
+            profiles = try controller.profiles()
+        } catch {
+            lastError = "\(error)"
+            profiles = []
         }
     }
 

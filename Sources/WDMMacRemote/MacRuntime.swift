@@ -24,6 +24,7 @@ public struct MacRuntime {
         let adapter = WDMMacRemoteAdapter(registry: registry)
         let vm = DisplaysListVM(controller: deps.controller)
         vm.reload()
+        vm.reloadProfiles()
         vm.startObservingReconfigurations()
         let runner = WDMMacRemoteRunner(registry: registry, vm: vm)
         return MacRuntime(deps: deps, registry: registry,

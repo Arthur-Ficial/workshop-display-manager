@@ -52,8 +52,28 @@ public struct SidebarView: View {
 
     private var profilesSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            SectionHeader(title: "PROFILES", count: 0)
-            EmptyHint("No saved profiles.", remoteID: "sidebar.profiles.empty")
+            SectionHeader(title: "PROFILES", count: vm.profiles.count)
+            if vm.profiles.isEmpty {
+                EmptyHint("No saved profiles.", remoteID: "sidebar.profiles.empty")
+            } else {
+                ForEach(vm.profiles, id: \.self) { name in
+                    Button { onSelect("sidebar.profiles.row.\(name)") } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "bookmark")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text(name)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                    }
+                    .buttonStyle(.plain)
+                    .clickable(cornerRadius: 5)
+                    .accessibilityIdentifier("sidebar.profiles.row.\(name)")
+                }
+            }
         }
     }
 }

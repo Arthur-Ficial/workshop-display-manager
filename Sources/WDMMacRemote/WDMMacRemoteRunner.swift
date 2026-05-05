@@ -17,17 +17,16 @@ public final class WDMMacRemoteRunner {
     public init(registry: RemoteRegistry, vm: DisplaysListVM) {
         self.registry = registry
         self.vm = vm
-        // Either the tile list OR the selection changing must restamp the
-        // registry — selection is what flips the `selected` state flag the
-        // remote API exposes per node.
-        vm.$tiles.combineLatest(vm.$selectedRemoteID)
-            .sink { [weak self] tiles, selected in
-                self?.sync(tiles: tiles, selected: selected)
+        // Tiles, selection, OR profiles changing must restamp the registry —
+        // selection flips the `selected` state flag, profiles add/remove rows.
+        vm.$tiles.combineLatest(vm.$selectedRemoteID, vm.$profiles)
+            .sink { [weak self] tiles, selected, profiles in
+                self?.sync(tiles: tiles, selected: selected, profiles: profiles)
             }
             .store(in: &cancellables)
     }
 
-    private func sync(tiles: [DisplaysListVM.Tile], selected: String?) {
+    private func sync(tiles: [DisplaysListVM.Tile], selected: String?, profiles: [String]) {
         let vm = self.vm
         var entries: [(String, RemoteRegistry.Entry)] = []
         for tile in tiles {
@@ -49,6 +48,20 @@ public final class WDMMacRemoteRunner {
             )
             entries.append((displaysID, entry))
             entries.append((stageID, entry))
+        }
+        // PROFILES sidebar rows. Click action selects the row's remoteID so
+        // future restore/save flows can read the selection — same shape as
+        // displays. The actual restore call will be wired separately.
+        for name in profiles {
+            let rowID = "sidebar.profiles.row.\(name)"
+            let click: @Sendable () -> Void = { [vm] in
+                Task { @MainActor in vm.select(remoteID: rowID) }
+            }
+            entries.append((rowID, RemoteRegistry.Entry(
+                role: "button", label: name, value: nil,
+                state: NodeState(selected: rowID == selected, enabled: true),
+                onClick: click
+            )))
         }
         registry.replace(entries: entries)
     }
