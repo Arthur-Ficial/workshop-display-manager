@@ -49,13 +49,15 @@ public final class WDMMacRemoteRunner {
             entries.append((displaysID, entry))
             entries.append((stageID, entry))
         }
-        // PROFILES sidebar rows. Click action selects the row's remoteID so
-        // future restore/save flows can read the selection — same shape as
-        // displays. The actual restore call will be wired separately.
+        // PROFILES sidebar rows. Clicking one restores that profile via the
+        // same Kit op the CLI's `wdm restore` exposes — workshop facilitator's
+        // hot-swap-the-room gesture, one click. The fixture provider persists
+        // the resulting arrangement; the e2e test asserts the on-disk shape
+        // changed to prove the wiring is real.
         for name in profiles {
             let rowID = "sidebar.profiles.row.\(name)"
             let click: @Sendable () -> Void = { [vm] in
-                Task { @MainActor in vm.select(remoteID: rowID) }
+                Task { @MainActor in vm.restoreProfile(named: name) }
             }
             entries.append((rowID, RemoteRegistry.Entry(
                 role: "button", label: name, value: nil,

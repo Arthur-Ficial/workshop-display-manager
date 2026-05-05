@@ -69,6 +69,20 @@ public final class DisplaysListVM: ObservableObject {
         }
     }
 
+    /// Workshop facilitator's flagship action: click a profile, snap the
+    /// displays back to that arrangement. Routes through the same Kit op
+    /// the CLI's `wdm restore` exposes, with the auto-yes confirmer (no
+    /// terminal prompt is reachable in the GUI flow).
+    public func restoreProfile(named name: String) {
+        do {
+            _ = try controller.restoreProfile(name, confirmer: AutoYesConfirmer())
+            lastError = nil
+        } catch {
+            lastError = "\(error)"
+        }
+        reload()
+    }
+
     public func reload() {
         do {
             let displays = try controller.list()
