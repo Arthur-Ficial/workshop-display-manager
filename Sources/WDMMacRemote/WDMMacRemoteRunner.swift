@@ -85,7 +85,8 @@ public final class WDMMacRemoteRunner {
         let selectedTile = tiles.first { $0.remoteID == selected } ?? tiles.first
         if let tile = selectedTile {
             if let level = tile.brightness {
-                let value = String(format: "%.2f", level)
+                // Human-friendly percentage matches macOS System Settings.
+                let value = "\(Int((level * 100).rounded()))%"
                 entries.append(("inspector.brightness.value", RemoteRegistry.Entry(
                     role: "text", label: "Brightness", value: value,
                     state: NodeState(selected: false, enabled: true),

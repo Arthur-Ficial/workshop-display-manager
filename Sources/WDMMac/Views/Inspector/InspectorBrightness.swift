@@ -37,6 +37,10 @@ public struct InspectorBrightness: View {
                 Image(systemName: "sun.max")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
+                Text("\(Int((level * 100).rounded()))%")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, alignment: .trailing)
             }
         } else {
             Text("Brightness control unavailable on this display.")

@@ -27,8 +27,8 @@ struct HeadlessBrightnessTests {
         )
         let valueNode = snap.nodes.first { $0.remoteID == "inspector.brightness.value" }
         try #require(valueNode != nil, "inspector.brightness.value must surface for the selected (Built-in) display")
-        #expect(valueNode?.value?.contains("0.4") == true,
-                "expected the value to render 0.40; got \(String(describing: valueNode?.value))")
+        #expect(valueNode?.value?.contains("40%") == true,
+                "expected the value to render 40% (human-friendly format); got \(String(describing: valueNode?.value))")
     }
 
     @Test func clickingPresetWritesBrightness() async throws {
@@ -66,8 +66,8 @@ struct HeadlessBrightnessTests {
             try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
         )
         let updated = snap.nodes.first { $0.remoteID == "inspector.brightness.value" }
-        #expect(updated?.value?.contains("0.75") == true,
-                "expected reload to show 0.75; got \(String(describing: updated?.value))")
+        #expect(updated?.value?.contains("75%") == true,
+                "expected reload to show 75% (human-friendly format); got \(String(describing: updated?.value))")
     }
 
     @Test func unsupportedShowsUnavailableHint() async throws {
