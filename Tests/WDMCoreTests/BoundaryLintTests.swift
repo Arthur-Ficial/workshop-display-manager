@@ -71,6 +71,11 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-no-fakes.sh")
     }
 
+    @Test("Every Apple icon slot present at right dimensions")
+    func iconCompleteness() throws {
+        try Self.runLint(named: "lint-icon-completeness.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")

@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size lint-cyclomatic-complexity lint-naming lint-public-surface lint-crash-regression lint-rendering-pixel-dims lint-no-fakes golden-goal app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size lint-cyclomatic-complexity lint-naming lint-public-surface lint-crash-regression lint-rendering-pixel-dims lint-no-fakes lint-icon-completeness generate-icon golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -131,6 +131,16 @@ lint-rendering-pixel-dims:
 # outside the documented factory boundary (docs/no-fakes-whitelist.md).
 lint-no-fakes:
 	@bash scripts/lint-no-fakes.sh
+
+# Asserts every Apple icon slot in the appiconset is present at the
+# right dimensions. Run after scripts/generate-icon.sh to verify.
+lint-icon-completeness:
+	@bash scripts/lint-icon-completeness.sh
+
+# Renders the wdm placeholder icon and slices it into every Apple
+# icon slot. Run once; commit the resulting PNGs.
+generate-icon:
+	@bash scripts/generate-icon.sh
 
 # Acceptance ledger for the ship-ready goal. 10 lines of evidence:
 # release build, swift test, headed e2e, every lint, codesign,

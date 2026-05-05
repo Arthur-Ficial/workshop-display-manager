@@ -58,6 +58,9 @@ bash scripts/lint-rendering-pixel-dims.sh
 echo "pre-commit: lint-no-fakes..."
 bash scripts/lint-no-fakes.sh
 
+echo "pre-commit: lint-icon-completeness..."
+bash scripts/lint-icon-completeness.sh
+
 echo "pre-commit: lint-github-tickets (soft)..."
 bash scripts/lint-github-tickets.sh
 

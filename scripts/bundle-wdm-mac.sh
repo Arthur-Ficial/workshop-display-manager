@@ -39,6 +39,29 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/wdm-mac"
 
+# Compile the asset catalog (icons) via actool. Skip silently when
+# the asset catalog isn't yet generated — bare-bones builds still work,
+# just without an icon.
+ICONSET="$ROOT/Sources/WDMMac/Resources/Assets.xcassets"
+if [ -d "$ICONSET/AppIcon.appiconset" ] && command -v xcrun >/dev/null 2>&1; then
+    if xcrun actool "$ICONSET" \
+        --compile "$APP/Contents/Resources" \
+        --platform macosx \
+        --minimum-deployment-target 14.0 \
+        --app-icon AppIcon \
+        --output-partial-info-plist /tmp/wdm-actool.plist \
+        >/dev/null 2>&1; then
+        ICON_KEYS='    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>'
+    else
+        ICON_KEYS=''
+    fi
+else
+    ICON_KEYS=''
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
@@ -63,6 +86,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
     <string>${BUILD}</string>
+${ICON_KEYS}
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>LSMinimumSystemVersion</key>
