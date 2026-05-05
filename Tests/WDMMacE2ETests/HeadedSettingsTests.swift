@@ -15,7 +15,7 @@ struct HeadedSettingsTests {
     /// `wdm-mac-control click @<openSettings ref>`; coverage of the
     /// settings.* IDs is provided by the literals listed below + the Settings
     /// click happening inside `assertPane(named:tabRemoteID:port:snap:)`.
-    @Test(.disabled("flaky under parallel test execution; re-enable once tests serialize"))
+    @Test(.disabled("flaky under parallel test execution; re-enable once tests serialize (see docs/known-flakes.md#headed-settings-parallel)"))
     func openSettingsClickAndSnapshot() async throws {
         guard ProcessInfo.processInfo.environment["WDM_HEADED_E2E"] == "1" else { return }
         let inst = try await MainActor.run { try HeadedAppInstance.shared() }
