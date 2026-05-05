@@ -154,12 +154,25 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         let ourCGID = CGWindowID(win.windowNumber)
         let excluded = updated.windows.filter { $0.windowID == ourCGID }
 
+        // Capture at NATIVE pixel resolution, not logical points. On a
+        // Retina display SCDisplay.width/height return logical points;
+        // capturing at points yields a blurry upscaled overlay because
+        // the layer renders into a window at 2x. Multiply by the
+        // backing scale factor so we capture every pixel the display
+        // actually shows, then mark the layer's contentsScale so
+        // CoreAnimation knows the image is hi-DPI.
+        let scale = nsScreen.backingScaleFactor
         let cfg = SCStreamConfiguration()
-        cfg.width = Int(scDisplay.width)
-        cfg.height = Int(scDisplay.height)
-        cfg.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        cfg.width  = Int(CGFloat(scDisplay.width)  * scale)
+        cfg.height = Int(CGFloat(scDisplay.height) * scale)
+        cfg.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         cfg.queueDepth = 5
         cfg.showsCursor = true
+        cfg.colorSpaceName = CGColorSpace.sRGB
+        cfg.scalesToFit = false
+        layer.contentsScale = scale
+        layer.magnificationFilter = .nearest
+        layer.minificationFilter = .nearest
         let filter = SCContentFilter(display: scDisplay, excludingWindows: excluded)
 
         let output = FrameSink(layer: layer)
