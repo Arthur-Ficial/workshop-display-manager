@@ -18,21 +18,22 @@ public final class WDMMacRemoteRunner {
     public init(registry: RemoteRegistry, vm: DisplaysListVM) {
         self.registry = registry
         self.vm = vm
-        // Tiles, selection, profiles, OR virtual-refusal-message changing must
-        // restamp the registry. 4-way combineLatest (combineLatest only takes
-        // 3 publishers; chain with another).
+        // Tiles, selection, profiles, virtual-refusal-message OR last error
+        // changing must restamp the registry.
         vm.$tiles.combineLatest(vm.$selectedRemoteID, vm.$profiles)
-            .combineLatest(vm.$virtualUnavailableMessage)
-            .sink { [weak self] triple, virtualMsg in
+            .combineLatest(vm.$virtualUnavailableMessage, vm.$lastError)
+            .sink { [weak self] triple, virtualMsg, lastError in
                 let (tiles, selected, profiles) = triple
                 self?.sync(tiles: tiles, selected: selected, profiles: profiles,
-                           virtualUnavailableMessage: virtualMsg)
+                           virtualUnavailableMessage: virtualMsg,
+                           lastError: lastError)
             }
             .store(in: &cancellables)
     }
 
     private func sync(tiles: [DisplaysListVM.Tile], selected: String?, profiles: [String],
-                      virtualUnavailableMessage: String?) {
+                      virtualUnavailableMessage: String?,
+                      lastError: String?) {
         let vm = self.vm
         var entries: [(String, RemoteRegistry.Entry)] = []
         for tile in tiles {
@@ -71,6 +72,20 @@ public final class WDMMacRemoteRunner {
             entries.append(("sidebar.virtual.lastError", RemoteRegistry.Entry(
                 role: "text", label: "Virtual display creation unavailable",
                 value: msg,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+        }
+
+        // INSPECTOR — last-error surfacing for the GEOMETRY section.
+        // When a rotate/flip click fails (e.g. Screen Recording
+        // permission denied for the overlay flipper, or rotation
+        // refused on Apple Silicon built-ins), the human needs to SEE
+        // why — not stare at an unchanged screen. Honest-unsupported-
+        // path per CLAUDE.md.
+        if let err = lastError, !err.isEmpty {
+            entries.append(("inspector.geometry.lastError", RemoteRegistry.Entry(
+                role: "text", label: "Last action error", value: err,
                 state: NodeState(selected: false, enabled: true),
                 onClick: nil
             )))

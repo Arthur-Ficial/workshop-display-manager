@@ -15,7 +15,7 @@ public struct InspectorGeometry: View {
     }
 
     public var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             SegmentedRow(
                 segments: [0, 90, 180, 270].map {
                     .init(id: $0, label: "\($0)°", remoteID: "inspector.rotate.\($0)")
@@ -27,6 +27,19 @@ public struct InspectorGeometry: View {
                 segments: Self.flipSegments,
                 selected: vm.flip(forRemoteID: tile.remoteID)
             ) { vm.applyFlip(displayID: tile.displayID, flip: $0) }
+
+            // Honest unsupported-path: when rotate / flip fails (Apple
+            // Silicon built-in refuses rotation, or Screen Recording
+            // permission is needed for the flip overlay), the user must
+            // SEE why — not stare at an unchanged screen.
+            if let err = vm.lastError, !err.isEmpty {
+                Text(err)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .lineLimit(3)
+                    .accessibilityIdentifier("inspector.geometry.lastError")
+                    .padding(.top, 2)
+            }
         }
     }
 

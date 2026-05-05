@@ -10,10 +10,20 @@ public final class RecordingOverlayFlipper: OverlayFlipper, @unchecked Sendable 
     private let url: URL
     private let lock = NSLock()
     private var stopRequested = false
+    /// When non-nil, `run(...)` throws `ProviderError.configurationFailed`
+    /// with this message before recording — used to test the GUI's
+    /// honest-unsupported-path surfacing of permission denials.
+    private let throwMessage: String?
 
-    public init(url: URL) { self.url = url }
+    public init(url: URL, throwMessage: String? = nil) {
+        self.url = url
+        self.throwMessage = throwMessage
+    }
 
     public func run(displayID: UInt32, flip: Flip, durationMs: Int?) throws {
+        if let msg = throwMessage {
+            throw ProviderError.configurationFailed(msg)
+        }
         let line = "run displayID=\(displayID) flip=\(flip.rawValue) durationMs=\(durationMs.map(String.init) ?? "nil")\n"
         try append(line)
         if let ms = durationMs {

@@ -51,6 +51,40 @@ struct HeadlessGeometryTests {
     /// Apple Silicon built-ins. The hermetic test asserts the
     /// `RecordingOverlayFlipper` was invoked with the expected axis
     /// by reading its log file.
+    /// When the overlay flipper throws (e.g. Screen Recording permission
+    /// denied), the GUI must surface the error visibly via
+    /// `inspector.geometry.lastError`. Anything less is a fake — the
+    /// user clicks Flip H, nothing flips, and they have no signal why.
+    @Test func flipFailureSurfacesAsLastErrorNode() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadlessWithFlipperThrow(env: env, message: "TEST: permission denied")
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        var snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let target = snap.nodes.first { $0.remoteID == "inspector.flip.h" }
+        try #require(target != nil)
+
+        var click = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
+        click.httpMethod = "POST"
+        click.httpBody = Data(#"{"ref":"\#(target!.ref.rawValue)"}"#.utf8)
+        _ = try await URLSession.shared.data(for: click)
+
+        var errValue: String?
+        for _ in 0..<25 {
+            try await Task.sleep(nanoseconds: 80_000_000)
+            snap = try SceneTreeJSON.decode(
+                try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+            )
+            errValue = snap.nodes.first { $0.remoteID == "inspector.geometry.lastError" }?.value
+            if errValue?.contains("permission denied") == true { break }
+        }
+        #expect(errValue?.contains("permission denied") == true,
+                "expected lastError to surface 'permission denied'; got \(String(describing: errValue))")
+    }
+
     @Test func clickingFlipHInvokesOverlayFlipper() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)

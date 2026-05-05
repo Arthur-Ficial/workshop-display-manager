@@ -51,6 +51,32 @@ private let fixtureJSON = """
 }
 """
 
+/// Spawn variant that wires a flipper that throws on `run(...)` —
+/// proves the GUI surfaces flip failures via inspector.geometry.lastError.
+func spawnHeadlessWithFlipperThrow(env: E2EEnv, message: String) throws -> Process {
+    let binary = try resolveBinary()
+    let proc = Process()
+    proc.executableURL = binary
+    proc.arguments = ["--remote", "--headless", "--state-file", env.stateFile.path]
+    proc.environment = [
+        "WDM_TEST_FIXTURE": env.fixture.path,
+        "WDM_PROFILES_DIR": env.dir.appendingPathComponent("profiles").path,
+        "WDM_TEST_OVERLAY_LOG": env.overlayLog.path,
+        "WDM_TEST_OVERLAY_THROW": message,
+        "HOME": env.dir.path,
+        "PATH": "/usr/bin:/bin",
+    ]
+    let errPipe = Pipe()
+    proc.standardOutput = FileHandle.nullDevice
+    proc.standardError = errPipe
+    try proc.run()
+    errPipe.fileHandleForReading.readabilityHandler = { handle in
+        let data = handle.availableData
+        if !data.isEmpty { FileHandle.standardError.write(data) }
+    }
+    return proc
+}
+
 func spawnHeadless(env: E2EEnv) throws -> Process {
     let binary = try resolveBinary()
     let proc = Process()

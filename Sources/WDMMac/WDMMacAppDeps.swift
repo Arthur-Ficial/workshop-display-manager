@@ -31,7 +31,10 @@ public struct WDMMacAppDeps {
         // runs get the AppKit overlay window.
         let flipper: OverlayFlipper
         if let path = env["WDM_TEST_OVERLAY_LOG"], !path.isEmpty {
-            flipper = RecordingOverlayFlipper(url: URL(fileURLWithPath: path))
+            flipper = RecordingOverlayFlipper(
+                url: URL(fileURLWithPath: path),
+                throwMessage: env["WDM_TEST_OVERLAY_THROW"]
+            )
         } else {
             flipper = AppKitOverlayFlipper()
         }
