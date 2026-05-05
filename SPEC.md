@@ -192,8 +192,8 @@ Conventions:
 - [x] Every CLI verb in CLAUDE.md has a matching e2e test under `Tests/WDMCLITests/`
 - [x] Every Kit op is reachable from CLI and Web; web smoke passes against fixture
 - [x] `make e2e-fullflow` drives the headed GUI through `/ui/*` only — zero osascript
-- [ ] WDMMac frontend reaches feature parity with CLI for read verbs (target: next planning cycle)
-- [ ] Drag-to-rearrange GUI hooks ship as a worked example of `wdm arrange` (target: same)
+- [x] WDMMac frontend reaches feature parity with CLI for read verbs **(2026-05-05: PROFILES read+save+restore+delete + 2s pollster, BRIGHTNESS read with refusal hint, drag-to-rearrange Stage in WebKit)**
+- [x] Drag-to-rearrange GUI hooks ship as a worked example of `wdm arrange` **(2026-05-05: `make demo-arrange-pipe` codifies the unix-pipe litmus test)**
 
 ---
 
