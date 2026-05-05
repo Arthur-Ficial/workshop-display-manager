@@ -115,6 +115,17 @@ public final class WDMMacRemoteRunner {
                 state: NodeState(selected: rowID == selected, enabled: true),
                 onClick: click
             )))
+            // Per-row delete (`× ` button next to the row). Same Kit
+            // op the CLI's `wdm profiles remove` exposes.
+            let deleteID = "sidebar.profiles.row.\(name).delete"
+            let deleteClick: @Sendable () -> Void = { [vm] in
+                Task { @MainActor in vm.removeProfile(named: name) }
+            }
+            entries.append((deleteID, RemoteRegistry.Entry(
+                role: "button", label: "Delete \(name)", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: deleteClick
+            )))
         }
         registry.replace(entries: entries)
     }

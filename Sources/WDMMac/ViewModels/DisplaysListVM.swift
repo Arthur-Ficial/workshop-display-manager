@@ -88,6 +88,19 @@ public final class DisplaysListVM: ObservableObject {
         reload()
     }
 
+    /// Delete a profile by name. Routes through the same Kit op the
+    /// CLI's `wdm profiles remove <name>` exposes. After delete,
+    /// reloadProfiles() refreshes the sidebar so the row disappears.
+    public func removeProfile(named name: String) {
+        do {
+            try controller.removeProfile(name)
+            lastError = nil
+        } catch {
+            lastError = "\(error)"
+        }
+        reloadProfiles()
+    }
+
     /// Save the current arrangement as a new profile. The GUI has no text
     /// entry yet, so the name is stamped from the wall clock —
     /// `snapshot-YYYYMMDD-HHMMSS`. Workshop facilitator can rename later

@@ -109,6 +109,51 @@ struct HeadlessProfilesTests {
         #expect(!rowIDs.isEmpty, "expected a sidebar.profiles.row.snapshot-* entry; got \(snap.nodes.map(\.remoteID))")
     }
 
+    /// Workshop facilitator cleanup: clicking the per-row `× delete`
+    /// button removes the profile JSON from disk and from the sidebar.
+    /// Same Kit op the CLI's `wdm profiles remove <name>` exposes.
+    @Test func clickingProfileRowDeleteRemovesIt() async throws {
+        let env = try makeEnv()
+        try seedProfiles(["keep", "doomed"], in: env)
+
+        let proc = try spawnHeadless(env: env)
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        var snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let deleteBtn = snap.nodes.first { $0.remoteID == "sidebar.profiles.row.doomed.delete" }
+        try #require(deleteBtn != nil, "delete button must exist; ids=\(snap.nodes.map(\.remoteID).sorted())")
+
+        var click = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
+        click.httpMethod = "POST"
+        click.httpBody = Data(#"{"ref":"\#(deleteBtn!.ref.rawValue)"}"#.utf8)
+        let (_, resp) = try await URLSession.shared.data(for: click)
+        #expect((resp as? HTTPURLResponse)?.statusCode == 200)
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        // On-disk file is gone.
+        let dir = env.dir.appendingPathComponent("profiles")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        #expect(!files.contains("doomed.json"),
+                "doomed.json must be deleted; remaining: \(files)")
+        #expect(files.contains("keep.json"),
+                "keep.json must survive; remaining: \(files)")
+
+        // Snapshot refreshed: row gone, but the kept one survives.
+        snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let ids = Set(snap.nodes.map(\.remoteID))
+        #expect(!ids.contains("sidebar.profiles.row.doomed"),
+                "doomed row must be gone")
+        #expect(!ids.contains("sidebar.profiles.row.doomed.delete"),
+                "doomed delete button must be gone")
+        #expect(ids.contains("sidebar.profiles.row.keep"),
+                "keep row must survive")
+    }
+
     @Test func sidebarShowsNoRowsWhenEmpty() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)

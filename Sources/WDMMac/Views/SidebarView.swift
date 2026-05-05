@@ -66,21 +66,33 @@ public struct SidebarView: View {
                 EmptyHint("No saved profiles.", remoteID: "sidebar.profiles.empty")
             } else {
                 ForEach(vm.profiles, id: \.self) { name in
-                    Button { onSelect("sidebar.profiles.row.\(name)") } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "bookmark")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            Text(name)
-                                .font(.system(size: 12))
-                                .foregroundStyle(.primary)
-                            Spacer()
+                    HStack(spacing: 4) {
+                        Button { onSelect("sidebar.profiles.row.\(name)") } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "bookmark")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                Text(name)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.primary)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 6).padding(.vertical, 3)
                         }
-                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .buttonStyle(.plain)
+                        .clickable(cornerRadius: 5)
+                        .accessibilityIdentifier("sidebar.profiles.row.\(name)")
+
+                        Button { vm.removeProfile(named: name) } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4).padding(.vertical, 2)
+                        }
+                        .buttonStyle(.plain)
+                        .clickable(cornerRadius: 4)
+                        .accessibilityIdentifier("sidebar.profiles.row.\(name).delete")
                     }
-                    .buttonStyle(.plain)
-                    .clickable(cornerRadius: 5)
-                    .accessibilityIdentifier("sidebar.profiles.row.\(name)")
                 }
             }
         }
