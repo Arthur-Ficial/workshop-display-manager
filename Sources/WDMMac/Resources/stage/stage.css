@@ -1,0 +1,183 @@
+/* wdm Stage — embedded WebKit monitor arrangement canvas.
+   Native macOS look (light theme, system fonts, subtle hairlines). */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #canvas {
+  height: 100%; width: 100%;
+  -webkit-user-select: none; user-select: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  color-scheme: light dark;
+  overflow: hidden;
+}
+
+#canvas {
+  position: relative;
+  background: var(--bg, #f6f7f7);
+  border-radius: 14px;
+  border: 1px solid color-mix(in oklch, currentColor 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, currentColor 5%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  #canvas { background: #1c1d1f; }
+}
+
+#grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, currentColor 5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, currentColor 5%, transparent) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: 0 0;
+  pointer-events: none;
+  border-radius: 14px;
+}
+
+#content {
+  position: absolute; inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+#guides {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  width: 100%; height: 100%;
+  opacity: 1;
+  transition: opacity 480ms ease-out;
+  z-index: 100;                       /* above any dragged tile */
+}
+#guides line {
+  stroke: #34c759;                    /* macOS green */
+  stroke-width: 2;                    /* thicker — visible across the canvas */
+  stroke-dasharray: 6 5;
+  filter: drop-shadow(0 0 3px rgba(52,199,89,0.6));
+  shape-rendering: crispEdges;
+  transition: opacity 160ms ease-out;
+}
+/* Active = the cursor is currently aligned to this line. Inactive =
+   we held the line in the linger window after we drifted off it, so
+   the user can still see which guide they were just on, only dimmed. */
+#guides line[data-active="1"] { opacity: 0.95; }
+#guides line[data-active="0"] { opacity: 0.20; }
+/* Hold lines visible after drag-end, then fade. Linger window matches
+   the post-release timer in stage.js. */
+#guides.guides-hold { opacity: 1; }
+#guides.guides-hold.guides-fade { opacity: 0; }
+
+/* one monitor tile — chassis bezel + screen surface + label */
+.tile {
+  position: absolute;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #383a3e 0%, #181a1d 100%);
+  box-shadow:
+    0 8px 18px -6px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -1px 0 rgba(0,0,0,0.5);
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+  transition: box-shadow 120ms ease;
+}
+.tile.is-dragging { cursor: grabbing; transition: none; z-index: 10; }
+.tile.is-selected {
+  box-shadow:
+    0 8px 18px -6px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    inset 0 -1px 0 rgba(0,0,0,0.5),
+    0 0 0 2px #34c759;
+}
+
+.webcam {
+  position: absolute;
+  top: 5px; left: 50%;
+  width: 5px; height: 5px;
+  margin-left: -2.5px;
+  border-radius: 50%;
+  background: #050505;
+  box-shadow: 0 0 0 0.5px rgba(255,255,255,0.18) inset;
+}
+
+.screen {
+  position: absolute;
+  top: 9px; left: 9px; right: 9px; bottom: 14px;
+  border-radius: 4px;
+  background:
+    radial-gradient(circle at 18% 15%, rgba(255,255,255,0.07), transparent 40%),
+    linear-gradient(180deg, #2c3950 0%, #1f2a3d 50%, #121a2a 100%);
+  border: 0.75px solid rgba(255,255,255,0.16);
+  overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+}
+.tile.is-selected .screen { border-color: #34c759; border-width: 1.5px; }
+.tile.is-main .screen { border-color: rgba(52, 199, 89, 0.55); }
+
+.tile .badge {
+  position: absolute; top: 8px; left: 8px;
+  padding: 1px 6px;
+  font: 600 11px/1 ui-monospace, "SF Mono", monospace;
+  color: #34c759;
+  background: rgba(52,199,89,0.18);
+  border-radius: 999px;
+}
+.tile .main-tag {
+  position: absolute; top: 8px; right: 8px;
+  padding: 1px 5px;
+  font: 700 9px/1 ui-monospace, "SF Mono", monospace;
+  letter-spacing: 0.05em;
+  color: #34c759;
+  background: rgba(52,199,89,0.18);
+  border-radius: 999px;
+}
+.tile .name {
+  font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.92);
+  max-width: calc(100% - 16px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: center;
+}
+.tile .res {
+  margin-top: 2px;
+  font: 400 10px/1.2 ui-monospace, "SF Mono", monospace;
+  color: rgba(255,255,255,0.6);
+  max-width: calc(100% - 16px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Progressive density tiers — tile.js sets data-tier per render. */
+.tile[data-tier="tiny"]   .name,
+.tile[data-tier="tiny"]   .res,
+.tile[data-tier="tiny"]   .main-tag { display: none !important; }
+.tile[data-tier="small"]  .res,
+.tile[data-tier="small"]  .main-tag { display: none !important; }
+.tile[data-tier="medium"] .main-tag { display: none !important; }
+
+/* Smaller font / badge at small tiers so the badge alone stays legible. */
+.tile[data-tier="tiny"]  .badge,
+.tile[data-tier="small"] .badge { padding: 0 4px; font-size: 10px; }
+.tile[data-tier="small"]  .name { font-size: 11px; }
+.tile[data-tier="medium"] .name { font-size: 12px; }
+
+/* zoom pill bottom-right */
+#zoom-controls {
+  position: absolute; right: 12px; bottom: 12px;
+  display: flex; align-items: center;
+  background: color-mix(in oklch, Canvas 80%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in oklch, currentColor 12%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+#zoom-controls button {
+  background: transparent; border: 0; cursor: pointer;
+  font: 500 14px/1 -apple-system, system-ui;
+  color: inherit;
+  padding: 5px 10px; min-width: 32px;
+  height: 26px;
+}
+#zoom-controls button:hover { background: color-mix(in oklch, currentColor 8%, transparent); }
+#zoom-controls #zoom-reset {
+  font: 500 11px/1 ui-monospace, "SF Mono", monospace;
+  min-width: 50px;
+}

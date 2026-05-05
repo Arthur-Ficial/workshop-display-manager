@@ -70,6 +70,12 @@ let package = Package(
             name: "WDMMac",
             dependencies: ["WDMKit"],
             path: "Sources/WDMMac",
+            resources: [
+                // Bundled web resources for the embedded Stage canvas.
+                // The Stage is the only WebKit-rendered surface in WDMMac;
+                // the rest of the app stays 100% native SwiftUI / AppKit.
+                .copy("Resources/stage")
+            ],
             swiftSettings: [
                 // Per-target deployment bump: WDMMac uses macOS 26 Liquid Glass
                 // APIs (NSGlassEffectView, .glassEffect, .buttonStyle(.glass)).
@@ -135,8 +141,12 @@ let package = Package(
         ),
         .testTarget(
             name: "WDMMacRemoteTests",
-            dependencies: ["WDMMacRemote"],
-            path: "Tests/WDMMacRemoteTests"
+            dependencies: ["WDMMacRemote", "WDMMac"],
+            path: "Tests/WDMMacRemoteTests",
+            swiftSettings: [
+                // WDMMac is built for macOS 26 — the test target must match.
+                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
+            ]
         ),
         .testTarget(
             name: "WDMMacE2ETests",

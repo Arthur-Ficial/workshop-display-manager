@@ -23,9 +23,9 @@ public struct ActionRow: View {
                 Spacer()
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .clickable(cornerRadius: 6)
         .accessibilityIdentifier(remoteID)
     }
 }

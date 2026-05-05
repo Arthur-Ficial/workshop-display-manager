@@ -18,11 +18,18 @@ struct WDMMacE2ETests {
         let snap = try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
         let tree = try SceneTreeJSON.decode(snap)
 
-        #expect(tree.nodes.count == 2)
+        // Each display surfaces TWICE on the agent surface — once as the
+        // sidebar row (`displays.tile.X`) and once as the Stage tile
+        // mirror (`stage.tile.X`). The Stage canvas is rendered in a
+        // WKWebView whose DOM children aren't visible to the macOS
+        // accessibility walker, so the registry carries the stage.tile.*
+        // mirror for AI-controllability.
+        #expect(tree.nodes.count == 4)
         let labels = tree.nodes.compactMap(\.label)
-        #expect(labels == ["Built-in", "Projector"])
+        #expect(labels == ["Built-in", "Built-in", "Projector", "Projector"])
         let remoteIDs = tree.nodes.map(\.remoteID)
-        #expect(remoteIDs == ["displays.tile.1", "displays.tile.2"])
+        #expect(remoteIDs == ["displays.tile.1", "stage.tile.1",
+                              "displays.tile.2", "stage.tile.2"])
     }
 
     @Test func clickRoundTripsToSelectedState() async throws {
@@ -33,7 +40,9 @@ struct WDMMacE2ETests {
         let port = try waitForPort(stateFile: env.stateFile)
         var req = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
         req.httpMethod = "POST"
-        req.httpBody = Data(#"{"ref":"@e2"}"#.utf8)
+        // Click the Projector's sidebar row — index 3 now that every
+        // display has both displays.tile.X and stage.tile.X entries.
+        req.httpBody = Data(#"{"ref":"@e3"}"#.utf8)
         let (data, resp) = try await URLSession.shared.data(for: req)
         #expect((resp as? HTTPURLResponse)?.statusCode == 200)
         let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]

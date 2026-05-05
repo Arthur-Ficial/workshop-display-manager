@@ -8,15 +8,9 @@ import WDMRemoteControl
 public enum HeadlessRunner {
     @MainActor
     public static func run(args: MacArgs) throws -> Never {
-        let deps = try WDMMacAppDeps.make()
-        let registry = RemoteRegistry()
-        let adapter = WDMMacRemoteAdapter(registry: registry)
-        let server = try RemoteControlServer(port: args.port, target: adapter)
-
-        let vm = DisplaysListVM(controller: deps.controller)
-        vm.reload()
-        let runner = WDMMacRemoteRunner(registry: registry, vm: vm)
-        HeadlessRunnerHolder.shared.retain(vm: vm, runner: runner)
+        let runtime = try MacRuntime.make()
+        let server = try RemoteControlServer(port: args.port, target: runtime.adapter)
+        HeadlessRunnerHolder.shared.retain(vm: runtime.vm, runner: runtime.runner)
 
         server.runAsync()
         let resolvedPort = server.resolvedPort() ?? args.port

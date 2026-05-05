@@ -25,7 +25,11 @@ public struct SidebarView: View {
     private var connectedSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             SectionHeader(title: "DISPLAYS", count: vm.tiles.count)
-            ForEach(vm.tiles) { SidebarDisplayRow(tile: $0, onSelect: onSelect) }
+            ForEach(vm.tiles) { tile in
+                SidebarDisplayRow(tile: tile,
+                                  isSelected: vm.isSelected(tile),
+                                  onSelect: onSelect)
+            }
         }
     }
 
@@ -35,8 +39,10 @@ public struct SidebarView: View {
                 Button {} label: {
                     Image(systemName: "plus").font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
                 }
                 .buttonStyle(.plain)
+                .clickable(cornerRadius: 5)
                 .accessibilityIdentifier("sidebar.virtual.add")
             }
             EmptyHint("No virtual displays.\nUse + to create one.",

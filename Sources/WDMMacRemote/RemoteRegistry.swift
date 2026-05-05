@@ -50,6 +50,21 @@ public final class RemoteRegistry: @unchecked Sendable {
         byID.removeAll(); order.removeAll(); version += 1
     }
 
+    /// Atomically replaces the entire registry contents in one transaction —
+    /// one version bump regardless of how many entries change. Use this when
+    /// re-rendering a whole region (e.g. the displays list); it eliminates
+    /// the 1+N version-bump storm of reset()+upsert*N.
+    public func replace(entries: [(String, Entry)]) {
+        lock.lock(); defer { lock.unlock() }
+        byID.removeAll(keepingCapacity: true)
+        order.removeAll(keepingCapacity: true)
+        for (id, entry) in entries {
+            order.append(id)
+            byID[id] = entry
+        }
+        version += 1
+    }
+
     public func currentTree() -> SceneTree {
         lock.lock(); defer { lock.unlock() }
         let nodes = order.enumerated().map { (idx, id) -> SceneNode in

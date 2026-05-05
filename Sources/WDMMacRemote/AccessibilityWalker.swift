@@ -26,7 +26,8 @@ public final class AccessibilityWalker {
         version += 1
         refToElement.removeAll(keepingCapacity: true)
         var counter = 0
-        let nodes = walk(element: appElement, counter: &counter, interactive: interactive)
+        let nodes = walk(element: appElement, counter: &counter,
+                          interactive: interactive, depth: 0)
         return SceneTree(version: version, nodes: nodes)
     }
 
@@ -45,7 +46,8 @@ public final class AccessibilityWalker {
         }
     }
 
-    private func walk(element: AXUIElement, counter: inout Int, interactive: Bool) -> [SceneNode] {
+    private func walk(element: AXUIElement, counter: inout Int,
+                      interactive: Bool, depth: Int) -> [SceneNode] {
         let id = ax_string(element, kAXIdentifierAttribute) ?? ""
         let role = ax_string(element, kAXRoleAttribute) ?? ""
         let label = ax_string(element, kAXTitleAttribute)
@@ -55,10 +57,24 @@ public final class AccessibilityWalker {
             || role == "AXCheckBox" || role == "AXPopUpButton"
 
         var children: [SceneNode] = []
-        if let kids = ax_children(element) {
+        // Skip recursion into WKWebView subtrees and the wrapper
+        // NSHostingView that holds them. Querying a WKWebView's
+        // accessibility children involves synchronous IPC to the
+        // WebContent child process; with our snapshot path being driven
+        // from a `DispatchQueue.main.sync` hop on the network queue,
+        // that IPC re-pumps the run loop and trips the Swift 6 actor
+        // isolation runtime check, tearing the host app down. The
+        // Stage's interactive elements are exposed via the
+        // RemoteRegistry path instead.
+        let isWebSubtree =
+            role.contains("Web") ||                  // AXWebArea, etc.
+            id == "stage.canvas" ||                  // our SwiftUI wrapper
+            (role == "AXScrollArea" && label == nil && id.isEmpty)
+        if !isWebSubtree, let kids = ax_children(element) {
             for kid in kids {
                 children.append(contentsOf: walk(element: kid, counter: &counter,
-                                                  interactive: interactive))
+                                                  interactive: interactive,
+                                                  depth: depth + 1))
             }
         }
 

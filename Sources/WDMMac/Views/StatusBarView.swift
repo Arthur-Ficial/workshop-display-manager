@@ -28,14 +28,24 @@ public struct StatusBarView: View {
 
             Spacer()
 
-            HStack(spacing: 6) {
-                Text(timestamp).font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                Text("·").foregroundStyle(.secondary)
-                Text(lastEvent).font(.system(size: 11)).foregroundStyle(.secondary)
-                    .lineLimit(1)
+            // TimelineView ticks once a second so the wall-clock display
+            // stays current — without it the timestamp froze at first paint.
+            TimelineView(.periodic(from: .now, by: 1)) { ctx in
+                HStack(spacing: 6) {
+                    Text(Self.formatter.string(from: ctx.date))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    Text("·").foregroundStyle(.secondary)
+                    Text(lastEvent).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                // Collapse into a single AX node — without this each Text
+                // child inherits the parent identifier and /ui/snapshot
+                // emits the same remoteID 3×.
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("statusbar.lastEvent")
             }
-            .accessibilityIdentifier("statusbar.lastEvent")
 
             Spacer()
 
@@ -57,6 +67,9 @@ public struct StatusBarView: View {
             Text("\(value)").font(.system(size: 11, weight: .semibold))
             Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
         }
+        // Collapse the inner Text children so the .accessibilityIdentifier
+        // applied at the call site lands on a single AX node, not both.
+        .accessibilityElement(children: .combine)
     }
 
     private func toggle(_ label: String, _ symbol: String) -> some View {
@@ -66,14 +79,10 @@ public struct StatusBarView: View {
                 Text(label).font(.system(size: 11, weight: .medium))
             }
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 6).padding(.vertical, 2)
         }
         .buttonStyle(.plain)
-    }
-
-    private var timestamp: String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f.string(from: Date())
+        .clickable(cornerRadius: 5)
     }
 
     private var lastEvent: String {
@@ -82,4 +91,12 @@ public struct StatusBarView: View {
         }
         return "ready"
     }
+
+    /// Cached formatter — re-allocating on every body call was a hot
+    /// path leak; DateFormatter is heavyweight to construct.
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
 }

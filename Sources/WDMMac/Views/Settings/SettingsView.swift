@@ -18,17 +18,18 @@ public struct SettingsView: View {
     }
 
     private var tabStrip: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             ForEach(SettingsTab.allCases) { t in
                 Button { tab = t } label: {
                     VStack(spacing: 4) {
                         Image(systemName: t.symbol).font(.system(size: 18))
+                            .foregroundStyle(t == tab ? Color.green : Color.primary)
                         Text(t.title).font(.system(size: 11, weight: .medium))
                     }
                     .frame(width: 78, height: 56)
                 }
                 .buttonStyle(.plain)
-                .panel(cornerRadius: 8, opacity: t == tab ? 0.18 : 0.0)
+                .clickable(isSelected: t == tab, cornerRadius: 8)
                 .accessibilityIdentifier("settings.tab.\(t.rawValue)")
             }
             Spacer()

@@ -26,11 +26,11 @@ public struct SegmentedRow<Tag: Hashable>: View {
             ForEach(segments) { seg in
                 Button { onPick(seg.id) } label: {
                     Text(seg.label).font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(seg.id == selected ? .green : .primary)
                         .frame(maxWidth: .infinity).padding(.vertical, 6)
                 }
                 .buttonStyle(.plain)
-                .panel(cornerRadius: 6,
-                       opacity: seg.id == selected ? 0.18 : 0.06)
+                .clickable(isSelected: seg.id == selected, cornerRadius: 6)
                 .accessibilityIdentifier(seg.remoteID)
             }
         }

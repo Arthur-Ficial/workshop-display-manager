@@ -23,7 +23,7 @@ public struct TitleBarView: View {
 
             Spacer()
 
-            HStack(spacing: 0) {
+            HStack(spacing: 6) {
                 ForEach(AppTab.allCases) { t in
                     Button { tab = t } label: {
                         HStack(spacing: 4) {
@@ -32,16 +32,9 @@ public struct TitleBarView: View {
                         }
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .foregroundStyle(t == tab ? Color.green : Color.primary)
-                        .background {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(t == tab ? Color.green.opacity(0.18) : Color.clear)
-                        }
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .stroke(t == tab ? Color.green : Color.clear, lineWidth: 1.5)
-                        }
                     }
                     .buttonStyle(.plain)
+                    .clickable(isSelected: t == tab)
                     .accessibilityIdentifier("titlebar.tab.\(t.rawValue)")
                 }
             }
@@ -57,12 +50,9 @@ public struct TitleBarView: View {
                         .font(.system(size: 12, weight: .medium))
                 }
                 .padding(.horizontal, 10).padding(.vertical, 5)
-                .background {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(.white.opacity(0.06))
-                }
             }
             .buttonStyle(.plain)
+            .clickable()
             .accessibilityIdentifier("titlebar.profile")
         }
         .padding(.horizontal, 16).padding(.vertical, 8)

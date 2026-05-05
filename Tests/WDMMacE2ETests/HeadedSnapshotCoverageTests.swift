@@ -10,7 +10,7 @@ struct HeadedSnapshotCoverageTests {
         "titlebar.profile",
         "titlebar.tab.stage", "titlebar.tab.profiles", "titlebar.tab.recordings",
         "sidebar.virtual.add", "sidebar.virtual.empty", "sidebar.profiles.empty",
-        "displays.tile.1", "stage.tile.1",
+        "displays.tile.1", "stage.tile.1", "stage.canvas",
         "inspector.title", "inspector.mode.dropdown",
         "inspector.rotate.0", "inspector.rotate.90", "inspector.rotate.180", "inspector.rotate.270",
         "inspector.flip.none", "inspector.flip.h", "inspector.flip.v",

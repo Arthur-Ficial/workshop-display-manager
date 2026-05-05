@@ -11,14 +11,14 @@ public struct InspectorView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if let tile = selectedTile {
+                if let tile = vm.selectedTile() {
                     InspectorHeader(tile: tile)
                     SectionLabel("MODE")
                     InspectorMode(tile: tile)
                     SectionLabel("IDENTITY")
                     InspectorIdentity(tile: tile)
                     SectionLabel("GEOMETRY")
-                    InspectorGeometry()
+                    InspectorGeometry(vm: vm, tile: tile)
                     SectionLabel("ACTIONS")
                     InspectorActions()
                 } else {
@@ -30,9 +30,5 @@ public struct InspectorView: View {
             .padding(18)
         }
         .frame(width: 280)
-    }
-
-    private var selectedTile: DisplaysListVM.Tile? {
-        vm.tiles.first(where: \.isSelected) ?? vm.tiles.first
     }
 }

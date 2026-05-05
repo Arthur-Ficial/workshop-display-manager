@@ -27,6 +27,15 @@ public struct AppFrameView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
+            // Visible hairline at the top of the SwiftUI safe area. With
+            // .fullSizeContentView the SwiftUI content extends edge-to-edge
+            // but safe-area insets still account for the OS title bar — so
+            // this rectangle lands exactly under the traffic lights /
+            // window-title row, marking where the draggable region ends.
+            Rectangle()
+                .fill(Color.secondary.opacity(0.40))
+                .frame(height: 1)
+
             TitleBarView(vm: vm, tab: $tab)
             Divider().opacity(0.25)
 

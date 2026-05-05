@@ -18,10 +18,9 @@ public struct InspectorMode: View {
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10).padding(.vertical, 8)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .panel(cornerRadius: 8)
+        .clickable(cornerRadius: 8)
         .accessibilityIdentifier("inspector.mode.dropdown")
     }
 }

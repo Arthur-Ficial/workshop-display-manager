@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>wdm Stage</title>
+  <link rel="stylesheet" href="stage.css">
+</head>
+<body>
+  <main id="canvas" aria-label="Display arrangement canvas">
+    <div id="grid"></div>
+    <div id="content"></div>
+    <svg id="guides" aria-hidden="true"></svg>
+    <div id="zoom-controls" role="group" aria-label="Zoom">
+      <button id="zoom-out" aria-label="Zoom out" data-id="stage.zoom.out">−</button>
+      <button id="zoom-reset" aria-label="Reset zoom to 100%" data-id="stage.zoom.reset">100%</button>
+      <button id="zoom-in" aria-label="Zoom in" data-id="stage.zoom.in">+</button>
+    </div>
+  </main>
+  <script src="stage.js"></script>
+</body>
+</html>

@@ -27,16 +27,19 @@ public enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
 
 /// Single source of truth for appearance. Views read via @ObservedObject;
 /// HeadedRunner reads via Combine sink to push into NSWindow.appearance.
+/// Constructed once by WDMMacAppDeps and injected — no global singleton,
+/// per CLAUDE.md "no static var shared, no global state".
 @MainActor
 public final class AppearanceStore: ObservableObject {
     @Published public var mode: AppearanceMode {
-        didSet { UserDefaults.standard.set(mode.rawValue, forKey: Self.key) }
+        didSet { defaults.set(mode.rawValue, forKey: Self.key) }
     }
-    public static let shared = AppearanceStore()
+    private let defaults: UserDefaults
     private static let key = "wdm.mac.appearance"
 
-    public init() {
-        let raw = UserDefaults.standard.string(forKey: Self.key) ?? AppearanceMode.system.rawValue
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        let raw = defaults.string(forKey: Self.key) ?? AppearanceMode.system.rawValue
         self.mode = AppearanceMode(rawValue: raw) ?? .system
     }
 }

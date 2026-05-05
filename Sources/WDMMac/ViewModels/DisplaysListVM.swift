@@ -19,6 +19,16 @@ public final class DisplaysListVM: ObservableObject {
         public let title: String
         public let subtitle: String
         public let isMain: Bool
+        public let rotationDegrees: Int
+        /// Real display pixel dimensions — sent to the WebKit Stage so it
+        /// can render every monitor at its true aspect ratio.
+        public let widthPx: Int
+        public let heightPx: Int
+        /// Real display origin in display pixels — anchors the WebKit
+        /// Stage's spatial layout. Updated only when the controller's
+        /// arrangement changes (after a drag-end commits).
+        public let originX: Int
+        public let originY: Int
         public var isSelected: Bool
 
         public var id: String { remoteID }
@@ -27,11 +37,24 @@ public final class DisplaysListVM: ObservableObject {
     @Published public private(set) var tiles: [Tile] = []
     @Published public private(set) var selectedRemoteID: String?
     @Published public private(set) var lastError: String?
+    @Published public internal(set) var flipSelection: [String: Flip] = [:]
 
     private let controller: WDMController
+    private var observer: Task<Void, Never>?
 
     public init(controller: WDMController) {
         self.controller = controller
+    }
+
+    deinit { observer?.cancel() }
+
+    /// Subscribe to display plug/unplug/mode-change events and reload the
+    /// tile list whenever one fires.
+    public func startObservingReconfigurations() {
+        observer?.cancel()
+        observer = controller.observeReconfigurations { [weak self] _ in
+            Task { @MainActor in self?.reload() }
+        }
     }
 
     public func reload() {
@@ -44,7 +67,12 @@ public final class DisplaysListVM: ObservableObject {
                     title: d.name ?? "Display \(d.id)",
                     subtitle: "\(d.currentMode.width)×\(d.currentMode.height) @ \(Int(d.currentMode.refreshHz))Hz",
                     isMain: d.isMain,
-                    isSelected: false
+                    rotationDegrees: d.rotationDegrees,
+                    widthPx: d.currentMode.width,
+                    heightPx: d.currentMode.height,
+                    originX: d.origin.x,
+                    originY: d.origin.y,
+                    isSelected: d.id == displayIDFor(remoteID: selectedRemoteID)
                 )
             }
             lastError = nil
@@ -54,6 +82,12 @@ public final class DisplaysListVM: ObservableObject {
         }
     }
 
+    private func displayIDFor(remoteID: String?) -> UInt32? {
+        guard let remoteID, let id = remoteID.split(separator: ".").last,
+              let n = UInt32(id) else { return nil }
+        return n
+    }
+
     public func select(remoteID: String) {
         selectedRemoteID = remoteID
         tiles = tiles.map { t in
@@ -61,5 +95,45 @@ public final class DisplaysListVM: ObservableObject {
             copy.isSelected = (t.remoteID == remoteID)
             return copy
         }
+    }
+
+    public func isSelected(_ tile: Tile) -> Bool {
+        tile.remoteID == selectedRemoteID
+    }
+
+    public func setFlip(_ flip: Flip, forRemoteID remoteID: String) {
+        flipSelection[remoteID] = flip
+    }
+
+    public func flip(forRemoteID remoteID: String) -> Flip {
+        flipSelection[remoteID] ?? .none
+    }
+
+    public func selectedTile() -> Tile? {
+        if let id = selectedRemoteID, let t = tiles.first(where: { $0.remoteID == id }) {
+            return t
+        }
+        return tiles.first
+    }
+
+    /// Commit a drag-end from the embedded WebKit Stage. Builds a fresh
+    /// arrangement plan with the dragged display at the new origin and
+    /// pushes it through `controller.setArrangement(_:confirmer:)` —
+    /// same op the CLI exposes via `wdm arrange set`.
+    public func commitDrag(displayID: UInt32, originX: Int, originY: Int) {
+        do {
+            let entries = try controller.arrangement().map { e -> ArrangementEntry in
+                let origin = (e.id == displayID)
+                    ? Point(x: originX, y: originY)
+                    : e.origin
+                return ArrangementEntry(id: e.id, origin: origin,
+                                        rotationDegrees: e.rotationDegrees)
+            }
+            _ = try controller.setArrangement(entries, confirmer: AutoYesConfirmer())
+            lastError = nil
+        } catch {
+            lastError = "\(error)"
+        }
+        reload()
     }
 }
