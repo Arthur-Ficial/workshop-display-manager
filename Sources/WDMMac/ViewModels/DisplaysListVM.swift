@@ -142,12 +142,14 @@ public final class DisplaysListVM: ObservableObject {
         reload()
     }
 
-    /// Apply a SOFTWARE overlay flip via `controller.flipOverlay(...)`
-    /// — the same Kit op `wdm flip-overlay <id> <axis> [--duration-ms N]`
-    /// uses. Works on every Mac (including Apple Silicon built-ins where
-    /// the IOKit framebuffer-flip path refuses), because the overlay
-    /// path is implemented as a transparent NSWindow that captures and
-    /// re-renders the screen flipped — no IODisplayConnect needed.
+    /// Apply a SOFTWARE overlay flip via the same in-process Kit op
+    /// the CLI uses (`controller.flipOverlay` → `AppKitOverlayFlipper`).
+    /// Runs on the main actor because the flipper's run-loop pump and
+    /// activation-policy switch require main-thread context. The UI
+    /// freezes for the 600 ms duration of the flip — that's the
+    /// intended behaviour: the *screen* is the user feedback during
+    /// the flip; pumping more SwiftUI updates over the top would just
+    /// fight the overlay.
     public func applyFlip(displayID: UInt32, flip: Flip) {
         flipSelection[String(displayID)] = flip
         guard flip != .none else {
@@ -155,19 +157,25 @@ public final class DisplaysListVM: ObservableObject {
             return
         }
         let alias = String(displayID)
-        // The default 600ms is the design-briefing's "show the flipped
-        // overlay then auto-restore" behaviour — workshop facilitators
-        // want to flip momentarily, not permanently.
-        Task.detached { [overlayFlipper, controller] in
+        let captureFlipper = overlayFlipper
+        let captureController = controller
+        // Schedule on main actor; SwiftUI's run loop will drive the
+        // flipper's internal pump. Synchronous `try` block bounded by
+        // the 600 ms `durationMs`.
+        Task { @MainActor [weak self] in
             do {
-                try controller.flipOverlay(alias, flip: flip,
-                                           durationMs: 600,
-                                           using: overlayFlipper)
-                await MainActor.run { [weak self] in self?.lastError = nil }
+                try captureController.flipOverlay(alias, flip: flip,
+                                                  durationMs: 600,
+                                                  using: captureFlipper)
+                self?.lastError = nil
             } catch {
-                await MainActor.run { [weak self] in
-                    self?.lastError = "Flip overlay failed: \(error)"
-                }
+                // Use \(error) (case name + payload) instead of
+                // .localizedDescription — the latter is generic
+                // ("The operation couldn't be completed") and hides
+                // the actual cause string. We need the cause in the
+                // visible UI so the user can recognise "Screen
+                // Recording denied" / "permission denied" / etc.
+                self?.lastError = "Flip overlay failed: \(error). If this mentions 'Screen Recording', grant WDMMac.app permission in System Settings → Privacy & Security → Screen Recording, then quit & relaunch."
             }
         }
     }

@@ -62,6 +62,7 @@ private struct SegmentedRowSegment: View {
                     shape.fill(fillColor)
                     shape.stroke(strokeColor, lineWidth: isSelected ? 1.5 : 0)
                 }
+                .contentShape(Rectangle())
                 // Per CLAUDE.md "SUPER RESPONSIVE INTERACTION":
                 // selection feedback must land in ≤50 ms. SwiftUI's
                 // default cross-fade on background changes is ~250 ms
@@ -71,6 +72,10 @@ private struct SegmentedRowSegment: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(remoteID)
+        // .buttonStyle(.plain) drops default AX press routing; without
+        // this, the AXPress reaches the button but never invokes the
+        // action closure. Explicit accessibilityAction restores it.
+        .accessibilityAction { onTap() }
         .onHover { hovering = $0 }
     }
 
