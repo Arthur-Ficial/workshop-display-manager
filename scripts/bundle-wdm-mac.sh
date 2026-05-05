@@ -64,6 +64,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <string>macosx26.4</string>
     <key>DTPlatformVersion</key>
     <string>26.4</string>
+    <!-- Required for TCC to show a meaningful prompt for Flip H/V's
+         overlay (uses ScreenCaptureKit). Without this key, macOS may
+         prompt repeatedly even after the toggle is on. -->
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Workshop Display Manager captures the screen to render flipped / picture-in-picture overlays for workshop facilitation. Capture happens only while you click Flip H/V or Open PiP, ends when the overlay closes, and is never recorded to disk.</string>
 </dict>
 </plist>
 PLIST
@@ -77,5 +82,23 @@ fi
 
 # Validate the plist
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
+
+# Code-sign with Developer ID + hardened runtime + entitlements.
+# Stable signing identity = TCC remembers Screen Recording grants
+# across rebuilds (binds by Team ID + Bundle ID once Developer ID
+# signed; the previous unsigned/ad-hoc builds rebound by CDHash and
+# re-prompted on every rebuild). Signing is silently skipped if the
+# Developer ID cert isn't in the keychain — falls back to the
+# previous behaviour.
+SIGN_IDENTITY="Developer ID Application: Franz Enzenhofer (7D2YX5DQ6M)"
+ENTITLEMENTS="$ROOT/Sources/WDMMac/WDMMac.entitlements"
+if security find-identity -v -p codesigning 2>/dev/null \
+        | grep -q "$SIGN_IDENTITY"; then
+    codesign --force --deep --options runtime \
+             --entitlements "$ENTITLEMENTS" \
+             --sign "$SIGN_IDENTITY" \
+             "$APP" >&2
+    codesign --verify --deep --strict --verbose=1 "$APP" >&2 || true
+fi
 
 echo "$APP"

@@ -71,10 +71,10 @@ struct HeadedBrightnessTests {
             try await Task.sleep(nanoseconds: 300_000_000)
         }
 
-        // After the last click (100%), the value node should reflect 1.00.
+        // After the last click (100%), the value node should reflect 100%.
         let after = try await api.snapshot()
         let value = after.nodes.first { $0.remoteID == "inspector.brightness.value" }
-        #expect(value?.value?.contains("1.0") == true,
-                "after .100 click, value should reflect 1.00; got \(String(describing: value?.value))")
+        #expect(value?.value?.contains("100%") == true,
+                "after .100 click, value should reflect 100%; got \(String(describing: value?.value))")
     }
 }
