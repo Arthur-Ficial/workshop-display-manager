@@ -168,6 +168,78 @@ struct HeadlessGeometryTests {
                 "GUI flip must NOT pass the legacy 600 ms duration; got log: \(content)")
     }
 
+    /// Flip H and Flip V are COMBINABLE — clicking H then V must end in
+    /// `.both`, not replace H with V. Clicking H again toggles H off
+    /// (leaving V → `.vertical`); clicking V again toggles V off
+    /// (leaving `.none` → "—" lights up). `—` is the implicit neutral
+    /// state, selected only when neither H nor V is on. Clicking "—"
+    /// at any time clears both. User briefing 2026-05-05.
+    @Test func flipHAndVAreCombinableToggles() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadless(env: env)
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        func snapshotState() async throws -> (none: Bool, h: Bool, v: Bool) {
+            let snap = try SceneTreeJSON.decode(
+                try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+            )
+            let none = snap.nodes.first { $0.remoteID == "inspector.flip.none" }
+            let h = snap.nodes.first { $0.remoteID == "inspector.flip.h" }
+            let v = snap.nodes.first { $0.remoteID == "inspector.flip.v" }
+            return (none?.state.selected == true,
+                    h?.state.selected == true,
+                    v?.state.selected == true)
+        }
+        func click(_ remoteID: String) async throws {
+            let snap = try SceneTreeJSON.decode(
+                try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+            )
+            guard let target = snap.nodes.first(where: { $0.remoteID == remoteID }) else {
+                throw NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "no node \(remoteID) in \(snap.nodes.map(\.remoteID).sorted())"])
+            }
+            var req = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
+            req.httpMethod = "POST"
+            req.httpBody = Data(#"{"ref":"\#(target.ref.rawValue)"}"#.utf8)
+            _ = try await URLSession.shared.data(for: req)
+            // Allow VM stamp + snapshot diff to land.
+            try await Task.sleep(nanoseconds: 80_000_000)
+        }
+
+        // Initial: nothing flipped → "—" selected.
+        var s = try await snapshotState()
+        #expect(s == (true, false, false), "initial state: only '—' selected, got \(s)")
+
+        // H → only H selected.
+        try await click("inspector.flip.h")
+        s = try await snapshotState()
+        #expect(s == (false, true, false), "after H click: only H selected, got \(s)")
+
+        // V on top → BOTH H and V selected (combined → .both).
+        try await click("inspector.flip.v")
+        s = try await snapshotState()
+        #expect(s == (false, true, true), "after V click on top of H: H AND V both selected, got \(s)")
+
+        // H toggle off → V remains.
+        try await click("inspector.flip.h")
+        s = try await snapshotState()
+        #expect(s == (false, false, true), "after H toggle off (V still on): only V selected, got \(s)")
+
+        // V toggle off → "—" lights up.
+        try await click("inspector.flip.v")
+        s = try await snapshotState()
+        #expect(s == (true, false, false), "after V toggle off: '—' selected, got \(s)")
+
+        // From a combined state, "—" must clear both.
+        try await click("inspector.flip.h")
+        try await click("inspector.flip.v")
+        s = try await snapshotState()
+        #expect(s == (false, true, true), "precondition: combined state before '—' click, got \(s)")
+        try await click("inspector.flip.none")
+        s = try await snapshotState()
+        #expect(s == (true, false, false), "after '—' click from combined: only '—' selected, got \(s)")
+    }
+
     @Test func clickingFlipHInvokesOverlayFlipper() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)

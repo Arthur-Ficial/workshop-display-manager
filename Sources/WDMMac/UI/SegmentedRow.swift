@@ -20,12 +20,22 @@ public struct SegmentedRow<Tag: Hashable>: View {
         }
     }
     let segments: [Segment]
-    let selected: Tag?
+    let isSelected: (Tag) -> Bool
     let onPick: (Tag) -> Void
 
+    /// Radio-style: exactly one tag is selected at a time (or none).
     public init(segments: [Segment], selected: Tag?, onPick: @escaping (Tag) -> Void) {
         self.segments = segments
-        self.selected = selected
+        self.isSelected = { $0 == selected }
+        self.onPick = onPick
+    }
+
+    /// Multi-select: caller decides per-segment which are lit. Used by
+    /// the GEOMETRY flip row where Flip H and Flip V are combinable
+    /// toggles and "—" lights up when neither is on.
+    public init(segments: [Segment], isSelected: @escaping (Tag) -> Bool, onPick: @escaping (Tag) -> Void) {
+        self.segments = segments
+        self.isSelected = isSelected
         self.onPick = onPick
     }
 
@@ -35,7 +45,7 @@ public struct SegmentedRow<Tag: Hashable>: View {
                 SegmentedRowSegment(
                     label: seg.label,
                     remoteID: seg.remoteID,
-                    isSelected: seg.id == selected,
+                    isSelected: isSelected(seg.id),
                     onTap: { onPick(seg.id) }
                 )
             }

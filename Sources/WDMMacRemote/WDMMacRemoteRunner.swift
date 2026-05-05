@@ -127,10 +127,14 @@ public final class WDMMacRemoteRunner {
                 ("v", Flip.vertical, "Flip V"),
             ] {
                 let id = "inspector.flip.\(axis)"
+                // SSOT: both /ui/click and the SwiftUI Button funnel
+                // through `vm.toggleFlip`, which uses the WDMCore
+                // `Flip.toggling(clicked:)` math. `hasAxis` is the
+                // matching pure predicate for the lit segments.
                 let click = mainClick { [vm] in
-                    vm.applyFlip(displayID: displayID, flip: flip)
+                    vm.toggleFlip(displayID: displayID, clicked: flip)
                 }
-                let isSelected = vm.flip(forRemoteID: tile.remoteID) == flip
+                let isSelected = vm.flip(forRemoteID: tile.remoteID).hasAxis(flip)
                 entries.append((id, RemoteRegistry.Entry(
                     role: "button", label: label, value: nil,
                     state: NodeState(selected: isSelected, enabled: true),

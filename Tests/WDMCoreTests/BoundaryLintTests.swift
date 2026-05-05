@@ -1,0 +1,46 @@
+import Testing
+import Foundation
+
+/// Architectural boundary lint, enforced as a hermetic test so a
+/// bypassed pre-commit hook cannot land a violation. Wraps
+/// `scripts/lint-no-gui-logic.sh` — the same script `make
+/// lint-no-gui-logic` runs.
+///
+/// Why this lives in `Tests/WDMCoreTests/`: WDMCore is the bottom of
+/// the layer stack, so its tests run early and fail fast. The lint
+/// script itself is pure bash with no Swift dependencies — calling it
+/// from any test target works.
+@Suite("Architectural boundaries")
+struct BoundaryLintTests {
+
+    @Test("GUI modules contain no business-logic extensions on lib types")
+    func noGuiLogic() throws {
+        let repoRoot = try Self.repoRoot()
+        let script = repoRoot.appendingPathComponent("scripts/lint-no-gui-logic.sh")
+        try #require(FileManager.default.isExecutableFile(atPath: script.path),
+                     "lint script missing or not executable at \(script.path)")
+
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/bash")
+        proc.arguments = [script.path]
+        let out = Pipe(); proc.standardOutput = out; proc.standardError = out
+        try proc.run()
+        proc.waitUntilExit()
+        let output = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        #expect(proc.terminationStatus == 0,
+                "lint-no-gui-logic.sh failed:\n\(output)")
+    }
+
+    private static func repoRoot() throws -> URL {
+        // Walk up from this source file until we see Package.swift.
+        var dir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        for _ in 0..<10 {
+            if FileManager.default.fileExists(atPath: dir.appendingPathComponent("Package.swift").path) {
+                return dir
+            }
+            dir = dir.deletingLastPathComponent()
+        }
+        throw NSError(domain: "BoundaryLintTests", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "could not find Package.swift walking up from \(#filePath)"])
+    }
+}

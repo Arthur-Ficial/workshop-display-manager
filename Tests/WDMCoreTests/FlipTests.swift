@@ -53,6 +53,46 @@ struct FlipTests {
         #expect(Flip.both.invertsY == true)
     }
 
+    @Test("toggling: H and V combine to .both, click again clears")
+    func togglingCombines() {
+        // From .none, clicking H and V are independent:
+        #expect(Flip.none.toggling(clicked: .horizontal) == .horizontal)
+        #expect(Flip.none.toggling(clicked: .vertical) == .vertical)
+        // Combine: H on top of V (or V on top of H) → .both.
+        #expect(Flip.horizontal.toggling(clicked: .vertical) == .both)
+        #expect(Flip.vertical.toggling(clicked: .horizontal) == .both)
+        // From .both, clicking H clears H (leaving V); clicking V clears V.
+        #expect(Flip.both.toggling(clicked: .horizontal) == .vertical)
+        #expect(Flip.both.toggling(clicked: .vertical) == .horizontal)
+        // Double-click clears the same axis.
+        #expect(Flip.horizontal.toggling(clicked: .horizontal) == Flip.none)
+        #expect(Flip.vertical.toggling(clicked: .vertical) == Flip.none)
+        // "—" always clears.
+        #expect(Flip.both.toggling(clicked: .none) == Flip.none)
+        #expect(Flip.horizontal.toggling(clicked: .none) == Flip.none)
+        #expect(Flip.vertical.toggling(clicked: .none) == Flip.none)
+        #expect(Flip.none.toggling(clicked: .none) == Flip.none)
+    }
+
+    @Test("hasAxis: H lights for horizontal AND both; V lights for vertical AND both")
+    func hasAxisLighting() {
+        // "—" lights only when nothing is flipped.
+        #expect(Flip.none.hasAxis(Flip.none))
+        #expect(!Flip.horizontal.hasAxis(Flip.none))
+        #expect(!Flip.vertical.hasAxis(Flip.none))
+        #expect(!Flip.both.hasAxis(Flip.none))
+        // Flip H lights for horizontal and both.
+        #expect(!Flip.none.hasAxis(.horizontal))
+        #expect(Flip.horizontal.hasAxis(.horizontal))
+        #expect(!Flip.vertical.hasAxis(.horizontal))
+        #expect(Flip.both.hasAxis(.horizontal))
+        // Flip V lights for vertical and both.
+        #expect(!Flip.none.hasAxis(.vertical))
+        #expect(!Flip.horizontal.hasAxis(.vertical))
+        #expect(Flip.vertical.hasAxis(.vertical))
+        #expect(Flip.both.hasAxis(.vertical))
+    }
+
     @Test("Codable round-trips through JSON")
     func codable() throws {
         for f in [Flip.none, .horizontal, .vertical, .both] {

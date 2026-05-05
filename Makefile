@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -57,6 +57,15 @@ lint-glass-env:
 # (wdm_close_window).
 lint-remote-coverage:
 	@bash scripts/lint-remote-coverage.sh
+
+# Forbids `extension <LibType>` in Sources/WDMMac and Sources/WDMMacRemote.
+# Enforces "no business logic in GUI": adding methods/properties to a lib
+# type from the GUI is a textbook DRY break — the next frontend would have
+# to reimplement the same logic. Lib types live in WDMCore/WDMSystem/WDMKit;
+# extensions belong there too. Catches the class of bug that motivated
+# pulling Flip.toggling / Flip.hasAxis out of DisplaysListVM into WDMCore.
+lint-no-gui-logic:
+	@bash scripts/lint-no-gui-logic.sh
 
 # Wraps the wdm-mac executable in a real .app bundle with an Info.plist
 # that opts into Liquid Glass (LSMinimumSystemVersion=26.0, no

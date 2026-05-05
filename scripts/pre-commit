@@ -25,6 +25,9 @@ if grep -RnE '^[[:space:]]*import[[:space:]]+ScreenCaptureKit[[:space:]]*$' \
     exit 1
 fi
 
+echo "pre-commit: lint-no-gui-logic..."
+bash scripts/lint-no-gui-logic.sh
+
 echo "pre-commit: release build (warnings-as-errors)..."
 swift build -c release -Xswiftc -warnings-as-errors >/dev/null
 

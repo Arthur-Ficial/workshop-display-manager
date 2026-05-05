@@ -163,7 +163,12 @@ public final class DisplaysListVM: ObservableObject {
     /// dispatches drive the AppKit window correctly, and the
     /// background thread's RunLoop pump satisfies the run() contract.
     public func applyFlip(displayID: UInt32, flip: Flip) {
-        flipSelection[String(displayID)] = flip
+        // Persist by tile remoteID — this is what `flip(forRemoteID:)`
+        // reads, what the segment selection bindings observe, and what
+        // the snapshot exposes. Writing only by `String(displayID)` made
+        // the H/V segment lights look stale because they read by
+        // remoteID and never saw the write.
+        flipSelection["displays.tile.\(displayID)"] = flip
         flipGeneration &+= 1
         let generation = flipGeneration
         let previous = flipTask
@@ -199,6 +204,17 @@ public final class DisplaysListVM: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Combinable-toggle entry point for the flip row. Reads current
+    /// flip state, calls into the WDMCore pure helper to compute the
+    /// next flip, then applies it. Single orchestration point — used
+    /// by both the SwiftUI Inspector and the remote-control registry.
+    /// All math lives in WDMCore (Flip+Toggle.swift); this method is
+    /// presentation-state glue, nothing else.
+    public func toggleFlip(displayID: UInt32, clicked: Flip) {
+        let current = flipSelection["displays.tile.\(displayID)"] ?? .none
+        applyFlip(displayID: displayID, flip: current.toggling(clicked: clicked))
     }
 
     private func finishFlip(generation: UInt64, message: String?) {

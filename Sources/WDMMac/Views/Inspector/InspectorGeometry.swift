@@ -25,8 +25,10 @@ public struct InspectorGeometry: View {
 
             SegmentedRow(
                 segments: Self.flipSegments,
-                selected: vm.flip(forRemoteID: tile.remoteID)
-            ) { vm.applyFlip(displayID: tile.displayID, flip: $0) }
+                isSelected: { vm.flip(forRemoteID: tile.remoteID).hasAxis($0) }
+            ) { tag in
+                vm.toggleFlip(displayID: tile.displayID, clicked: tag)
+            }
 
             // Honest unsupported-path: when rotate / flip fails (Apple
             // Silicon built-in refuses rotation, or Screen Recording
