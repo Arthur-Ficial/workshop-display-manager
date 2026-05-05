@@ -34,6 +34,9 @@ bash scripts/lint-gui-parity.sh
 echo "pre-commit: lint-every-verb-has-e2e..."
 bash scripts/lint-every-verb-has-e2e.sh
 
+echo "pre-commit: lint-file-size..."
+bash scripts/lint-file-size.sh
+
 echo "pre-commit: lint-github-tickets (soft)..."
 bash scripts/lint-github-tickets.sh
 

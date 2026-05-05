@@ -43,7 +43,11 @@ struct RecordingVirtualDisplayManagerTests {
         _ = try await task.value
         let elapsed = Date().timeIntervalSince(started)
         #expect(elapsed >= 0.08)
-        #expect(elapsed < 1.0)  // stop arrived; we exited quickly
+        // 5 s budget (was 1 s, flaked under `swift test --parallel` on
+        // contended hosts where Task.detached scheduling lags ~1 s past
+        // the 10 ms polling interval). Test intent is "stop unblocks
+        // reasonably quickly", not a tight perf budget.
+        #expect(elapsed < 5.0)
 
         let body = try String(contentsOf: url)
         #expect(body.contains("run "))

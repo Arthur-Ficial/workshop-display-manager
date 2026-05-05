@@ -28,6 +28,11 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-every-verb-has-e2e.sh")
     }
 
+    @Test("No Sources/ Swift file > 150 lines (whitelist for refactor backlog)")
+    func fileSize() throws {
+        try Self.runLint(named: "lint-file-size.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")

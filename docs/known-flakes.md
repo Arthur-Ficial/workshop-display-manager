@@ -12,6 +12,21 @@ The `Tests/WDMCLITests/DisabledTestsHaveLinkTest.swift` test enforces this by sc
 
 ---
 
+## ax-walker-tab-role
+
+**Tests:**
+- `Tests/WDMMacE2ETests/HeadedTabClickTests.swift` — `tabsClickableViaRemoteAPI`
+- `Tests/WDMMacE2ETests/HeadedClickCoverageTests.swift` — `everyClickableDispatchable`
+- `Tests/WDMMacE2ETests/HeadedSnapshotCoverageTests.swift` — `everyRemoteIDInSnapshot`
+
+**Symptom:** SwiftUI `Button` declarations carrying `.buttonStyle(.plain)` + `.clickable()` don't surface in the AccessibilityWalker with `role == "AXButton"`, so the test's `pressable.contains($0.role)` predicate never finds them. The titlebar tabs are the most visible case (`titlebar.tab.{stage,profiles,recordings}`); 18 other remoteIDs (sidebar.virtual.empty, inspector.action.*, inspector.title, statusbar.*, stage.canvas, etc.) are also absent from `/ui/snapshot` because the walker filters strictly by interactive role + non-empty id.
+
+**Plan:** M5 fixes the role exposure (likely `.accessibilityAddTraits(.isButton)` on each tab Button + a wider walker policy for static remoteIDs). Tests re-enabled then. Tracked under [issue #119](https://github.com/Arthur-Ficial/workshop-display-manager/issues/119) (M5 — GUI gap closure).
+
+**Workaround in place (golden-goal.sh):** The 3 suites are skipped in `make golden-goal` headed-e2e via `--skip` flags. The remaining 10 headed tests run visibly and pass.
+
+---
+
 ## headed-settings-parallel
 
 **Test:** `Tests/WDMMacE2ETests/HeadedSettingsTests.swift` — `openSettingsClickAndSnapshot`
