@@ -184,13 +184,13 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         cfg.height = Int(CGFloat(scDisplay.height) * scale)
         cfg.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         cfg.queueDepth = 5
-        // Don't composite the cursor into the captured frame. The live
-        // cursor stays visible (we don't call CGDisplayHideCursor below)
-        // so the user can still navigate during a sticky flip — clicking
-        // "—" to undo, or another segment to switch axis. Compositing
-        // would only show a flipped cursor on top of the flipped overlay,
-        // which is doubled & disorienting.
-        cfg.showsCursor = false
+        // Composite the cursor into the captured frame ("fake" cursor in
+        // the flipped overlay) AND keep the live cursor visible (we
+        // never call CGDisplayHideCursor). User asked for both — the
+        // real cursor at real position lets them navigate during a
+        // sticky flip, the fake cursor shows what an audience / mirrored
+        // output sees. Two cursors over the flipped display, by design.
+        cfg.showsCursor = true
         cfg.colorSpaceName = CGColorSpace.sRGB
         cfg.scalesToFit = false
         layer.contentsScale = scale
