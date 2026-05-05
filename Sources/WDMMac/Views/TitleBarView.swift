@@ -35,6 +35,10 @@ public struct TitleBarView: View {
                     }
                     .buttonStyle(.plain)
                     .clickable(isSelected: t == tab)
+                    // .buttonStyle(.plain) elides the AXButton role —
+                    // re-add it so the AccessibilityWalker / headed
+                    // e2e tests can locate the tab as a clickable.
+                    .accessibilityAddTraits(.isButton)
                     .accessibilityIdentifier("titlebar.tab.\(t.rawValue)")
                 }
             }
@@ -53,6 +57,7 @@ public struct TitleBarView: View {
             }
             .buttonStyle(.plain)
             .clickable()
+            .accessibilityAddTraits(.isButton)
             .accessibilityIdentifier("titlebar.profile")
         }
         .padding(.horizontal, 16).padding(.vertical, 8)
