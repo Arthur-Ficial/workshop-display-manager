@@ -85,6 +85,42 @@ If any answer is yes: delete the lie, surface the failure, write the test that p
 
 ---
 
+## CRISP-AS-DAY RENDERING (non-negotiable)
+
+**Anything that captures or renders a display must do so at NATIVE PIXEL RESOLUTION. No exceptions, no upscaling, no "good enough."**
+
+User-visible blur in flip-overlays, picture-in-picture mirrors, screen recordings, screenshots, or stage thumbnails is a defect, not a polish item. The user's eye notices a 1-pixel softness on Retina; treating that as acceptable lies to them about what wdm is doing.
+
+### Hard rules for every screen-capture / render path
+
+- **Capture in pixels, not points.** `SCDisplay.width/height`, `NSScreen.frame`, `CGDisplayBounds(...)` — every framework's "size" property may return logical points. On Retina, points × `nsScreen.backingScaleFactor` = native pixels. Capture-config dimensions (e.g. `SCStreamConfiguration.width/height`) MUST be in pixels. If you don't multiply by the scale, you capture at half resolution and upscale = blur.
+- **Mark `CALayer.contentsScale`.** When rendering a captured frame back into a `CALayer`, set `contentsScale = backingScaleFactor`. CoreAnimation otherwise treats your hi-DPI bitmap as 1x and rescales = blur.
+- **Filter `.nearest` on pixel-aligned content.** When the source pixel dims match the destination pixel dims, `magnificationFilter = .nearest` keeps every pixel sharp. Bilinear scaling on already-aligned pixels is a soft-blur generator. Use linear/trilinear filters only when you genuinely need to scale.
+- **No `scalesToFit`.** `SCStreamConfiguration.scalesToFit = false`. We control sizing explicitly; framework-side scaling defeats the rule.
+- **60 fps minimum.** `cfg.minimumFrameInterval = CMTime(value: 1, timescale: 60)` for anything that follows the user's screen — workshop facilitators see at the screen's refresh rate, the overlay must too.
+- **Color-space pinned.** `cfg.colorSpaceName = CGColorSpace.sRGB` so the captured frame doesn't get re-tagged in transit (color-shifted overlays look "off" in a way users can't articulate but feel).
+
+### Test for it
+
+Every screen-capture path must have a real-hardware visual test that:
+1. Triggers the capture/render.
+2. Reads the resulting bitmap (file output, layer contents, screenshot).
+3. Asserts the pixel dimensions match `display.width × backingScaleFactor`.
+
+A test that asserts "the function ran" without checking output dimensions does not catch the upscale bug.
+
+### Smell check before commit
+
+For any new screen-capture / render code, ask:
+- Did I multiply by `backingScaleFactor` somewhere?
+- Did I set `layer.contentsScale`?
+- Did I set the magnification/minification filter explicitly, or am I relying on a default that's likely bilinear?
+- Did I run it on the user's real Retina display and look at the output with my own eyes?
+
+If any answer is no, the path is blurry. Fix it before shipping.
+
+---
+
 ## SUPER RESPONSIVE INTERACTION (non-negotiable)
 
 **Every interaction in WDMMac must be SUPER fast. No sluggishness. No exceptions.**
