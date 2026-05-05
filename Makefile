@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage app-mac app-mac-release install clean
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -11,6 +11,14 @@ release:
 
 test:
 	$(SWIFT) test
+
+# Hermetic demo of CLAUDE.md's "every GUI interaction reproducible from
+# a pipe" litmus test, applied to drag-to-rearrange:
+#   wdm arrange list --json | jq '...' | wdm arrange set @-
+# Proves the SSOT property — the GUI's drag-end commit and this CLI
+# pipe call exactly the same WDMController op.
+demo-arrange-pipe: build
+	@bash scripts/demo-arrange-pipe.sh
 
 # Reads/clicks the headless GUI through the remote API. The same flow the
 # AI uses. Hermetic — builds, spawns wdm-mac, drives it via wdm-mac-control,
