@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import WDMCore
 import WDMMac
 import WDMRemoteControl
 
@@ -73,6 +74,40 @@ public final class WDMMacRemoteRunner {
                 state: NodeState(selected: false, enabled: true),
                 onClick: nil
             )))
+        }
+
+        // INSPECTOR — GEOMETRY rotation + flip segments. Same selected-
+        // tile scoping as brightness. Each segment routes to the same
+        // Kit op the CLI exposes (`wdm rotate`, `wdm flip`).
+        if let tile = (tiles.first { $0.remoteID == selected } ?? tiles.first) {
+            let displayID = tile.displayID
+            for degrees in [0, 90, 180, 270] {
+                let id = "inspector.rotate.\(degrees)"
+                let click: @Sendable () -> Void = { [vm] in
+                    Task { @MainActor in vm.setRotation(displayID: displayID, degrees: degrees) }
+                }
+                entries.append((id, RemoteRegistry.Entry(
+                    role: "button", label: "\(degrees)°", value: nil,
+                    state: NodeState(selected: tile.rotationDegrees == degrees, enabled: true),
+                    onClick: click
+                )))
+            }
+            for (axis, flip, label) in [
+                ("none", Flip.none, "—"),
+                ("h", Flip.horizontal, "Flip H"),
+                ("v", Flip.vertical, "Flip V"),
+            ] {
+                let id = "inspector.flip.\(axis)"
+                let click: @Sendable () -> Void = { [vm] in
+                    Task { @MainActor in vm.applyFlip(displayID: displayID, flip: flip) }
+                }
+                let isSelected = vm.flip(forRemoteID: tile.remoteID) == flip
+                entries.append((id, RemoteRegistry.Entry(
+                    role: "button", label: label, value: nil,
+                    state: NodeState(selected: isSelected, enabled: true),
+                    onClick: click
+                )))
+            }
         }
 
         // INSPECTOR — brightness section, surfaced for the currently-

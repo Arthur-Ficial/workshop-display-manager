@@ -125,6 +125,35 @@ public final class DisplaysListVM: ObservableObject {
         reloadProfiles()
     }
 
+    /// Set physical rotation for a display via `controller.rotate(...)`
+    /// (same Kit op as `wdm rotate <id> <0|90|180|270>`). On Apple
+    /// Silicon built-ins where IODisplayConnect isn't exposed, this
+    /// throws and the error message surfaces in `lastError` per
+    /// CLAUDE.md "honest unsupported-path policy".
+    public func setRotation(displayID: UInt32, degrees: Int) {
+        do {
+            _ = try controller.rotate(String(displayID), degrees: degrees, confirmer: AutoYesConfirmer())
+            lastError = nil
+        } catch {
+            lastError = "Rotate to \(degrees)° failed: \(error)"
+        }
+        reload()
+    }
+
+    /// Apply framebuffer flip via `controller.flip(...)` (same Kit op
+    /// as `wdm flip <id> <none|h|v|hv|off>`). Same hardware-refusal
+    /// rules as rotate.
+    public func applyFlip(displayID: UInt32, flip: Flip) {
+        do {
+            _ = try controller.flip(String(displayID), flip: flip, confirmer: AutoYesConfirmer())
+            lastError = nil
+        } catch {
+            lastError = "Flip to \(flip) failed: \(error)"
+        }
+        flipSelection[String(displayID)] = flip
+        reload()
+    }
+
     /// Honest refusal for the VIRTUAL section's `+` CTA. Virtual
     /// display creation goes through the CGVirtualDisplay SPI, which
     /// the GUI hasn't wired up yet — the CLI's `wdm virtual create`

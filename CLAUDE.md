@@ -85,6 +85,38 @@ If any answer is yes: delete the lie, surface the failure, write the test that p
 
 ---
 
+## SUPER RESPONSIVE INTERACTION (non-negotiable)
+
+**Every interaction in WDMMac must be SUPER fast. No sluggishness. No exceptions.**
+
+This is the fourth pillar, equal to the iron law / no-fakes / modular. The user reported it twice with screenshots; if a click feels off-instant, that is a defect, not a tradeoff.
+
+### Hard targets (enforced — measurable, not vibes)
+
+- **First visible feedback after click ≤ 50 ms.** The button highlight, the slider thumb move, the tab swap — *something* visibly responds in under one display frame at 60 Hz. CSS / SwiftUI default cross-fade is 0.25 s — that is *too slow* on its own; add explicit `.animation(.easeOut(duration: 0.08))` or remove the implicit animation entirely on hot-path controls.
+- **Full state change ≤ 100 ms.** Clicking a rotation segment → display rotates and the new tile origin appears in the snapshot within 100 ms wall time on the user's MacBook Air.
+- **Slider drag ≤ 16 ms per tick.** Brightness slider must keep up at 60 Hz. If the controller call costs more, throttle/coalesce — never block.
+- **`/ui/click` → `/ui/snapshot` round-trip ≤ 100 ms** on the test rig. Hermetic e2e benchmark — if it ever exceeds, the build fails.
+
+### What this forbids
+
+- ❌ Default SwiftUI animations on hot-path interactions. They look fine on first sight and feel sluggish on the third click. Override with explicit short durations or remove.
+- ❌ Doing extra work per click. `reload()` after every VM mutation re-fetches every display + every brightness — do the minimum: update only what changed.
+- ❌ Synchronous IPC on the main thread on click. Round-trips to WebContent / DisplayServices / IOKit go off-main; main thread updates the visible state immediately, the IPC reconciles in the background.
+- ❌ Combine subscribers that rebuild the entire registry on every `@Published` write. Diff or scope the trigger to the field that actually changed.
+- ❌ Animations on AX-tree-visible elements that delay the AX walker seeing the new state. The AI tests must observe state change within the 100 ms budget too.
+
+### What this requires
+
+- ✅ Profile, don't guess. Use `os_signpost` / `signposter.beginInterval(...)` around suspect spans. The PERF ticket in `tasks/todo.md` tells you where to look first.
+- ✅ Measure on the *user's hardware*. Synthetic benchmarks lie; the workshop facilitator clicking on their MacBook Air is the only ground truth that matters.
+- ✅ Add a hermetic perf e2e for every new hot path. `swift test --filter Perf*` should bench the round-trip and fail if any verb exceeds its budget.
+- ✅ Treat sluggishness as a **defect**, not a polish item. File it like a crash. Block the next feature on it if it regresses past the budget.
+
+If a click on this app ever feels even slightly slower than a click in System Settings, you have failed this pillar. Fix it before shipping anything else.
+
+---
+
 ## SUPER MODULAR CODE (non-negotiable)
 
 The codebase is decomposed into the smallest sensible units. Every file does one thing. Every type has one reason to change. Every function has one job.

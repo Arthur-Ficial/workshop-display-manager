@@ -130,6 +130,8 @@ private struct SidebarProfileRow: View {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(hovering ? Color.secondary.opacity(0.10) : .clear)
                 }
+                // CLAUDE.md responsiveness pillar — snap, don't fade.
+                .animation(.easeOut(duration: 0.05), value: hovering)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("sidebar.profiles.row.\(name)")

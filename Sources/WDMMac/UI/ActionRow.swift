@@ -32,6 +32,8 @@ public struct ActionRow: View {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(hovering ? Color.secondary.opacity(0.10) : .clear)
             }
+            // CLAUDE.md responsiveness pillar — snap, don't fade.
+            .animation(.easeOut(duration: 0.05), value: hovering)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(remoteID)

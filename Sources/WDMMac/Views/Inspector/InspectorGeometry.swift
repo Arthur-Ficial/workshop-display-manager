@@ -21,16 +21,12 @@ public struct InspectorGeometry: View {
                     .init(id: $0, label: "\($0)°", remoteID: "inspector.rotate.\($0)")
                 },
                 selected: tile.rotationDegrees
-            ) { _ in
-                // Apply landed in a later milestone — for M2 the controller
-                // doesn't write rotation from the GUI yet. Click is wired so
-                // the remote API + e2e coverage exercises the segment.
-            }
+            ) { vm.setRotation(displayID: tile.displayID, degrees: $0) }
 
             SegmentedRow(
                 segments: Self.flipSegments,
                 selected: vm.flip(forRemoteID: tile.remoteID)
-            ) { vm.setFlip($0, forRemoteID: tile.remoteID) }
+            ) { vm.applyFlip(displayID: tile.displayID, flip: $0) }
         }
     }
 

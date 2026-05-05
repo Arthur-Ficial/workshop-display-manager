@@ -62,6 +62,12 @@ private struct SegmentedRowSegment: View {
                     shape.fill(fillColor)
                     shape.stroke(strokeColor, lineWidth: isSelected ? 1.5 : 0)
                 }
+                // Per CLAUDE.md "SUPER RESPONSIVE INTERACTION":
+                // selection feedback must land in ≤50 ms. SwiftUI's
+                // default cross-fade on background changes is ~250 ms
+                // — that's the user-reported "sluggish" feel. Snap.
+                .animation(.easeOut(duration: 0.05), value: isSelected)
+                .animation(.easeOut(duration: 0.05), value: hovering)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier(remoteID)
