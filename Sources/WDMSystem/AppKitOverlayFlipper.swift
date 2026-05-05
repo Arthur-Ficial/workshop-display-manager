@@ -184,7 +184,13 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         cfg.height = Int(CGFloat(scDisplay.height) * scale)
         cfg.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         cfg.queueDepth = 5
-        cfg.showsCursor = true
+        // Don't composite the cursor into the captured frame. The live
+        // cursor stays visible (we don't call CGDisplayHideCursor below)
+        // so the user can still navigate during a sticky flip — clicking
+        // "—" to undo, or another segment to switch axis. Compositing
+        // would only show a flipped cursor on top of the flipped overlay,
+        // which is doubled & disorienting.
+        cfg.showsCursor = false
         cfg.colorSpaceName = CGColorSpace.sRGB
         cfg.scalesToFit = false
         layer.contentsScale = scale
@@ -200,16 +206,19 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         try s.addStreamOutput(output, type: .screen, sampleHandlerQueue: captureQ)
         try await s.startCapture()
 
-        // Hide the live cursor while it's over the target display so only
-        // the captured (flipped) cursor is visible. Reference-counted —
-        // matched by CGDisplayShowCursor in teardown(). If the process is
-        // killed -9, the cursor stays hidden until next reboot or another
-        // process calls CGDisplayShowCursor.
-        CGDisplayHideCursor(scDisplay.displayID)
-        self.cursorHiddenOnDisplay = scDisplay.displayID
+        // Live cursor stays visible at its real position — we do NOT
+        // call CGDisplayHideCursor. Together with `showsCursor = false`
+        // above, the user sees exactly one cursor: their real one, in
+        // normal orientation, at its real screen position. They can
+        // navigate over the flipped overlay and click "—" / another
+        // segment to switch axis. Hiding the cursor on a sticky flip
+        // strands the user — they cannot find the cursor to undo.
     }
 
     private func teardown() {
+        // Defensive: if a previous version of this code (or a future
+        // change) ever set cursorHiddenOnDisplay, restore it. Belt-and-
+        // suspenders — current run() never hides the live cursor.
         if let id = cursorHiddenOnDisplay {
             CGDisplayShowCursor(id)
             cursorHiddenOnDisplay = nil
