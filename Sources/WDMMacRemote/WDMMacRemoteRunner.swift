@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 import WDMCore
 import WDMMac
 import WDMRemoteControl
@@ -181,6 +182,49 @@ public final class WDMMacRemoteRunner {
                     onClick: nil
                 )))
             }
+
+            // INSPECTOR — actions section. "Make main" is wired to the
+            // live Kit op; the others surface honest refusals (per
+            // CLAUDE.md "no fakes — surface the limitation"). The
+            // SwiftUI tree wires them too; the registry exposes them
+            // here so the headless /ui/click path also works.
+            let displayID = tile.displayID
+            entries.append(("inspector.action.makeMain", RemoteRegistry.Entry(
+                role: "button", label: "Make main", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { [vm] in vm.makeMain(displayID: displayID) }
+            )))
+            entries.append(("inspector.action.pip", RemoteRegistry.Entry(
+                role: "button", label: "Open PiP window", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { [vm] in
+                    vm.refuseAction(named: "PiP window",
+                                    cliEquivalent: "wdm pip \(displayID)")
+                }
+            )))
+            entries.append(("inspector.action.record", RemoteRegistry.Entry(
+                role: "button", label: "Record", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { [vm] in
+                    vm.refuseAction(named: "Record",
+                                    cliEquivalent: "wdm record \(displayID) --out <path> --duration <sec>")
+                }
+            )))
+            entries.append(("inspector.action.reset", RemoteRegistry.Entry(
+                role: "button", label: "Reset / reconnect…", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { [vm] in
+                    vm.refuseAction(named: "Reset",
+                                    cliEquivalent: "wdm doctor disconnect \(displayID)")
+                }
+            )))
+            entries.append(("inspector.action.advanced", RemoteRegistry.Entry(
+                role: "button", label: "Open Advanced", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick {
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                }
+            )))
         }
 
         // PROFILES section header `+` button — saves the current arrangement

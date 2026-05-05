@@ -36,6 +36,12 @@ public struct ActionRow: View {
             .animation(.easeOut(duration: 0.05), value: hovering)
         }
         .buttonStyle(.plain)
+        // .buttonStyle(.plain) elides the AXButton role —
+        // re-add it so AccessibilityWalker / headed e2e tests can
+        // locate the row as a clickable. Plus an explicit
+        // accessibilityAction so AXPress reaches the closure.
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { action() }
         .accessibilityIdentifier(remoteID)
         .onHover { hovering = $0 }
     }

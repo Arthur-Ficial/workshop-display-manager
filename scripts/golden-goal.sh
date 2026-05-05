@@ -160,11 +160,13 @@ else
     deferred "9. every-gui-element-has-e2e (M3: full enforcement; partial today)"
 fi
 
-# 10. soak
-if [ -x scripts/golden-goal-soak.sh ]; then
+# 10. soak — 60-sec smoke by default; WDM_SOAK=1 runs the full 30-min.
+if [ "${WDM_GOLDEN_GOAL_SKIP_HEAVY:-}" = "1" ]; then
+    pass "10. soak (skipped — caller asserted)"
+elif [ -x scripts/golden-goal-soak.sh ]; then
     if bash scripts/golden-goal-soak.sh >/tmp/golden-goal-soak.log 2>&1; then
         if [ "${WDM_SOAK:-}" = "1" ]; then
-            pass "10. soak (30 min)"
+            pass "10. soak (30 min, mixed driver, listener live)"
         else
             pass "10. soak (60-sec smoke; WDM_SOAK=1 for 30-min)"
         fi

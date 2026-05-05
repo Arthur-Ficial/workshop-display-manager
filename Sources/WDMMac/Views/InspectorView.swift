@@ -22,7 +22,7 @@ public struct InspectorView: View {
                     SectionLabel("BRIGHTNESS")
                     InspectorBrightness(vm: vm, tile: tile)
                     SectionLabel("ACTIONS")
-                    InspectorActions()
+                    InspectorActions(vm: vm, tile: tile)
                 } else {
                     Text("Select a display to inspect.")
                         .foregroundStyle(.secondary).padding(.top, 36)

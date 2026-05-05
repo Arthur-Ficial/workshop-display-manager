@@ -134,6 +134,27 @@ public final class DisplaysListVM: ObservableObject {
         reloadProfiles()
     }
 
+    /// Set the primary (main) display — same Kit op as `wdm main <id>`.
+    /// Surfaces failures via `lastError` per CLAUDE.md "honest
+    /// unsupported-path policy".
+    public func makeMain(displayID: UInt32) {
+        do {
+            _ = try controller.main(String(displayID), confirmer: AutoYesConfirmer())
+            lastError = nil
+        } catch {
+            lastError = "Make main failed: \(error)"
+        }
+        reload()
+    }
+
+    /// Honest refusal for Inspector actions whose GUI wiring is on the
+    /// v1.1 backlog (PiP / Record / Reset). The CLI command is the
+    /// supported path. Surfaces a message in `lastError` so the user
+    /// sees WHY the click didn't do anything.
+    public func refuseAction(named name: String, cliEquivalent: String) {
+        lastError = "\(name) via the GUI is on the v1.1 backlog. CLI: `\(cliEquivalent)`"
+    }
+
     /// Set physical rotation for a display via `controller.rotate(...)`
     /// (same Kit op as `wdm rotate <id> <0|90|180|270>`). On Apple
     /// Silicon built-ins where IODisplayConnect isn't exposed, this
