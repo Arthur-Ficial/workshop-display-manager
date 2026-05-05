@@ -52,50 +52,83 @@ public struct SidebarView: View {
 
     private var profilesSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            SectionHeader(title: "PROFILES", count: vm.profiles.count) {
-                Button { onSelect("sidebar.profiles.add") } label: {
-                    Image(systemName: "plus").font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 5).padding(.vertical, 1)
-                }
-                .buttonStyle(.plain)
-                .clickable(cornerRadius: 5)
-                .accessibilityIdentifier("sidebar.profiles.add")
-            }
+            SectionHeader(title: "PROFILES", count: vm.profiles.count)
+
             if vm.profiles.isEmpty {
                 EmptyHint("No saved profiles.", remoteID: "sidebar.profiles.empty")
             } else {
                 ForEach(vm.profiles, id: \.self) { name in
-                    HStack(spacing: 4) {
-                        Button { onSelect("sidebar.profiles.row.\(name)") } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "bookmark")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                Text(name)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 6).padding(.vertical, 3)
-                        }
-                        .buttonStyle(.plain)
-                        .clickable(cornerRadius: 5)
-                        .accessibilityIdentifier("sidebar.profiles.row.\(name)")
-
-                        Button { vm.removeProfile(named: name) } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .padding(.horizontal, 4).padding(.vertical, 2)
-                        }
-                        .buttonStyle(.plain)
-                        .clickable(cornerRadius: 4)
-                        .accessibilityIdentifier("sidebar.profiles.row.\(name).delete")
-                    }
+                    SidebarProfileRow(
+                        name: name,
+                        onApply: { onSelect("sidebar.profiles.row.\(name)") },
+                        onDelete: { vm.removeProfile(named: name) }
+                    )
                 }
             }
+
+            // Per design briefing: a "Save current as…" CTA at the bottom
+            // of the section, not a `+` in the header.
+            Button { onSelect("sidebar.profiles.add") } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Save current as…")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6).padding(.vertical, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sidebar.profiles.add")
+            .padding(.top, 2)
         }
+    }
+}
+
+/// Single profile row — subtle hover highlight (no idle border per
+/// the design briefing's "Saved arrangements" treatment), inline
+/// delete button that fades to ~30% opacity until pointer hover.
+private struct SidebarProfileRow: View {
+    let name: String
+    let onApply: () -> Void
+    let onDelete: () -> Void
+    @State private var hovering: Bool = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Button(action: onApply) {
+                HStack(spacing: 6) {
+                    Image(systemName: "bookmark")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    Text(name)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 6).padding(.vertical, 3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background {
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(hovering ? Color.secondary.opacity(0.10) : .clear)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sidebar.profiles.row.\(name)")
+
+            Button(action: onDelete) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4).padding(.vertical, 3)
+                    .opacity(hovering ? 0.85 : 0.30)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sidebar.profiles.row.\(name).delete")
+        }
+        .onHover { hovering = $0 }
     }
 }
 
