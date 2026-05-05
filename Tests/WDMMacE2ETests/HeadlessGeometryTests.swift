@@ -55,6 +55,39 @@ struct HeadlessGeometryTests {
     /// denied), the GUI must surface the error visibly via
     /// `inspector.geometry.lastError`. Anything less is a fake — the
     /// user clicks Flip H, nothing flips, and they have no signal why.
+    /// Regression: clicking flip then waiting must NOT crash the
+    /// process. User reported app dying after each Flip H click; root
+    /// cause was SCStream frame callbacks racing window-close. The
+    /// fix detaches the frame sink's layer first + waits synchronously
+    /// for stopCapture before tearing down. This test catches any
+    /// future regression in that ordering.
+    @Test func clickingFlipDoesNotCrashTheProcess() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadless(env: env)
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        // Click flip once.
+        let snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let target = snap.nodes.first { $0.remoteID == "inspector.flip.h" }
+        try #require(target != nil)
+        var click = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
+        click.httpMethod = "POST"
+        click.httpBody = Data(#"{"ref":"\#(target!.ref.rawValue)"}"#.utf8)
+        _ = try await URLSession.shared.data(for: click)
+
+        // Wait past the flip's 600 ms duration + teardown grace. If the
+        // process crashed, isPortAccepting returns false (the listener
+        // is gone with the process) AND proc.isRunning becomes false.
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        #expect(proc.isRunning,
+                "wdm-mac should still be running after a flip click; got dead")
+        #expect(isPortAccepting(port: port),
+                "port \(port) should still accept after a flip click; got connection refused")
+    }
+
     @Test func flipFailureSurfacesAsLastErrorNode() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadlessWithFlipperThrow(env: env, message: "TEST: permission denied")

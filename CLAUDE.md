@@ -85,6 +85,33 @@ If any answer is yes: delete the lie, surface the failure, write the test that p
 
 ---
 
+## NO CRASHES (non-negotiable)
+
+**A user-visible crash is a release-blocker, never a "we'll get to it." Crashes are measured, controlled, and fixed before anything else ships.**
+
+The user reported "the app crashed after Flip" 2026-05-05. That kind of report must never appear in a production session.
+
+### Hard rules
+
+- **Crash = priority 0.** Drop whatever else you're doing. The next commit fixes the crash, or reverts the code that introduced it.
+- **Every crash gets a regression test.** Before fixing, write a test that proves the crash existed. Spawn the binary as a subprocess, exercise the path, assert `proc.isRunning == true` afterwards (or assert the listener-port still accepts). The test must FAIL on the broken build and PASS on the fixed one. CLAUDE.md "tests must actually run" applies double here — a crash test that's never executed catches nothing.
+- **Race conditions in tear-down are crashes.** Specifically: framework callbacks (SCStream sample buffers, IOKit notifications, NSWindow delegates, timers) firing after their owning state has been deallocated. Always detach the callback's reference to the dying state BEFORE freeing the state, AND wait synchronously for the framework's stop semantics before proceeding. "Fire-and-forget Task { try? await stop() }" is a crash generator — race between stop completing and your next teardown step.
+- **Defensive teardown at re-entry.** Long-lived flippers / streamers / probes that get reused across calls must `teardown()` at the start of each `run()` so leftover state from a prior run can't race the new one.
+- **No `signal(SIG_IGN)` in libraries.** A library that ignores SIGINT/SIGTERM globally breaks the host's ability to be interrupted cleanly. Use `DispatchSourceSignal` *without* the SIG_IGN preamble in CLI-only paths; in GUI hosts the host already owns signal handling.
+- **Activation-policy switches are scoped.** Switching to `.accessory` is appropriate for a CLI process about to draw an overlay (suppresses Dock-icon flash). For a GUI host (wdm-mac), switching to `.accessory` HIDES the user's main window and looks like a crash. Read the current policy, only switch from `.prohibited`.
+
+### How to "make it testable" for crashes
+
+Standard pattern:
+1. Spawn the binary as a subprocess in the test (`spawnHeadless(env:)` already does this).
+2. Drive the suspect path via `/ui/click` or another stable interface.
+3. Wait long enough for the bug's race window to fire (1–2 × the longest async operation).
+4. Assert the subprocess is still alive: `#expect(proc.isRunning)` AND `#expect(isPortAccepting(port:))`. Both, because a process can be alive in the kernel sense but its listener thread can have crashed.
+
+The test is the contract. If a crash recurs in any form, this test catches it before the user does.
+
+---
+
 ## CRISP-AS-DAY RENDERING (non-negotiable)
 
 **Anything that captures or renders a display must do so at NATIVE PIXEL RESOLUTION. No exceptions, no upscaling, no "good enough."**

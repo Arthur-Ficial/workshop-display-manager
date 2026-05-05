@@ -40,8 +40,20 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         try PermissionProbe.requireScreenRecording(context: "flip-overlay")
         // Reset the stop flag from any previous run.
         lock.withLock { stopRequested = false }
-        savedActivationPolicy = readActivationPolicy()
-        runOnMainSetActivationPolicy(.accessory)
+        // Only switch to .accessory when the host is .prohibited
+        // (a bare CLI process — we want to suppress the Dock icon
+        // flash during flip). For .regular hosts (GUI apps like
+        // wdm-mac), switching would HIDE the user's main window and
+        // dock icon — looks like a crash to the user even though we
+        // restore the policy in teardown. Per the user's "looks like
+        // a crash" report 2026-05-05.
+        let current = readActivationPolicy()
+        if current == .prohibited {
+            savedActivationPolicy = current
+            runOnMainSetActivationPolicy(.accessory)
+        } else {
+            savedActivationPolicy = nil
+        }
         installSignalHandlers()
 
         let errBox = ErrorBox()
@@ -220,8 +232,20 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
             CGDisplayShowCursor(id)
             cursorHiddenOnDisplay = nil
         }
+        // Detach the frame sink's layer reference FIRST so any
+        // in-flight frame callbacks become no-ops, then synchronously
+        // wait for SCStream to stop. Closing the window before the
+        // stream is stopped + frames are flushed crashes AppKit when
+        // a late frame writes to the now-deallocated NSView layer
+        // (user-reported "app crashes after Flip" 2026-05-05).
+        (frameSink as? FrameSink)?.detachLayer()
         if let s = stream {
-            Task { try? await s.stopCapture() }
+            let done = DispatchSemaphore(value: 0)
+            Task {
+                try? await s.stopCapture()
+                done.signal()
+            }
+            _ = done.wait(timeout: .now() + .milliseconds(500))
         }
         stream = nil
         frameSink = nil
@@ -284,19 +308,28 @@ private final class ErrorBox: @unchecked Sendable {
 }
 
 @objc private final class FrameSink: NSObject, SCStreamOutput, @unchecked Sendable {
-    nonisolated(unsafe) let layer: CALayer
-    init(layer: CALayer) { self.layer = layer }
+    nonisolated(unsafe) private var _layer: CALayer?
+    private let lock = NSLock()
+    init(layer: CALayer) { self._layer = layer }
+    /// Called from teardown to break the layer reference. Without this,
+    /// late-arriving SCStream frames could write to a layer whose
+    /// owning NSWindow had already closed → AppKit crash.
+    func detachLayer() { lock.withLock { _layer = nil } }
     @objc func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
         guard type == .screen, sampleBuffer.isValid,
               let pixelBuffer = sampleBuffer.imageBuffer else { return }
+        let layer = lock.withLock { _layer }
+        guard let layer else { return }
         let ci = CIImage(cvPixelBuffer: pixelBuffer)
         let ctx = CIContext()
         guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
-        let l = self.layer
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            // Re-check on main — teardown may have detached between
+            // bg-thread render and main-thread commit.
+            guard let live = self?.lock.withLock({ self?._layer }), live === layer else { return }
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            l.contents = cg
+            layer.contents = cg
             CATransaction.commit()
         }
     }
