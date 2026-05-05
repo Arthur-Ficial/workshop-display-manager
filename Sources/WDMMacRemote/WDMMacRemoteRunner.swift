@@ -77,6 +77,20 @@ public final class WDMMacRemoteRunner {
             )))
         }
 
+        // INSPECTOR HEADER — Mirror-of tag. When the selected tile mirrors
+        // another, surface "Mirror of 0X" (1-based index of the source
+        // in the visible tile list, matches Stage badge format).
+        if let tile = (tiles.first { $0.remoteID == selected } ?? tiles.first),
+           let src = tile.mirrorSource,
+           let idx = tiles.firstIndex(where: { $0.displayID == src }) {
+            let label = String(format: "Mirror of %02d", idx + 1)
+            entries.append(("inspector.title.mirror", RemoteRegistry.Entry(
+                role: "text", label: "Mirror tag", value: label,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+        }
+
         // INSPECTOR — last-error surfacing for the GEOMETRY section.
         // When a rotate/flip click fails (e.g. Screen Recording
         // permission denied for the overlay flipper, or rotation

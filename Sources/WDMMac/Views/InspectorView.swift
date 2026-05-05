@@ -12,7 +12,7 @@ public struct InspectorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let tile = vm.selectedTile() {
-                    InspectorHeader(tile: tile)
+                    InspectorHeader(tile: tile, allTiles: vm.tiles)
                     SectionLabel("MODE")
                     InspectorMode(tile: tile)
                     SectionLabel("IDENTITY")

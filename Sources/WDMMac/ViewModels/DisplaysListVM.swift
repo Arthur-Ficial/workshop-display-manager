@@ -34,6 +34,9 @@ public final class DisplaysListVM: ObservableObject {
         /// Inspector's brightness section refuses to render a slider when
         /// nil, per CLAUDE.md's honest-unsupported-path policy.
         public let brightness: Float?
+        /// Display ID this one mirrors, if any. Surfaced as the
+        /// "Mirror of 0X" tag in the Inspector HEADER per design briefing.
+        public let mirrorSource: UInt32?
         public var isSelected: Bool
 
         public var id: String { remoteID }
@@ -223,6 +226,7 @@ public final class DisplaysListVM: ObservableObject {
                     originX: d.origin.x,
                     originY: d.origin.y,
                     brightness: tryBrightness(displayID: d.id),
+                    mirrorSource: d.mirrorSource,
                     isSelected: d.id == displayIDFor(remoteID: selectedRemoteID)
                 )
             }
