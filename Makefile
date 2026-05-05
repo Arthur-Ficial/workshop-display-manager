@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic golden-goal app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -66,6 +66,18 @@ lint-remote-coverage:
 # pulling Flip.toggling / Flip.hasAxis out of DisplaysListVM into WDMCore.
 lint-no-gui-logic:
 	@bash scripts/lint-no-gui-logic.sh
+
+# Forbids CLI verbs without a GUI surface (or vice versa). Allowlist of
+# intentional CLI-only verbs lives in docs/cli-only-verbs.md. Catches
+# the "I added a CLI command but forgot the button" class of regression.
+lint-gui-parity:
+	@bash scripts/lint-gui-parity.sh
+
+# Asserts every milestone in tasks/golden-goal-spec.md has a GitHub
+# issue (open or closed). Soft-fails when offline / unauthenticated;
+# set WDM_LINT_TICKETS_STRICT=1 to enforce.
+lint-github-tickets:
+	@bash scripts/lint-github-tickets.sh
 
 # Acceptance ledger for the ship-ready goal. 10 lines of evidence:
 # release build, swift test, headed e2e, every lint, codesign,

@@ -24,7 +24,7 @@ A signed + notarized + stapled `WDMMac.app` plus its companion binaries (`wdm`, 
 | 4 | lint-quality (every `scripts/lint-*.sh` exits 0; count grows M1..M4..M7) | M0 (grows) |
 | 5 | codesign-verify (`spctl -a -t exec -vv` on `.build/release/WDMMac.app`) | M6 |
 | 6 | notarized-stapled (`xcrun stapler validate`; latest CFBundleVersion in notarytool history = Accepted) | M6 |
-| 7 | cli-web-gui-parity (`scripts/lint-cli-web-parity.sh` + `scripts/lint-gui-parity.sh`) | M1 |
+| 7 | cli-gui-parity (`scripts/lint-gui-parity.sh`) — Web parity dropped from v1.0.0 scope | M1 |
 | 8 | every-verb-has-e2e (`scripts/lint-every-verb-has-e2e.sh`) | M2 |
 | 9 | every-gui-element-has-e2e (`scripts/lint-remote-coverage.sh` extended) | M3 (full) |
 | 10 | soak (60-sec smoke default; full 30-min when `WDM_SOAK=1`) | M8 |

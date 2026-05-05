@@ -15,8 +15,17 @@ struct BoundaryLintTests {
 
     @Test("GUI modules contain no business-logic extensions on lib types")
     func noGuiLogic() throws {
+        try Self.runLint(named: "lint-no-gui-logic.sh")
+    }
+
+    @Test("Every CLI verb has a GUI surface or is on the documented allowlist")
+    func guiParity() throws {
+        try Self.runLint(named: "lint-gui-parity.sh")
+    }
+
+    private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
-        let script = repoRoot.appendingPathComponent("scripts/lint-no-gui-logic.sh")
+        let script = repoRoot.appendingPathComponent("scripts/\(named)")
         try #require(FileManager.default.isExecutableFile(atPath: script.path),
                      "lint script missing or not executable at \(script.path)")
 
@@ -28,7 +37,7 @@ struct BoundaryLintTests {
         proc.waitUntilExit()
         let output = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         #expect(proc.terminationStatus == 0,
-                "lint-no-gui-logic.sh failed:\n\(output)")
+                "\(named) failed:\n\(output)")
     }
 
     private static func repoRoot() throws -> URL {

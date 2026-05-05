@@ -110,16 +110,15 @@ else
     deferred "6. notarized-stapled (M6: bundle not built)"
 fi
 
-# 7. cli-web-gui-parity
-if [ -x scripts/lint-cli-web-parity.sh ] && [ -x scripts/lint-gui-parity.sh ]; then
-    if bash scripts/lint-cli-web-parity.sh >/tmp/golden-goal-parity.log 2>&1 \
-       && bash scripts/lint-gui-parity.sh >>/tmp/golden-goal-parity.log 2>&1; then
-        pass "7. cli-web-gui-parity"
+# 7. cli-gui-parity (Web parity dropped from v1.0.0 scope per user 2026-05-05)
+if [ -x scripts/lint-gui-parity.sh ]; then
+    if bash scripts/lint-gui-parity.sh >/tmp/golden-goal-parity.log 2>&1; then
+        pass "7. cli-gui-parity"
     else
-        fail "7. cli-web-gui-parity (see /tmp/golden-goal-parity.log)"
+        fail "7. cli-gui-parity (see /tmp/golden-goal-parity.log)"
     fi
 else
-    deferred "7. cli-web-gui-parity (M1: lints not written yet)"
+    deferred "7. cli-gui-parity (M1: lint not written yet)"
 fi
 
 # 8. every-verb-has-e2e
