@@ -27,6 +27,33 @@ Installed: 2026-05-05 — files copied into this project's `.claude/`. **No glob
 - `/build` and `/test` already align with wdm's existing red→green→refactor and 100% e2e rules — they're a more disciplined wrapper around what's already required, not a replacement.
 - Hooks from the source repo (`hooks/sdd-cache-*.sh`, `hooks/session-start.sh`, etc.) were **not** installed. They mutate `.claude/settings.local.json` and are not needed for the workflow itself.
 
+## Project-local stop-verify hook
+
+`hooks/stop-verify.sh` is a project-local Stop hook that fires aggressively (every 30 seconds) instead of "once per chain" like the global `~/.claude/hooks/stop-verify.sh`. The 30-second debounce uses `/tmp/wdm-stop-verify-last-fire` to prevent infinite block-respond-block spirals.
+
+**To activate** (per-developer; `.claude/settings.local.json` is gitignored):
+
+Add a Stop hook entry to `.claude/settings.local.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/arthurficial/dev/workshop-display-manager/.claude/hooks/stop-verify.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Reload via `/hooks` in Claude Code (or restart the session) so the settings watcher picks up the change.
+
 ## Removing the install
 
 ```sh
