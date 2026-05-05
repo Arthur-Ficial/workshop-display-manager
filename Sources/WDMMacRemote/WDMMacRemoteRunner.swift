@@ -45,8 +45,8 @@ public final class WDMMacRemoteRunner {
             // visible to the macOS AccessibilityWalker (it skips that
             // subtree to avoid a WebContent IPC deadlock), so the
             // registry has to carry the stage.tile.* mirror directly.
-            let displaysClick: @Sendable () -> Void = { [vm] in
-                Task { @MainActor in vm.select(remoteID: displaysID) }
+            let displaysClick = mainClick { [vm] in
+                vm.select(remoteID: displaysID)
             }
             let entry = RemoteRegistry.Entry(
                 role: "button", label: tile.title, value: tile.subtitle,
@@ -60,8 +60,8 @@ public final class WDMMacRemoteRunner {
         // is always present (matches the design briefing's bottom-CTA
         // pattern); clicking it surfaces a concrete refusal message
         // instead of a silent no-op.
-        let virtualClick: @Sendable () -> Void = { [vm] in
-            Task { @MainActor in vm.refuseVirtualCreate() }
+        let virtualClick = mainClick { [vm] in
+            vm.refuseVirtualCreate()
         }
         entries.append(("sidebar.virtual.add", RemoteRegistry.Entry(
             role: "button", label: "Add virtual display", value: nil,
@@ -112,8 +112,8 @@ public final class WDMMacRemoteRunner {
             let displayID = tile.displayID
             for degrees in [0, 90, 180, 270] {
                 let id = "inspector.rotate.\(degrees)"
-                let click: @Sendable () -> Void = { [vm] in
-                    Task { @MainActor in vm.setRotation(displayID: displayID, degrees: degrees) }
+                let click = mainClick { [vm] in
+                    vm.setRotation(displayID: displayID, degrees: degrees)
                 }
                 entries.append((id, RemoteRegistry.Entry(
                     role: "button", label: "\(degrees)°", value: nil,
@@ -127,8 +127,8 @@ public final class WDMMacRemoteRunner {
                 ("v", Flip.vertical, "Flip V"),
             ] {
                 let id = "inspector.flip.\(axis)"
-                let click: @Sendable () -> Void = { [vm] in
-                    Task { @MainActor in vm.applyFlip(displayID: displayID, flip: flip) }
+                let click = mainClick { [vm] in
+                    vm.applyFlip(displayID: displayID, flip: flip)
                 }
                 let isSelected = vm.flip(forRemoteID: tile.remoteID) == flip
                 entries.append((id, RemoteRegistry.Entry(
@@ -160,8 +160,8 @@ public final class WDMMacRemoteRunner {
                 for preset in [25, 50, 75, 100] {
                     let presetID = "inspector.brightness.value.\(String(format: "%03d", preset))"
                     let presetValue = Float(preset) / 100.0
-                    let click: @Sendable () -> Void = { [vm] in
-                        Task { @MainActor in vm.setBrightness(displayID: displayID, value: presetValue) }
+                    let click = mainClick { [vm] in
+                        vm.setBrightness(displayID: displayID, value: presetValue)
                     }
                     entries.append((presetID, RemoteRegistry.Entry(
                         role: "button", label: "\(preset)%", value: nil,
@@ -182,8 +182,8 @@ public final class WDMMacRemoteRunner {
         // PROFILES section header `+` button — saves the current arrangement
         // as `snapshot-<timestamp>` and refreshes the sidebar.
         let saveID = "sidebar.profiles.add"
-        let saveClick: @Sendable () -> Void = { [vm] in
-            Task { @MainActor in vm.saveCurrentAsProfile() }
+        let saveClick = mainClick { [vm] in
+            vm.saveCurrentAsProfile()
         }
         entries.append((saveID, RemoteRegistry.Entry(
             role: "button", label: "Save current arrangement", value: nil,
@@ -198,8 +198,8 @@ public final class WDMMacRemoteRunner {
         // changed to prove the wiring is real.
         for name in profiles {
             let rowID = "sidebar.profiles.row.\(name)"
-            let click: @Sendable () -> Void = { [vm] in
-                Task { @MainActor in vm.restoreProfile(named: name) }
+            let click = mainClick { [vm] in
+                vm.restoreProfile(named: name)
             }
             entries.append((rowID, RemoteRegistry.Entry(
                 role: "button", label: name, value: nil,
@@ -209,8 +209,8 @@ public final class WDMMacRemoteRunner {
             // Per-row delete (`× ` button next to the row). Same Kit
             // op the CLI's `wdm profiles remove` exposes.
             let deleteID = "sidebar.profiles.row.\(name).delete"
-            let deleteClick: @Sendable () -> Void = { [vm] in
-                Task { @MainActor in vm.removeProfile(named: name) }
+            let deleteClick = mainClick { [vm] in
+                vm.removeProfile(named: name)
             }
             entries.append((deleteID, RemoteRegistry.Entry(
                 role: "button", label: "Delete \(name)", value: nil,
@@ -219,5 +219,17 @@ public final class WDMMacRemoteRunner {
             )))
         }
         registry.replace(entries: entries)
+    }
+
+    private func mainClick(_ body: @MainActor @Sendable @escaping () -> Void) -> @Sendable () -> Void {
+        {
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { body() }
+            } else {
+                DispatchQueue.main.sync {
+                    MainActor.assumeIsolated { body() }
+                }
+            }
+        }
     }
 }
