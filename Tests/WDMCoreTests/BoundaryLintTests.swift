@@ -56,6 +56,21 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-public-surface.sh")
     }
 
+    @Test("No known crash-generating patterns (NO CRASHES pillar)")
+    func crashRegression() throws {
+        try Self.runLint(named: "lint-crash-regression.sh")
+    }
+
+    @Test("Capture paths use native pixel dims (CRISP RENDERING pillar)")
+    func renderingPixelDims() throws {
+        try Self.runLint(named: "lint-rendering-pixel-dims.sh")
+    }
+
+    @Test("No fakes / stub markers in production (NO FAKES pillar)")
+    func noFakes() throws {
+        try Self.runLint(named: "lint-no-fakes.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")

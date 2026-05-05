@@ -49,6 +49,15 @@ bash scripts/lint-naming.sh
 echo "pre-commit: lint-public-surface (soft)..."
 bash scripts/lint-public-surface.sh
 
+echo "pre-commit: lint-crash-regression..."
+bash scripts/lint-crash-regression.sh
+
+echo "pre-commit: lint-rendering-pixel-dims..."
+bash scripts/lint-rendering-pixel-dims.sh
+
+echo "pre-commit: lint-no-fakes..."
+bash scripts/lint-no-fakes.sh
+
 echo "pre-commit: lint-github-tickets (soft)..."
 bash scripts/lint-github-tickets.sh
 
