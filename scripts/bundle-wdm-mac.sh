@@ -22,11 +22,24 @@ if [[ ! -x "$BIN" ]]; then
   exit 1
 fi
 
+# Single source of truth: Sources/WDMCore/Version.swift's `current`
+# constant. Read it via grep to avoid a Swift dependency at bundle time.
+VERSION=$(grep -oE 'public static let current: String = "[^"]+"' \
+    "$ROOT/Sources/WDMCore/Version.swift" 2>/dev/null \
+    | sed -E 's/.*= "([^"]+)"/\1/' || true)
+if [[ -z "$VERSION" ]]; then
+    echo "bundle-wdm-mac: could not read Version.current from Sources/WDMCore/Version.swift" >&2
+    exit 1
+fi
+# CFBundleVersion = git short SHA (or "1" outside a git checkout, for
+# bare extracts).
+BUILD=$(cd "$ROOT" && git rev-parse --short HEAD 2>/dev/null || echo "1")
+
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/wdm-mac"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -47,9 +60,9 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${BUILD}</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.utilities</string>
     <key>LSMinimumSystemVersion</key>
