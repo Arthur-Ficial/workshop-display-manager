@@ -43,6 +43,10 @@ public final class DisplaysListVM: ObservableObject {
     @Published public private(set) var profiles: [String] = []
     @Published public private(set) var selectedRemoteID: String?
     @Published public private(set) var lastError: String?
+    /// Refusal message specific to the VIRTUAL section. Populated by
+    /// `refuseVirtualCreate()` so the GUI can surface "this isn't
+    /// wired up yet" honestly per CLAUDE.md "no fakes".
+    @Published public private(set) var virtualUnavailableMessage: String?
     @Published public internal(set) var flipSelection: [String: Flip] = [:]
 
     private let controller: WDMController
@@ -119,6 +123,17 @@ public final class DisplaysListVM: ObservableObject {
             lastError = "\(error)"
         }
         reloadProfiles()
+    }
+
+    /// Honest refusal for the VIRTUAL section's `+` CTA. Virtual
+    /// display creation goes through the CGVirtualDisplay SPI, which
+    /// the GUI hasn't wired up yet — the CLI's `wdm virtual create`
+    /// is the supported path. Setting the dedicated message field
+    /// gives the user observable feedback (and AI agents an assertable
+    /// signal) instead of a silent no-op.
+    public func refuseVirtualCreate() {
+        virtualUnavailableMessage =
+            "Virtual display creation isn't wired through the GUI yet. Run `wdm virtual create --name <s> --mode WxH@Hz` from the CLI."
     }
 
     /// Save the current arrangement as a new profile. The GUI has no text

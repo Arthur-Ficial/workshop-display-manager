@@ -17,16 +17,21 @@ public final class WDMMacRemoteRunner {
     public init(registry: RemoteRegistry, vm: DisplaysListVM) {
         self.registry = registry
         self.vm = vm
-        // Tiles, selection, OR profiles changing must restamp the registry —
-        // selection flips the `selected` state flag, profiles add/remove rows.
+        // Tiles, selection, profiles, OR virtual-refusal-message changing must
+        // restamp the registry. 4-way combineLatest (combineLatest only takes
+        // 3 publishers; chain with another).
         vm.$tiles.combineLatest(vm.$selectedRemoteID, vm.$profiles)
-            .sink { [weak self] tiles, selected, profiles in
-                self?.sync(tiles: tiles, selected: selected, profiles: profiles)
+            .combineLatest(vm.$virtualUnavailableMessage)
+            .sink { [weak self] triple, virtualMsg in
+                let (tiles, selected, profiles) = triple
+                self?.sync(tiles: tiles, selected: selected, profiles: profiles,
+                           virtualUnavailableMessage: virtualMsg)
             }
             .store(in: &cancellables)
     }
 
-    private func sync(tiles: [DisplaysListVM.Tile], selected: String?, profiles: [String]) {
+    private func sync(tiles: [DisplaysListVM.Tile], selected: String?, profiles: [String],
+                      virtualUnavailableMessage: String?) {
         let vm = self.vm
         var entries: [(String, RemoteRegistry.Entry)] = []
         for tile in tiles {
@@ -49,6 +54,27 @@ public final class WDMMacRemoteRunner {
             entries.append((displaysID, entry))
             entries.append((stageID, entry))
         }
+        // VIRTUAL section — `+` CTA + honest-refusal message. The CTA
+        // is always present (matches the design briefing's bottom-CTA
+        // pattern); clicking it surfaces a concrete refusal message
+        // instead of a silent no-op.
+        let virtualClick: @Sendable () -> Void = { [vm] in
+            Task { @MainActor in vm.refuseVirtualCreate() }
+        }
+        entries.append(("sidebar.virtual.add", RemoteRegistry.Entry(
+            role: "button", label: "Add virtual display", value: nil,
+            state: NodeState(selected: false, enabled: true),
+            onClick: virtualClick
+        )))
+        if let msg = virtualUnavailableMessage, !msg.isEmpty {
+            entries.append(("sidebar.virtual.lastError", RemoteRegistry.Entry(
+                role: "text", label: "Virtual display creation unavailable",
+                value: msg,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+        }
+
         // INSPECTOR — brightness section, surfaced for the currently-
         // selected display only (mirrors the SwiftUI Inspector). For
         // supported displays: a passive `inspector.brightness.value`

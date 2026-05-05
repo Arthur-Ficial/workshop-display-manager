@@ -35,18 +35,34 @@ public struct SidebarView: View {
 
     private var virtualSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            SectionHeader(title: "VIRTUAL", count: 0) {
-                Button {} label: {
-                    Image(systemName: "plus").font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 5).padding(.vertical, 1)
+            SectionHeader(title: "VIRTUAL", count: 0)
+            EmptyHint("No virtual displays.", remoteID: "sidebar.virtual.empty")
+            // Honest-refusal CTA — clicking sets virtualUnavailableMessage,
+            // which surfaces in the registry as `sidebar.virtual.lastError`
+            // so AI agents see "this isn't wired yet" instead of a silent
+            // no-op. Visual pattern matches PROFILES' "+ Save current as…".
+            Button { vm.refuseVirtualCreate() } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Add virtual display")
+                        .font(.system(size: 12, weight: .medium))
                 }
-                .buttonStyle(.plain)
-                .clickable(cornerRadius: 5)
-                .accessibilityIdentifier("sidebar.virtual.add")
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 6).padding(.vertical, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            EmptyHint("No virtual displays.\nUse + to create one.",
-                      remoteID: "sidebar.virtual.empty")
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("sidebar.virtual.add")
+            .padding(.top, 2)
+
+            if let msg = vm.virtualUnavailableMessage {
+                Text(msg)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .accessibilityIdentifier("sidebar.virtual.lastError")
+            }
         }
     }
 
