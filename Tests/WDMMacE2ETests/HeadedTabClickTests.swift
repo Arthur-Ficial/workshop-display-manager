@@ -41,14 +41,23 @@ func killHeaded(env: HeadedEnv) {
 }
 
 func spawnHeaded(env: HeadedEnv) throws -> Process {
-    // Headed needs the .app bundle launched via `open -a` so LaunchServices
+    // Headed needs the .app bundle launched via `open` so LaunchServices
     // registers a proper session — without that, NSApp's menu bar
     // (Settings…, etc.) doesn't appear in the AX tree.
+    //
+    // `-n` forces a NEW instance even if WDMMac.app is already running.
+    // Without it, `open -a` simply activates the existing instance and
+    // silently DROPS the --args, so --state-file is never received and
+    // waitForPort times out. Killing existing instances first is the
+    // belt-and-braces partner; the test harness retains responsibility
+    // for tearing down whatever it spawned.
     let app = ProcessInfo.processInfo.environment["WDM_MAC_APP"]
         ?? "\(FileManager.default.currentDirectoryPath)/.build/debug/WDMMac.app"
+    _ = try? Process.run(URL(fileURLWithPath: "/usr/bin/pkill"),
+                         arguments: ["-9", "-f", "WDMMac.app/Contents/MacOS/wdm-mac"]).waitUntilExit()
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-    proc.arguments = ["-a", app, "--args", "--remote", "--state-file", env.stateFile.path]
+    proc.arguments = ["-n", "-a", app, "--args", "--remote", "--state-file", env.stateFile.path]
     proc.environment = ["HOME": env.dir.path, "PATH": "/usr/bin:/bin"]
     proc.standardOutput = FileHandle.nullDevice
     proc.standardError = FileHandle.nullDevice
