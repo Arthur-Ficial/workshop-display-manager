@@ -53,10 +53,14 @@ func spawnHeaded(env: HeadedEnv) throws -> Process {
     // for tearing down whatever it spawned.
     let app = ProcessInfo.processInfo.environment["WDM_MAC_APP"]
         ?? "\(FileManager.default.currentDirectoryPath)/.build/debug/WDMMac.app"
-    _ = try? Process.run(URL(fileURLWithPath: "/usr/bin/pkill"),
-                         arguments: ["-9", "-f", "WDMMac.app/Contents/MacOS/wdm-mac"]).waitUntilExit()
     let proc = Process()
     proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+    // `-n` forces a NEW instance + lets it coexist with any other
+    // wdm-mac the user already has running (e.g. for manual testing).
+    // Each instance has its own HOME-scoped state file, so the harness's
+    // `HeadedAppInstance.shared()` always finds the right one. We do
+    // NOT pkill the user's running instance from inside the test
+    // harness — that's a global side-effect tests must not have.
     proc.arguments = ["-n", "-a", app, "--args", "--remote", "--state-file", env.stateFile.path]
     proc.environment = ["HOME": env.dir.path, "PATH": "/usr/bin:/bin"]
     proc.standardOutput = FileHandle.nullDevice

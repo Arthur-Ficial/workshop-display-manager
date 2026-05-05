@@ -68,8 +68,15 @@ struct HeadedBrightnessTests {
             let id = "inspector.brightness.value.\(preset)"
             let r = try await api.clickRemoteID(id)
             #expect(r["ok"] as? Bool == true, "click \(id) -> \(r)")
-            try await Task.sleep(nanoseconds: 300_000_000)
+            // Each click queues a Task → vm.setBrightness → controller
+            // → DisplayServices write → reload → probe. The whole chain
+            // is asynchronous; 600 ms gives DisplayServices time to
+            // settle on real hardware before the next preset overwrites.
+            try await Task.sleep(nanoseconds: 600_000_000)
         }
+        // Final settle before the assertion-time snapshot — DisplayServices
+        // brightness reads can lag the last write by a beat.
+        try await Task.sleep(nanoseconds: 500_000_000)
 
         // After the last click (.100), the value node should reflect a
         // high brightness — but the controller probes the actual
