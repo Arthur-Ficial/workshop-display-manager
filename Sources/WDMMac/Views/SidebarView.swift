@@ -135,6 +135,10 @@ private struct SidebarProfileRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("sidebar.profiles.row.\(name)")
+            // .buttonStyle(.plain) drops default AX press routing —
+            // explicit accessibilityAction restores it so AXPress
+            // actually invokes the action closure.
+            .accessibilityAction { onApply() }
 
             Button(action: onDelete) {
                 Image(systemName: "xmark")
@@ -145,6 +149,7 @@ private struct SidebarProfileRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("sidebar.profiles.row.\(name).delete")
+            .accessibilityAction { onDelete() }
         }
         .onHover { hovering = $0 }
     }

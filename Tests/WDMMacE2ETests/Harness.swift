@@ -123,14 +123,52 @@ private final class BundleAnchor {}
 
 func waitForPort(stateFile: URL, timeout: TimeInterval = 5.0) throws -> UInt16 {
     let deadline = Date().addingTimeInterval(timeout)
+    var lastPort: UInt16 = 0
+    // Poll for the state file AND the HTTP listener accepting
+    // connections. wdm-mac writes the state file slightly before its
+    // network thread is ready to accept; without the second check, the
+    // first /ui/snapshot request can hit a connection-refused race.
     while Date() < deadline {
         if let s = try? RemoteStateWriter.read(from: stateFile) {
-            return s.port
+            lastPort = s.port
+            if isPortAccepting(port: s.port) {
+                return s.port
+            }
         }
         Thread.sleep(forTimeInterval: 0.05)
     }
+    if lastPort != 0 {
+        throw NSError(domain: "wdm-mac-e2e", code: 3, userInfo: [
+            NSLocalizedDescriptionKey: "wdm-mac wrote port \(lastPort) but never started accepting connections within \(timeout)s",
+        ])
+    }
     throw NSError(domain: "wdm-mac-e2e", code: 2,
                   userInfo: [NSLocalizedDescriptionKey: "wdm-mac never wrote \(stateFile.path)"])
+}
+
+/// Quick-probe: is anything actively accepting on 127.0.0.1:<port>?
+/// Uses a short-timeout request to /ui/version which every wdm-mac
+/// --remote serves; treat any HTTP response (even 404) as proof the
+/// listener is up.
+func isPortAccepting(port: UInt16) -> Bool {
+    guard let url = URL(string: "http://127.0.0.1:\(port)/ui/version") else { return false }
+    var req = URLRequest(url: url)
+    req.timeoutInterval = 0.3
+    let result = OkBox()
+    let sem = DispatchSemaphore(value: 0)
+    URLSession.shared.dataTask(with: req) { _, resp, _ in
+        result.set((resp as? HTTPURLResponse) != nil)
+        sem.signal()
+    }.resume()
+    _ = sem.wait(timeout: .now() + .milliseconds(400))
+    return result.get()
+}
+
+private final class OkBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var v = false
+    func set(_ b: Bool) { lock.withLock { v = b } }
+    func get() -> Bool { lock.withLock { v } }
 }
 
 func get(_ url: URL) async throws -> Data {

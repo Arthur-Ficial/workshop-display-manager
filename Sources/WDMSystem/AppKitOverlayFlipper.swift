@@ -24,11 +24,23 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
     nonisolated(unsafe) private var frameSink: NSObject?
     nonisolated(unsafe) private var cursorHiddenOnDisplay: CGDirectDisplayID?
     nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
+    /// Activation policy at the moment we entered run() — restored in
+    /// teardown(). For a GUI app (wdm-mac), this is .regular; switching
+    /// to .accessory and never restoring would hide the Dock icon and
+    /// main menu permanently after one flip.
+    nonisolated(unsafe) private var savedActivationPolicy: NSApplication.ActivationPolicy?
 
     public init() {}
 
     public func run(displayID: UInt32, flip: Flip, durationMs: Int?) throws {
+        // Defensive: if a previous flip left a window or stream behind
+        // (e.g. caller killed before teardown ran), kill them now so
+        // a new flip never doubles up onto a stale overlay.
+        teardown()
         try PermissionProbe.requireScreenRecording(context: "flip-overlay")
+        // Reset the stop flag from any previous run.
+        lock.withLock { stopRequested = false }
+        savedActivationPolicy = readActivationPolicy()
         runOnMainSetActivationPolicy(.accessory)
         installSignalHandlers()
 
@@ -49,7 +61,12 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
             RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.05))
             if Date() > startDeadline { break }
         }
-        if let err = errBox.get() { throw err }
+        if let err = errBox.get() {
+            // If startStream failed, tear down anything we put up
+            // before it threw — never leave an orphan overlay window.
+            teardown()
+            throw err
+        }
 
         if let ms = durationMs {
             let deadline = Date(timeIntervalSinceNow: TimeInterval(ms) / 1000.0)
@@ -129,8 +146,14 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
             defer: false
         )
         win.level = NSWindow.Level(Int(CGShieldingWindowLevel()))
-        win.isOpaque = true
-        win.backgroundColor = .black
+        // Transparent until the first captured frame arrives. Earlier
+        // versions used .black + isOpaque=true which caused a visible
+        // black flash before the first frame, and a permanently-black
+        // overlay if the stream ever failed to deliver frames (the
+        // process would leave a black window over the screen).
+        win.isOpaque = false
+        win.backgroundColor = .clear
+        win.hasShadow = false
         win.ignoresMouseEvents = true
         win.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         let view = NSView(frame: win.contentView!.bounds)
@@ -200,10 +223,47 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         if let s = stream {
             Task { try? await s.stopCapture() }
         }
-        DispatchQueue.main.async { [window] in
-            window?.orderOut(nil)
-            window?.close()
+        stream = nil
+        frameSink = nil
+        // Synchronous window close: a previous async dispatch let the
+        // overlay linger a beat past teardown which on a slow main
+        // thread looked like an "orphan black screen". Closing on the
+        // current thread (we're already on main when teardown runs in
+        // the GUI path) tears it down immediately.
+        let toClose = window
+        window = nil
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                toClose?.orderOut(nil)
+                toClose?.close()
+            }
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    toClose?.orderOut(nil)
+                    toClose?.close()
+                }
+            }
         }
+        // Restore the calling app's activation policy. Without this,
+        // a GUI host (wdm-mac) loses its Dock icon and main menu
+        // permanently after one flip — `runOnMainSetActivationPolicy(.accessory)`
+        // is a one-way switch otherwise.
+        if let saved = savedActivationPolicy {
+            runOnMainSetActivationPolicy(saved)
+            savedActivationPolicy = nil
+        }
+    }
+
+    private func readActivationPolicy() -> NSApplication.ActivationPolicy {
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated { NSApplication.shared.activationPolicy() }
+        }
+        var policy: NSApplication.ActivationPolicy = .regular
+        DispatchQueue.main.sync {
+            MainActor.assumeIsolated { policy = NSApplication.shared.activationPolicy() }
+        }
+        return policy
     }
 
     private func transform(for flip: Flip) -> CGAffineTransform {
