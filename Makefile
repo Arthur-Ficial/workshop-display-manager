@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets golden-goal app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -78,6 +78,13 @@ lint-gui-parity:
 # set WDM_LINT_TICKETS_STRICT=1 to enforce.
 lint-github-tickets:
 	@bash scripts/lint-github-tickets.sh
+
+# Forbids CLI commands without an e2e test. CLAUDE.md iron law: a
+# feature without an e2e test does not exist. Discovers commands from
+# Sources/WDMCLI/Commands/*Command.swift and asserts each verb appears
+# as a string literal in Tests/WDMCLITests/**/*.swift.
+lint-every-verb-has-e2e:
+	@bash scripts/lint-every-verb-has-e2e.sh
 
 # Acceptance ledger for the ship-ready goal. 10 lines of evidence:
 # release build, swift test, headed e2e, every lint, codesign,

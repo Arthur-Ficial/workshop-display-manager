@@ -121,7 +121,9 @@ else
     deferred "7. cli-gui-parity (M1: lint not written yet)"
 fi
 
-# 8. every-verb-has-e2e
+# 8. every-verb-has-e2e — already counted in line 4 lint-quality, but
+# pinned here too so the milestone-by-milestone ledger shows the
+# transition from DEFERRED → ENFORCED for this specific contract.
 if [ -x scripts/lint-every-verb-has-e2e.sh ]; then
     if bash scripts/lint-every-verb-has-e2e.sh >/tmp/golden-goal-verb-e2e.log 2>&1; then
         pass "8. every-verb-has-e2e"

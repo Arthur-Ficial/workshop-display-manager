@@ -23,6 +23,11 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-gui-parity.sh")
     }
 
+    @Test("Every CLI verb has at least one e2e test under Tests/WDMCLITests")
+    func everyVerbHasE2E() throws {
+        try Self.runLint(named: "lint-every-verb-has-e2e.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")
