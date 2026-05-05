@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -66,6 +66,15 @@ lint-remote-coverage:
 # pulling Flip.toggling / Flip.hasAxis out of DisplaysListVM into WDMCore.
 lint-no-gui-logic:
 	@bash scripts/lint-no-gui-logic.sh
+
+# Acceptance ledger for the ship-ready goal. 10 lines of evidence:
+# release build, swift test, headed e2e, every lint, codesign,
+# notarization, CLI/Web/GUI parity, every-verb e2e, every-GUI-element
+# e2e, soak. Lines that depend on yet-unwritten lints / artefacts
+# print DEFERRED with the milestone that unblocks them. The DEFERRED
+# count must monotonically decrease milestone-over-milestone.
+golden-goal:
+	@bash scripts/golden-goal.sh
 
 # Wraps the wdm-mac executable in a real .app bundle with an Info.plist
 # that opts into Liquid Glass (LSMinimumSystemVersion=26.0, no
