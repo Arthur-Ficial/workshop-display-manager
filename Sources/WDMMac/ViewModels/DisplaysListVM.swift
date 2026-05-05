@@ -181,8 +181,13 @@ public final class DisplaysListVM: ObservableObject {
             await previous?.value
             guard !Task.isCancelled else { return }
             do {
+                // Sticky flip: durationMs=nil means run until stop().
+                // The CLI's `wdm flip-overlay 1 h` works the same way
+                // (no --duration-ms = nil); the GUI must match. The
+                // overlay is torn down on the NEXT user click via
+                // `overlayFlipper.stop()` at the top of applyFlip.
                 try captureController.flipOverlay(alias, flip: flip,
-                                                  durationMs: 600,
+                                                  durationMs: nil,
                                                   using: captureFlipper)
                 await MainActor.run { [weak self] in
                     self?.finishFlip(generation: generation, message: nil)

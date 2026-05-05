@@ -130,6 +130,44 @@ struct HeadlessGeometryTests {
                 "expected lastError to surface 'permission denied'; got \(String(describing: errValue))")
     }
 
+    /// Flip H/V must be STICKY — the overlay window stays alive until
+    /// the user picks another flip option (or "—"). The CLI's `wdm
+    /// flip-overlay 1 h` works that way (no --duration-ms = nil =
+    /// indefinite); the GUI must match. Regression: GUI was hardcoded
+    /// to durationMs=600 so the overlay closed after 600 ms — flip
+    /// flashed and reverted, button stayed marked but effect was gone.
+    /// This test catches any future re-introduction of a finite
+    /// duration on the GUI flip path.
+    @Test func clickingFlipHRunsOverlayIndefinitely() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadless(env: env)
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        let snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let target = snap.nodes.first { $0.remoteID == "inspector.flip.h" }
+        try #require(target != nil)
+        var click = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
+        click.httpMethod = "POST"
+        click.httpBody = Data(#"{"ref":"\#(target!.ref.rawValue)"}"#.utf8)
+        _ = try await URLSession.shared.data(for: click)
+
+        var content = ""
+        for _ in 0..<30 {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            content = (try? String(contentsOf: env.overlayLog, encoding: .utf8)) ?? ""
+            if content.contains("durationMs=") { break }
+        }
+        // RecordingOverlayFlipper writes `... durationMs=<N|nil>`.
+        // Sticky behaviour requires nil; any finite N breaks it.
+        #expect(content.contains("durationMs=nil"),
+                "GUI flip must call flipOverlay with durationMs=nil (sticky); got log: \(content)")
+        #expect(!content.contains("durationMs=600"),
+                "GUI flip must NOT pass the legacy 600 ms duration; got log: \(content)")
+    }
+
     @Test func clickingFlipHInvokesOverlayFlipper() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)
