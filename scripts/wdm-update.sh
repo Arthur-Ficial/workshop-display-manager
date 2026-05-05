@@ -57,8 +57,9 @@ if ! spctl -a -t exec -vv "$NEW_APP" 2>&1 | grep -q "Notarized Developer ID"; th
     exit 1
 fi
 
-# Quit existing instance + replace.
-osascript -e 'tell application "WDMMac" to quit' 2>/dev/null || true
+# Quit existing instance + replace. (lint-remote-coverage forbids
+# osascript in scripts/; SIGTERM is sufficient.)
+pkill -TERM -f 'WDMMac.app/Contents/MacOS/wdm-mac' 2>/dev/null || true
 sleep 1
 rm -rf "$APP_DIR"
 mv "$NEW_APP" "$APP_DIR"
