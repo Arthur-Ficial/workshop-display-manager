@@ -109,6 +109,40 @@ struct HeadlessProfilesTests {
         #expect(!rowIDs.isEmpty, "expected a sidebar.profiles.row.snapshot-* entry; got \(snap.nodes.map(\.remoteID))")
     }
 
+    /// External-change pickup: if `wdm save foo` runs in another
+    /// terminal during a session, the GUI's PROFILES sidebar must
+    /// catch up within a few seconds without any GUI interaction.
+    /// Pollster lives inside MacRuntime; this test proves it works.
+    @Test func externalProfileWriteAppearsInSidebar() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadless(env: env)
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        // Initial: no profiles.
+        var snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let beforeIDs = snap.nodes.map(\.remoteID).filter { $0.hasPrefix("sidebar.profiles.row.") }
+        try #require(beforeIDs.isEmpty, "expected no rows initially; got \(beforeIDs)")
+
+        // Externally write a profile (simulates `wdm save` in another terminal).
+        try seedProfiles(["external"], in: env)
+
+        // Poll the snapshot for up to 5 seconds for the row to appear.
+        var afterIDs: [String] = []
+        for _ in 0..<25 {
+            try await Task.sleep(nanoseconds: 200_000_000)
+            snap = try SceneTreeJSON.decode(
+                try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+            )
+            afterIDs = snap.nodes.map(\.remoteID).filter { $0.hasPrefix("sidebar.profiles.row.") }
+            if afterIDs.contains("sidebar.profiles.row.external") { break }
+        }
+        #expect(afterIDs.contains("sidebar.profiles.row.external"),
+                "external profile must appear within 5s; got \(afterIDs)")
+    }
+
     /// Workshop facilitator cleanup: clicking the per-row `× delete`
     /// button removes the profile JSON from disk and from the sidebar.
     /// Same Kit op the CLI's `wdm profiles remove <name>` exposes.

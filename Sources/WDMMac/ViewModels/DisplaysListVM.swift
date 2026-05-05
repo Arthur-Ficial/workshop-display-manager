@@ -47,12 +47,16 @@ public final class DisplaysListVM: ObservableObject {
 
     private let controller: WDMController
     private var observer: Task<Void, Never>?
+    private var profilePoller: Task<Void, Never>?
 
     public init(controller: WDMController) {
         self.controller = controller
     }
 
-    deinit { observer?.cancel() }
+    deinit {
+        observer?.cancel()
+        profilePoller?.cancel()
+    }
 
     /// Subscribe to display plug/unplug/mode-change events and reload the
     /// tile list whenever one fires.
@@ -60,6 +64,22 @@ public final class DisplaysListVM: ObservableObject {
         observer?.cancel()
         observer = controller.observeReconfigurations { [weak self] _ in
             Task { @MainActor in self?.reload() }
+        }
+    }
+
+    /// Poll the profile store every `intervalSeconds` seconds so external
+    /// `wdm save` / `wdm profiles remove` invocations in another terminal
+    /// flow into the GUI without requiring user interaction. The cost is
+    /// negligible — one `contentsOfDirectory` call every poll.
+    public func startPollingProfiles(intervalSeconds: Double = 2.0) {
+        profilePoller?.cancel()
+        let nanos = UInt64(intervalSeconds * 1_000_000_000)
+        profilePoller = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: nanos)
+                if Task.isCancelled { return }
+                await MainActor.run { self?.reloadProfiles() }
+            }
         }
     }
 

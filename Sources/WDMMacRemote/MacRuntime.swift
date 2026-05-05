@@ -26,6 +26,7 @@ public struct MacRuntime {
         vm.reload()
         vm.reloadProfiles()
         vm.startObservingReconfigurations()
+        vm.startPollingProfiles()
         let runner = WDMMacRemoteRunner(registry: registry, vm: vm)
         return MacRuntime(deps: deps, registry: registry,
                           adapter: adapter, vm: vm, runner: runner)
