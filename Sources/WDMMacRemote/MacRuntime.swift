@@ -22,7 +22,7 @@ public struct MacRuntime {
         let deps = try WDMMacAppDeps.make()
         let registry = RemoteRegistry()
         let adapter = WDMMacRemoteAdapter(registry: registry)
-        let vm = DisplaysListVM(controller: deps.controller)
+        let vm = DisplaysListVM(controller: deps.controller, overlayFlipper: deps.overlayFlipper)
         vm.reload()
         vm.reloadProfiles()
         vm.startObservingReconfigurations()

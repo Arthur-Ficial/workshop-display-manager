@@ -46,7 +46,12 @@ struct HeadlessGeometryTests {
                 "180 segment should be selected after click; state=\(String(describing: segment?.state))")
     }
 
-    @Test func clickingFlipHFlipsFixture() async throws {
+    /// Flip uses the SOFTWARE OVERLAY path (`controller.flipOverlay`,
+    /// same as `wdm flip-overlay`) — works on every Mac including
+    /// Apple Silicon built-ins. The hermetic test asserts the
+    /// `RecordingOverlayFlipper` was invoked with the expected axis
+    /// by reading its log file.
+    @Test func clickingFlipHInvokesOverlayFlipper() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)
         defer { proc.terminate() }
@@ -63,19 +68,18 @@ struct HeadlessGeometryTests {
         click.httpBody = Data(#"{"ref":"\#(target!.ref.rawValue)"}"#.utf8)
         let (_, resp) = try await URLSession.shared.data(for: click)
         #expect((resp as? HTTPURLResponse)?.statusCode == 200)
-        try await Task.sleep(nanoseconds: 300_000_000)
 
-        // Fixture's flip table updates.
-        let bytes = try Data(contentsOf: env.fixture)
-        let obj = try JSONSerialization.jsonObject(with: bytes) as? [String: Any]
-        let flip = obj?["flip"] as? [String: Any]
-        let displayFlip = flip?["1"] as? String
-        // FixtureDisplayProvider stores Flip as a stringified value;
-        // exact format depends on Codable. Accept any contains-"horizontal".
-        #expect(
-            displayFlip?.lowercased().contains("horizontal") == true
-                || (flip?["1"] as? [String: Any])?["axis"] as? String == "horizontal",
-            "expected horizontal flip after click; got \(String(describing: flip))"
-        )
+        // The flipper runs on a detached Task and sleeps for 600 ms;
+        // poll the log for up to 1.5 s.
+        var content = ""
+        for _ in 0..<30 {
+            try await Task.sleep(nanoseconds: 50_000_000)
+            content = (try? String(contentsOf: env.overlayLog, encoding: .utf8)) ?? ""
+            if content.contains("displayID=1") && content.contains("horizontal") { break }
+        }
+        #expect(content.contains("displayID=1"),
+                "overlay flipper log should record displayID=1; got \(content)")
+        #expect(content.contains("horizontal"),
+                "overlay flipper log should record horizontal axis; got \(content)")
     }
 }

@@ -50,11 +50,13 @@ public final class DisplaysListVM: ObservableObject {
     @Published public internal(set) var flipSelection: [String: Flip] = [:]
 
     private let controller: WDMController
+    private let overlayFlipper: OverlayFlipper
     private var observer: Task<Void, Never>?
     private var profilePoller: Task<Void, Never>?
 
-    public init(controller: WDMController) {
+    public init(controller: WDMController, overlayFlipper: OverlayFlipper) {
         self.controller = controller
+        self.overlayFlipper = overlayFlipper
     }
 
     deinit {
@@ -140,18 +142,34 @@ public final class DisplaysListVM: ObservableObject {
         reload()
     }
 
-    /// Apply framebuffer flip via `controller.flip(...)` (same Kit op
-    /// as `wdm flip <id> <none|h|v|hv|off>`). Same hardware-refusal
-    /// rules as rotate.
+    /// Apply a SOFTWARE overlay flip via `controller.flipOverlay(...)`
+    /// — the same Kit op `wdm flip-overlay <id> <axis> [--duration-ms N]`
+    /// uses. Works on every Mac (including Apple Silicon built-ins where
+    /// the IOKit framebuffer-flip path refuses), because the overlay
+    /// path is implemented as a transparent NSWindow that captures and
+    /// re-renders the screen flipped — no IODisplayConnect needed.
     public func applyFlip(displayID: UInt32, flip: Flip) {
-        do {
-            _ = try controller.flip(String(displayID), flip: flip, confirmer: AutoYesConfirmer())
-            lastError = nil
-        } catch {
-            lastError = "Flip to \(flip) failed: \(error)"
-        }
         flipSelection[String(displayID)] = flip
-        reload()
+        guard flip != .none else {
+            lastError = nil
+            return
+        }
+        let alias = String(displayID)
+        // The default 600ms is the design-briefing's "show the flipped
+        // overlay then auto-restore" behaviour — workshop facilitators
+        // want to flip momentarily, not permanently.
+        Task.detached { [overlayFlipper, controller] in
+            do {
+                try controller.flipOverlay(alias, flip: flip,
+                                           durationMs: 600,
+                                           using: overlayFlipper)
+                await MainActor.run { [weak self] in self?.lastError = nil }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.lastError = "Flip overlay failed: \(error)"
+                }
+            }
+        }
     }
 
     /// Honest refusal for the VIRTUAL section's `+` CTA. Virtual

@@ -7,6 +7,7 @@ struct E2EEnv {
     let dir: URL
     let fixture: URL
     let stateFile: URL
+    var overlayLog: URL { dir.appendingPathComponent("overlay-flipper.log") }
 }
 
 func makeEnv() throws -> E2EEnv {
@@ -58,6 +59,7 @@ func spawnHeadless(env: E2EEnv) throws -> Process {
     proc.environment = [
         "WDM_TEST_FIXTURE": env.fixture.path,
         "WDM_PROFILES_DIR": env.dir.appendingPathComponent("profiles").path,
+        "WDM_TEST_OVERLAY_LOG": env.overlayLog.path,
         "HOME": env.dir.path,
         "PATH": "/usr/bin:/bin",
     ]
