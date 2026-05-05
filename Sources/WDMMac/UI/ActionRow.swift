@@ -1,12 +1,17 @@
 import SwiftUI
 
 /// Inspector ACTIONS row — leading SF Symbol, label, optional trailing.
-/// Tappable, no chrome (sits inside an inset container).
+/// Subtle hover-only chrome to match the design briefing's lighter
+/// aesthetic (consistent with `SidebarProfileRow` and
+/// `SegmentedRowSegment`):
+///   - idle:  no border, transparent — clean
+///   - hover: .secondary 10% fill
 public struct ActionRow: View {
     let label: String
     let symbol: String
     let remoteID: String
     let action: () -> Void
+    @State private var hovering = false
 
     public init(label: String, symbol: String, remoteID: String,
                 action: @escaping () -> Void = {}) {
@@ -23,9 +28,13 @@ public struct ActionRow: View {
                 Spacer()
             }
             .padding(.horizontal, 8).padding(.vertical, 6)
+            .background {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(hovering ? Color.secondary.opacity(0.10) : .clear)
+            }
         }
         .buttonStyle(.plain)
-        .clickable(cornerRadius: 6)
         .accessibilityIdentifier(remoteID)
+        .onHover { hovering = $0 }
     }
 }
