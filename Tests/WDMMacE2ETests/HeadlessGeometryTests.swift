@@ -8,6 +8,18 @@ import Foundation
 /// "no fakes / no fallbacks" rule).
 @Suite("wdm-mac headless: GEOMETRY rotation + flip clicks are real")
 struct HeadlessGeometryTests {
+    @Test func headlessTerminateDoesNotCrash() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadless(env: env)
+        _ = try waitForPort(stateFile: env.stateFile)
+
+        proc.terminate()
+        proc.waitUntilExit()
+
+        #expect(proc.terminationStatus != SIGTRAP,
+                "wdm-mac trapped during SIGTERM shutdown")
+    }
+
     @Test func clickingRotation180RotatesFixture() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)

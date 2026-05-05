@@ -27,8 +27,6 @@ public enum HeadlessRunner {
             "wdm-mac --remote --headless: listening on 127.0.0.1:\(resolvedPort) (state: \(path.path))\n".utf8
         ))
 
-        signal(SIGINT) { _ in exit(0) }
-        signal(SIGTERM) { _ in exit(0) }
         // dispatchMain() converts the main thread into a libdispatch worker;
         // the server's queue continues to handle connections.
         dispatchMain()

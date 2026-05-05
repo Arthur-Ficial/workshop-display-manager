@@ -8,8 +8,8 @@ import WDMCore
 /// Real `VirtualDisplayManager` backed by Apple's `CGVirtualDisplay` SPI in
 /// CoreGraphics. The virtual display lives as long as the `CGVirtualDisplay`
 /// instance is retained — `run` blocks the calling thread on the main runloop
-/// (until SIGTERM/SIGINT/SIGHUP or `durationMs` elapses) while keeping the
-/// instance alive, then drops it so WindowServer tears the display down.
+/// (until `stop()` is called or `durationMs` elapses) while keeping the instance
+/// alive, then drops it so WindowServer tears the display down.
 public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Sendable {
 
     private let isSPIAvailable: @Sendable () -> Bool
@@ -18,7 +18,6 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
     nonisolated(unsafe) private var display: CGVirtualDisplay?
     nonisolated(unsafe) private var cursorPortal: VirtualCursorPortal?
     nonisolated(unsafe) private var cursorWarper: VirtualCursorEdgeWarper?
-    nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
 
     /// Default runtime probe: do the SPI classes still resolve on this macOS?
     public static let defaultSPIProbe: @Sendable () -> Bool = {
@@ -47,7 +46,6 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
             )
         }
 
-        installSignalHandlers()
         setAccessoryActivationPolicy()
 
         let descriptor = CGVirtualDisplayDescriptor()
@@ -144,15 +142,4 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
         return (hash ^ pid) | 0x1     // never zero
     }
 
-    private func installSignalHandlers() {
-        signal(SIGINT, SIG_IGN)
-        signal(SIGTERM, SIG_IGN)
-        signal(SIGHUP, SIG_IGN)
-        for sig in [SIGINT, SIGTERM, SIGHUP] as [Int32] {
-            let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
-            src.setEventHandler { [weak self] in self?.stop() }
-            src.resume()
-            signalSources.append(src)
-        }
-    }
 }

@@ -56,6 +56,8 @@ public final class DisplaysListVM: ObservableObject {
     private let overlayFlipper: OverlayFlipper
     private var observer: Task<Void, Never>?
     private var profilePoller: Task<Void, Never>?
+    private var flipTask: Task<Void, Never>?
+    private var flipGeneration: UInt64 = 0
 
     public init(controller: WDMController, overlayFlipper: OverlayFlipper) {
         self.controller = controller
@@ -65,6 +67,8 @@ public final class DisplaysListVM: ObservableObject {
     deinit {
         observer?.cancel()
         profilePoller?.cancel()
+        flipTask?.cancel()
+        overlayFlipper.stop()
     }
 
     /// Subscribe to display plug/unplug/mode-change events and reload the
@@ -160,25 +164,42 @@ public final class DisplaysListVM: ObservableObject {
     /// background thread's RunLoop pump satisfies the run() contract.
     public func applyFlip(displayID: UInt32, flip: Flip) {
         flipSelection[String(displayID)] = flip
+        flipGeneration &+= 1
+        let generation = flipGeneration
+        let previous = flipTask
+        previous?.cancel()
+        overlayFlipper.stop()
         guard flip != .none else {
             lastError = nil
+            flipTask = nil
             return
         }
         let alias = String(displayID)
         let captureFlipper = overlayFlipper
         let captureController = controller
-        Task.detached { [weak self] in
+        flipTask = Task.detached(priority: .userInitiated) { [weak self] in
+            await previous?.value
+            guard !Task.isCancelled else { return }
             do {
                 try captureController.flipOverlay(alias, flip: flip,
                                                   durationMs: 600,
                                                   using: captureFlipper)
-                await MainActor.run { [weak self] in self?.lastError = nil }
+                await MainActor.run { [weak self] in
+                    self?.finishFlip(generation: generation, message: nil)
+                }
             } catch {
                 let msg = "Flip overlay failed: \(error). If this mentions 'Screen Recording', grant WDMMac.app permission in System Settings → Privacy & Security → Screen Recording, then quit & relaunch."
-                await MainActor.run { [weak self] in self?.lastError = msg }
+                await MainActor.run { [weak self] in
+                    self?.finishFlip(generation: generation, message: msg)
+                }
             }
-            _ = self  // silence weak-self-unused warning when self is nil
         }
+    }
+
+    private func finishFlip(generation: UInt64, message: String?) {
+        guard generation == flipGeneration else { return }
+        lastError = message
+        flipTask = nil
     }
 
     /// Honest refusal for the VIRTUAL section's `+` CTA. Virtual

@@ -27,6 +27,7 @@ enum WDMMacMainWindowFactory {
         win.title = title
         win.titlebarAppearsTransparent = true
         win.titleVisibility = .visible
+        win.isRestorable = false
         // titlebarSeparatorStyle=.line is invisible against a transparent
         // title chrome — the system paints the line into the transparent
         // zone where it disappears. The visible separator is added by

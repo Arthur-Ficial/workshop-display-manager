@@ -82,6 +82,10 @@ final class WDMMacAppDelegate: NSObject, NSApplicationDelegate {
         RemoteStateWriter.clear(at: remoteStatePath())
     }
 
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        false
+    }
+
     private func remoteStatePath() -> URL {
         args.statePath.map(URL.init(fileURLWithPath:)) ?? RemoteStateWriter.defaultPath()
     }

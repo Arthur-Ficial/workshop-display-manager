@@ -10,7 +10,7 @@ import WDMCore
 /// Real PIP flipper. Captures `sourceID` via `SCStream` and renders frames
 /// into a movable / resizable `NSWindow` placed on `destinationID`. The
 /// window has a normal title bar so the user can drag it across displays
-/// or close it; teardown unwinds capture + signal handlers cleanly.
+/// or close it; teardown unwinds capture cleanly.
 public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
 
     private let lock = NSLock()
@@ -20,7 +20,6 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
     nonisolated(unsafe) private var frameSink: NSObject?
     nonisolated(unsafe) private var captureTimer: DispatchSourceTimer?
     private let pollerStopBox = PollerStopBox()
-    nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
     nonisolated(unsafe) private var requestedPosition: PipPosition?
     nonisolated(unsafe) private var remoteControl: Bool = false
 
@@ -45,7 +44,6 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         // Workshop spawns dozens of virtual+pip processes; .regular gives every
         // one a generic "exec" tile in the dock, which is unusable.
         runOnMainSetActivationPolicy(.accessory)
-        installSignalHandlers()
 
         let errBox = ErrorBoxPip()
         let started = DispatchSemaphore(value: 0)
@@ -215,17 +213,6 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         }
     }
 
-    private func installSignalHandlers() {
-        signal(SIGINT, SIG_IGN)
-        signal(SIGTERM, SIG_IGN)
-        signal(SIGHUP, SIG_IGN)
-        for sig in [SIGINT, SIGTERM, SIGHUP] as [Int32] {
-            let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
-            src.setEventHandler { [weak self] in self?.stop() }
-            src.resume()
-            signalSources.append(src)
-        }
-    }
 }
 
 private final class ErrorBoxPip: @unchecked Sendable {

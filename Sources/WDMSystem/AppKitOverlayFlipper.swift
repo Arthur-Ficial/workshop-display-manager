@@ -17,13 +17,14 @@ import WDMCore
 /// prompts the user; if denied, `SCShareableContent.current` throws.
 public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
 
+    private let runLock = NSLock()
     private let lock = NSLock()
     private var stopRequested = false
     nonisolated(unsafe) private var stream: SCStream?
     nonisolated(unsafe) private var window: NSWindow?
+    nonisolated(unsafe) private var retiredWindows: [NSWindow] = []
     nonisolated(unsafe) private var frameSink: NSObject?
     nonisolated(unsafe) private var cursorHiddenOnDisplay: CGDirectDisplayID?
-    nonisolated(unsafe) private var signalSources: [DispatchSourceSignal] = []
     /// Activation policy at the moment we entered run() — restored in
     /// teardown(). For a GUI app (wdm-mac), this is .regular; switching
     /// to .accessory and never restoring would hide the Dock icon and
@@ -33,10 +34,13 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
     public init() {}
 
     public func run(displayID: UInt32, flip: Flip, durationMs: Int?) throws {
+        runLock.lock()
+        defer { runLock.unlock() }
         // Defensive: if a previous flip left a window or stream behind
         // (e.g. caller killed before teardown ran), kill them now so
         // a new flip never doubles up onto a stale overlay.
         teardown()
+        defer { teardown() }
         try PermissionProbe.requireScreenRecording(context: "flip-overlay")
         // Reset the stop flag from any previous run.
         lock.withLock { stopRequested = false }
@@ -54,7 +58,6 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         } else {
             savedActivationPolicy = nil
         }
-        installSignalHandlers()
 
         let errBox = ErrorBox()
         let started = DispatchSemaphore(value: 0)
@@ -74,9 +77,6 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
             if Date() > startDeadline { break }
         }
         if let err = errBox.get() {
-            // If startStream failed, tear down anything we put up
-            // before it threw — never leave an orphan overlay window.
-            teardown()
             throw err
         }
 
@@ -90,7 +90,6 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
                 RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
             }
         }
-        teardown()
     }
 
     private func runOnMainSetActivationPolicy(_ policy: NSApplication.ActivationPolicy) {
@@ -104,26 +103,6 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
                     _ = NSApplication.shared.setActivationPolicy(policy)
                 }
             }
-        }
-    }
-
-    private func installSignalHandlers() {
-        // Translate SIGINT / SIGTERM / SIGHUP into stop() so teardown runs and
-        // the cursor is unhidden — otherwise CGDisplayHideCursor stays in effect
-        // across this process's death.
-        // Order matters: SIG_IGN the default action *first* (so the kernel
-        // doesn't kill us), then start the dispatch sources. Sources must be
-        // retained on the instance — local-var sources get deallocated when
-        // this function returns and never fire.
-        signal(SIGINT, SIG_IGN)
-        signal(SIGTERM, SIG_IGN)
-        signal(SIGHUP, SIG_IGN)
-        let signals: [Int32] = [SIGINT, SIGTERM, SIGHUP]
-        for sig in signals {
-            let src = DispatchSource.makeSignalSource(signal: sig, queue: .main)
-            src.setEventHandler { [weak self] in self?.stop() }
-            src.resume()
-            signalSources.append(src)
         }
     }
 
@@ -165,14 +144,17 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         // process would leave a black window over the screen).
         win.isOpaque = false
         win.backgroundColor = .clear
+        win.alphaValue = 0
         win.hasShadow = false
         win.ignoresMouseEvents = true
         win.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         let view = NSView(frame: win.contentView!.bounds)
         view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
         view.layerContentsRedrawPolicy = .duringViewResize
         let imageLayer = CALayer()
         imageLayer.contentsGravity = .resizeAspectFill
+        imageLayer.backgroundColor = NSColor.clear.cgColor
         imageLayer.frame = view.bounds
         imageLayer.autoresizingMask = [.layerWidthSizable, .layerHeightSizable]
         imageLayer.setAffineTransform(transform(for: flip))
@@ -210,13 +192,13 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         layer.minificationFilter = .nearest
         let filter = SCContentFilter(display: scDisplay, excludingWindows: excluded)
 
-        let output = FrameSink(layer: layer)
+        let output = FrameSink(layer: layer, window: win)
         let captureQ = DispatchQueue(label: "wdm.overlay.capture", qos: .userInteractive)
         let s = SCStream(filter: filter, configuration: cfg, delegate: nil)
-        try s.addStreamOutput(output, type: .screen, sampleHandlerQueue: captureQ)
-        try await s.startCapture()
         self.stream = s
         self.frameSink = output
+        try s.addStreamOutput(output, type: .screen, sampleHandlerQueue: captureQ)
+        try await s.startCapture()
 
         // Hide the live cursor while it's over the target display so only
         // the captured (flipped) cursor is visible. Reference-counted —
@@ -245,27 +227,26 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
                 try? await s.stopCapture()
                 done.signal()
             }
-            _ = done.wait(timeout: .now() + .milliseconds(500))
+            done.wait()
         }
         stream = nil
         frameSink = nil
-        // Synchronous window close: a previous async dispatch let the
-        // overlay linger a beat past teardown which on a slow main
-        // thread looked like an "orphan black screen". Closing on the
-        // current thread (we're already on main when teardown runs in
-        // the GUI path) tears it down immediately.
+        // Hide synchronously, but do not close/free the shielding window
+        // on the hot teardown path. ScreenCaptureKit can still have
+        // late WindowServer bookkeeping immediately after stopCapture's
+        // completion fires; closing here killed the headed GUI during
+        // rapid Flip re-entry. Retaining retired windows until process
+        // exit is boring and stable; they are ordered out and invisible.
         let toClose = window
         window = nil
         if Thread.isMainThread {
             MainActor.assumeIsolated {
-                toClose?.orderOut(nil)
-                toClose?.close()
+                retireWindow(toClose)
             }
         } else {
             DispatchQueue.main.sync {
                 MainActor.assumeIsolated {
-                    toClose?.orderOut(nil)
-                    toClose?.close()
+                    retireWindow(toClose)
                 }
             }
         }
@@ -290,6 +271,14 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         return policy
     }
 
+    @MainActor
+    private func retireWindow(_ win: NSWindow?) {
+        guard let win else { return }
+        win.alphaValue = 0
+        win.orderOut(nil)
+        retiredWindows.append(win)
+    }
+
     private func transform(for flip: Flip) -> CGAffineTransform {
         switch flip {
         case .none:       return .identity
@@ -309,8 +298,13 @@ private final class ErrorBox: @unchecked Sendable {
 
 @objc private final class FrameSink: NSObject, SCStreamOutput, @unchecked Sendable {
     nonisolated(unsafe) private var _layer: CALayer?
+    nonisolated(unsafe) private weak var window: NSWindow?
+    private let ciContext = CIContext()
     private let lock = NSLock()
-    init(layer: CALayer) { self._layer = layer }
+    init(layer: CALayer, window: NSWindow) {
+        self._layer = layer
+        self.window = window
+    }
     /// Called from teardown to break the layer reference. Without this,
     /// late-arriving SCStream frames could write to a layer whose
     /// owning NSWindow had already closed → AppKit crash.
@@ -321,8 +315,7 @@ private final class ErrorBox: @unchecked Sendable {
         let layer = lock.withLock { _layer }
         guard let layer else { return }
         let ci = CIImage(cvPixelBuffer: pixelBuffer)
-        let ctx = CIContext()
-        guard let cg = ctx.createCGImage(ci, from: ci.extent) else { return }
+        guard let cg = ciContext.createCGImage(ci, from: ci.extent) else { return }
         DispatchQueue.main.async { [weak self] in
             // Re-check on main — teardown may have detached between
             // bg-thread render and main-thread commit.
@@ -330,6 +323,7 @@ private final class ErrorBox: @unchecked Sendable {
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             layer.contents = cg
+            self?.window?.alphaValue = 1
             CATransaction.commit()
         }
     }

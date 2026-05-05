@@ -14,6 +14,8 @@ public enum HeadedRunner {
         // returns, otherwise the delegate is freed before launch fires.
         let delegate = WDMMacAppDelegate(runtime: runtime, args: args)
         let app = NSApplication.shared
+        UserDefaults.standard.set(true, forKey: "ApplePersistenceIgnoreState")
+        ProcessInfo.processInfo.disableAutomaticTermination("wdm-mac keeps the remote server and main window alive")
         app.delegate = delegate
         app.setActivationPolicy(.regular)
         app.activate(ignoringOtherApps: true)

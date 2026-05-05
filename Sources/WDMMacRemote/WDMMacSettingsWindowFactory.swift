@@ -15,6 +15,7 @@ enum WDMMacSettingsWindowFactory {
             backing: .buffered, defer: false
         )
         w.title = "Settings"
+        w.isRestorable = false
         w.contentView = host
         w.appearance = appearance.mode.nsAppearance
         w.center()
