@@ -1,7 +1,7 @@
 SWIFT ?= swift
 PREFIX ?= /usr/local
 
-.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size lint-cyclomatic-complexity golden-goal app-mac app-mac-release install clean demo-arrange-pipe
+.PHONY: build test release smoke smoke-mac-remote e2e-fullflow lint-glass lint-glass-env lint-remote-coverage lint-no-gui-logic lint-gui-parity lint-github-tickets lint-every-verb-has-e2e lint-file-size lint-function-size lint-cyclomatic-complexity lint-naming lint-public-surface golden-goal app-mac app-mac-release install clean demo-arrange-pipe
 
 build:
 	$(SWIFT) build
@@ -105,6 +105,16 @@ lint-function-size:
 # docs/cyclomatic-whitelist.md.
 lint-cyclomatic-complexity:
 	@bash scripts/lint-cyclomatic-complexity.sh
+
+# Forbids "and" segments in function names (= two responsibilities) and
+# grab-bag filenames (Utilities/Helpers/Extensions/Misc/Common.swift).
+lint-naming:
+	@bash scripts/lint-naming.sh
+
+# Soft warning for public symbols without a cross-module consumer
+# (CLAUDE.md "default to internal"). Strict mode: WDM_LINT_PUBLIC_SURFACE_STRICT=1.
+lint-public-surface:
+	@bash scripts/lint-public-surface.sh
 
 # Acceptance ledger for the ship-ready goal. 10 lines of evidence:
 # release build, swift test, headed e2e, every lint, codesign,

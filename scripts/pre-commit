@@ -43,6 +43,12 @@ bash scripts/lint-function-size.sh
 echo "pre-commit: lint-cyclomatic-complexity..."
 bash scripts/lint-cyclomatic-complexity.sh
 
+echo "pre-commit: lint-naming..."
+bash scripts/lint-naming.sh
+
+echo "pre-commit: lint-public-surface (soft)..."
+bash scripts/lint-public-surface.sh
+
 echo "pre-commit: lint-github-tickets (soft)..."
 bash scripts/lint-github-tickets.sh
 

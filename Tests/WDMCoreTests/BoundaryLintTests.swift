@@ -43,6 +43,19 @@ struct BoundaryLintTests {
         try Self.runLint(named: "lint-cyclomatic-complexity.sh")
     }
 
+    @Test("No 'and' segments in function names; no grab-bag filenames")
+    func naming() throws {
+        try Self.runLint(named: "lint-naming.sh")
+    }
+
+    @Test("Public-surface lint runs cleanly (soft — warnings allowed)")
+    func publicSurface() throws {
+        // Public-surface is SOFT by default. Just assert the script
+        // exits 0 (warnings printed, no hard failure). When the
+        // whitelist is curated, strict mode can be turned on here.
+        try Self.runLint(named: "lint-public-surface.sh")
+    }
+
     private static func runLint(named: String) throws {
         let repoRoot = try Self.repoRoot()
         let script = repoRoot.appendingPathComponent("scripts/\(named)")
