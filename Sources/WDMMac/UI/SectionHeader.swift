@@ -18,9 +18,17 @@ public struct SectionHeader<Trailing: View>: View {
     public var body: some View {
         HStack(spacing: 6) {
             SectionLabel(title)
-            if let count { CountChip(count: count) }
+            if Self.showsCountChip(count) { CountChip(count: count!) }
             Spacer()
             trailing()
         }
+    }
+
+    /// Render rule for the count chip:
+    /// nil → false (no count to show), 0 → false (empty-state hint
+    /// already communicates the zero), >0 → true.
+    public static func showsCountChip(_ count: Int?) -> Bool {
+        if let count, count > 0 { return true }
+        return false
     }
 }
