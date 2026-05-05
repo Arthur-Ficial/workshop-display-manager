@@ -52,7 +52,16 @@ public struct SidebarView: View {
 
     private var profilesSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            SectionHeader(title: "PROFILES", count: vm.profiles.count)
+            SectionHeader(title: "PROFILES", count: vm.profiles.count) {
+                Button { onSelect("sidebar.profiles.add") } label: {
+                    Image(systemName: "plus").font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                }
+                .buttonStyle(.plain)
+                .clickable(cornerRadius: 5)
+                .accessibilityIdentifier("sidebar.profiles.add")
+            }
             if vm.profiles.isEmpty {
                 EmptyHint("No saved profiles.", remoteID: "sidebar.profiles.empty")
             } else {

@@ -49,6 +49,18 @@ public final class WDMMacRemoteRunner {
             entries.append((displaysID, entry))
             entries.append((stageID, entry))
         }
+        // PROFILES section header `+` button — saves the current arrangement
+        // as `snapshot-<timestamp>` and refreshes the sidebar.
+        let saveID = "sidebar.profiles.add"
+        let saveClick: @Sendable () -> Void = { [vm] in
+            Task { @MainActor in vm.saveCurrentAsProfile() }
+        }
+        entries.append((saveID, RemoteRegistry.Entry(
+            role: "button", label: "Save current arrangement", value: nil,
+            state: NodeState(selected: false, enabled: true),
+            onClick: saveClick
+        )))
+
         // PROFILES sidebar rows. Clicking one restores that profile via the
         // same Kit op the CLI's `wdm restore` exposes — workshop facilitator's
         // hot-swap-the-room gesture, one click. The fixture provider persists

@@ -71,6 +71,44 @@ struct HeadlessProfilesTests {
                 "Built-in origin.x should be 1000 after restore; got \(String(describing: origin))")
     }
 
+    /// Clicking the `+` in the PROFILES section header saves the current
+    /// arrangement as a fresh profile (named "snapshot-<timestamp>") and
+    /// re-renders the sidebar so the new row appears immediately.
+    @Test func clickingProfilesAddSavesCurrentArrangement() async throws {
+        let env = try makeEnv()
+        let proc = try spawnHeadless(env: env)
+        defer { proc.terminate() }
+        let port = try waitForPort(stateFile: env.stateFile)
+
+        // Find the add button.
+        var snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let addBtn = snap.nodes.first { $0.remoteID == "sidebar.profiles.add" }
+        try #require(addBtn != nil, "sidebar.profiles.add must exist")
+
+        // Click it.
+        var click = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
+        click.httpMethod = "POST"
+        click.httpBody = Data(#"{"ref":"\#(addBtn!.ref.rawValue)"}"#.utf8)
+        let (_, resp) = try await URLSession.shared.data(for: click)
+        #expect((resp as? HTTPURLResponse)?.statusCode == 200)
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        // A snapshot-* file should exist on disk and a matching row in the snapshot.
+        let dir = env.dir.appendingPathComponent("profiles")
+        let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+        let savedJSONs = files.filter { $0.hasPrefix("snapshot-") && $0.hasSuffix(".json") }
+        #expect(!savedJSONs.isEmpty, "expected one snapshot-*.json on disk; got \(files)")
+
+        snap = try SceneTreeJSON.decode(
+            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
+        )
+        let rowIDs = snap.nodes.map(\.remoteID)
+            .filter { $0.hasPrefix("sidebar.profiles.row.snapshot-") }
+        #expect(!rowIDs.isEmpty, "expected a sidebar.profiles.row.snapshot-* entry; got \(snap.nodes.map(\.remoteID))")
+    }
+
     @Test func sidebarShowsNoRowsWhenEmpty() async throws {
         let env = try makeEnv()
         let proc = try spawnHeadless(env: env)

@@ -83,6 +83,24 @@ public final class DisplaysListVM: ObservableObject {
         reload()
     }
 
+    /// Save the current arrangement as a new profile. The GUI has no text
+    /// entry yet, so the name is stamped from the wall clock —
+    /// `snapshot-YYYYMMDD-HHMMSS`. Workshop facilitator can rename later
+    /// via `wdm profiles` if desired.
+    public func saveCurrentAsProfile() {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        let name = "snapshot-\(formatter.string(from: Date()))"
+        do {
+            try controller.saveProfile(name)
+            lastError = nil
+        } catch {
+            lastError = "\(error)"
+        }
+        reloadProfiles()
+    }
+
     public func reload() {
         do {
             let displays = try controller.list()

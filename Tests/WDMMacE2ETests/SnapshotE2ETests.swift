@@ -23,13 +23,18 @@ struct WDMMacE2ETests {
         // mirror (`stage.tile.X`). The Stage canvas is rendered in a
         // WKWebView whose DOM children aren't visible to the macOS
         // accessibility walker, so the registry carries the stage.tile.*
-        // mirror for AI-controllability.
-        #expect(tree.nodes.count == 4)
-        let labels = tree.nodes.compactMap(\.label)
-        #expect(labels == ["Built-in", "Built-in", "Projector", "Projector"])
-        let remoteIDs = tree.nodes.map(\.remoteID)
-        #expect(remoteIDs == ["displays.tile.1", "stage.tile.1",
-                              "displays.tile.2", "stage.tile.2"])
+        // mirror for AI-controllability. Filter to display-related IDs so
+        // future sidebar additions (PROFILES Save button, VIRTUAL +, etc.)
+        // don't regress this test.
+        let displayIDs = tree.nodes.map(\.remoteID).filter {
+            $0.hasPrefix("displays.tile.") || $0.hasPrefix("stage.tile.")
+        }
+        #expect(displayIDs == ["displays.tile.1", "stage.tile.1",
+                               "displays.tile.2", "stage.tile.2"])
+        let displayLabels = tree.nodes
+            .filter { $0.remoteID.hasPrefix("displays.tile.") || $0.remoteID.hasPrefix("stage.tile.") }
+            .compactMap(\.label)
+        #expect(displayLabels == ["Built-in", "Built-in", "Projector", "Projector"])
     }
 
     @Test func clickRoundTripsToSelectedState() async throws {
