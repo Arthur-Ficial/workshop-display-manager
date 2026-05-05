@@ -70,6 +70,11 @@ let package = Package(
             name: "WDMMac",
             dependencies: ["WDMKit"],
             path: "Sources/WDMMac",
+            exclude: [
+                // Code-signing entitlements consumed by
+                // scripts/bundle-wdm-mac.sh — not a SwiftPM resource.
+                "WDMMac.entitlements"
+            ],
             resources: [
                 // Bundled web resources for the embedded Stage canvas.
                 // The Stage is the only WebKit-rendered surface in WDMMac;
