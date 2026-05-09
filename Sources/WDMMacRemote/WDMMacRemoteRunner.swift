@@ -251,8 +251,7 @@ public final class WDMMacRemoteRunner {
                 role: "button", label: "Record", value: nil,
                 state: NodeState(selected: false, enabled: true),
                 onClick: mainClick { [vm] in
-                    vm.refuseAction(named: "Record",
-                                    cliEquivalent: "wdm record \(displayID) --out <path> --duration <sec>")
+                    vm.startRecording(displayID: displayID)
                 }
             )))
             entries.append(("inspector.action.reset", RemoteRegistry.Entry(

@@ -64,6 +64,7 @@ public final class DisplaysListVM: ObservableObject {
     private let overlayFlipper: OverlayFlipper
     private let virtualManagerFactory: @Sendable () -> VirtualDisplayManager
     private let pipFlipperFactory: @Sendable () -> PipFlipper
+    private let recorderFactory: @Sendable () -> Recorder
     private var observer: Task<Void, Never>?
     private var profilePoller: Task<Void, Never>?
     private var flipTask: Task<Void, Never>?
@@ -87,11 +88,13 @@ public final class DisplaysListVM: ObservableObject {
 
     public init(controller: WDMController, overlayFlipper: OverlayFlipper,
                 virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager,
-                pipFlipperFactory: @escaping @Sendable () -> PipFlipper) {
+                pipFlipperFactory: @escaping @Sendable () -> PipFlipper,
+                recorderFactory: @escaping @Sendable () -> Recorder) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
         self.virtualManagerFactory = virtualDisplayManagerFactory
         self.pipFlipperFactory = pipFlipperFactory
+        self.recorderFactory = recorderFactory
     }
 
     deinit {
@@ -402,6 +405,40 @@ public final class DisplaysListVM: ObservableObject {
     /// Snapshot of currently-active PiP source IDs — for the registry.
     public func activePipSourceIDs() -> [UInt32] {
         Array(activePipTasks.keys).sorted()
+    }
+
+    /// Path of the most-recently-finished recording — used by views to
+    /// surface a "saved to …" toast.
+    @Published public private(set) var lastRecordingPath: String?
+
+    /// Start a screen recording of `displayID` for `durationSec` seconds.
+    /// Output goes to `~/Movies/wdm-display-<id>-<unix>.mov`. Same Kit
+    /// surface the CLI's `wdm record <id> --out <path> --duration N`
+    /// hits. Errors surface via `lastError`; on completion the saved
+    /// path lands in `lastRecordingPath`.
+    public func startRecording(displayID: UInt32, durationSec: Int = 10) {
+        let outURL = recordingOutputURL(displayID: displayID)
+        let recorder = recorderFactory()
+        let dur = max(1, durationSec)
+        Task.detached { [weak self] in
+            do {
+                try recorder.record(displayID: displayID, to: outURL, durationSec: dur)
+                await MainActor.run {
+                    self?.lastError = nil
+                    self?.lastRecordingPath = outURL.path
+                }
+            } catch {
+                await MainActor.run { self?.lastError = "Record failed: \(error)" }
+            }
+        }
+    }
+
+    private func recordingOutputURL(displayID: UInt32) -> URL {
+        let movies = FileManager.default.urls(for: .moviesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Movies")
+        try? FileManager.default.createDirectory(at: movies, withIntermediateDirectories: true)
+        let stamp = Int(Date().timeIntervalSince1970)
+        return movies.appendingPathComponent("wdm-display-\(displayID)-\(stamp).mov")
     }
 
     /// Save the current arrangement as a new profile. The GUI has no text
