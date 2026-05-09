@@ -37,11 +37,9 @@ public struct SidebarView: View {
         VStack(alignment: .leading, spacing: 4) {
             SectionHeader(title: "VIRTUAL", count: 0)
             EmptyHint("No virtual displays.", remoteID: "sidebar.virtual.empty")
-            // Honest-refusal CTA — clicking sets virtualUnavailableMessage,
-            // which surfaces in the registry as `sidebar.virtual.lastError`
-            // so AI agents see "this isn't wired yet" instead of a silent
-            // no-op. Visual pattern matches PROFILES' "+ Save current as…".
-            Button { vm.refuseVirtualCreate() } label: {
+            // Live virtual-display creation. Same Kit op as
+            // `wdm virtual create`. Default spec: 1920×1080 @ 60Hz HiDPI.
+            Button { vm.createVirtualDisplay() } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "plus")
                         .font(.system(size: 11, weight: .medium))

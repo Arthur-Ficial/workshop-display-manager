@@ -21,18 +21,15 @@ public struct InspectorActions: View {
             }
             ActionRow(label: "Open PiP window", symbol: "pip",
                       remoteID: "inspector.action.pip") {
-                vm.refuseAction(named: "PiP window",
-                                cliEquivalent: "wdm pip \(tile.displayID)")
+                vm.openPiP(sourceDisplayID: tile.displayID)
             }
             ActionRow(label: "Record", symbol: "record.circle",
                       remoteID: "inspector.action.record") {
-                vm.refuseAction(named: "Record",
-                                cliEquivalent: "wdm record \(tile.displayID) --out <path> --duration <sec>")
+                vm.startRecording(displayID: tile.displayID)
             }
             ActionRow(label: "Reset / reconnect…", symbol: "arrow.clockwise",
                       remoteID: "inspector.action.reset") {
-                vm.refuseAction(named: "Reset",
-                                cliEquivalent: "wdm doctor disconnect \(tile.displayID)")
+                vm.resetDisplay(displayID: tile.displayID)
             }
             ActionRow(label: "Open Advanced", symbol: "slider.horizontal.3",
                       remoteID: "inspector.action.advanced") {
