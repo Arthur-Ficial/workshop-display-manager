@@ -3,7 +3,7 @@ import WDMSystem
 extension WDMController {
     /// Real-time read of the active arrangement: one entry per online display
     /// with its current origin + rotation. Cheap — single snapshot. Designed
-    /// for GUIs polling at ~10 Hz to draw the live layout.
+    /// for live editors polling at ~10 Hz to draw the layout.
     public func arrangement() throws -> [ArrangementEntry] {
         try mapErrors {
             try provider.snapshot().displays.map {
@@ -14,7 +14,7 @@ extension WDMController {
         }
     }
 
-    /// Apply a bulk arrangement (the GUI's drag-to-rearrange gesture). Every
+    /// Apply a bulk arrangement. Every
     /// entry's move runs inside one safe transaction: success → all applied;
     /// failure → previous arrangement restored. Atomicity at the OS level is
     /// best-effort: providers that override `setArrangement` (CGDisplayProvider

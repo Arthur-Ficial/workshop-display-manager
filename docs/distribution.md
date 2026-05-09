@@ -1,78 +1,58 @@
 # Distribution
 
-`wdm` ships as a Developer ID-signed, notarized macOS binary set for direct download. **Not on the Mac App Store** — see `docs/adr/0001-developer-id-not-mas.md` for the architectural reasons.
+`wdm` currently ships as a source-built macOS CLI. The active release artefact is
+the `wdm` executable. The archived Mac GUI distribution notes live under
+`Archive/gui/2026-05-09/docs/adr/`.
 
 ## Components
 
 | Binary | Purpose |
 |---|---|
-| `wdm` | CLI — every workshop display operation, scriptable, one binary |
-| `WDMMac.app` | Native macOS GUI on top of the same lib (signed Developer ID, hardened runtime, notarized) |
-| `wdm-mac-control` | Companion CLI to drive WDMMac.app's remote API (`agent-browser`-style) |
-| `wdm-web` | Proof-of-concept HTTP frontend (not a shipped product) |
+| `wdm` | Primary Unix CLI for display operations. |
+| `wdm-web` | Local proof-of-concept HTTP frontend, not a shipped product. |
 
-## Install — GUI
-
-```sh
-# Download
-curl -LO https://github.com/Arthur-Ficial/workshop-display-manager/releases/download/v0.2.0/WDMMac-0.2.0.zip
-unzip WDMMac-0.2.0.zip -d /Applications/
-open /Applications/WDMMac.app
-```
-
-The first launch will prompt for **Screen Recording** permission (needed for Flip H/V's overlay). Grant it once — notarized bundles persist the grant across rebuilds.
-
-## Install — CLI
+## Install From Source
 
 ```sh
 git clone git@github.com:Arthur-Ficial/workshop-display-manager.git
 cd workshop-display-manager
-make install          # copies .build/release/wdm to /usr/local/bin/
+make release
+make install
 wdm version
 ```
 
-(A signed standalone `wdm` binary in the GitHub release archive is on the v1.0.0 backlog.)
+Default install path is `/usr/local/bin/wdm`. Override with:
+
+```sh
+PREFIX="$HOME/.local" make install
+```
 
 ## Permissions
 
-`wdm` and `WDMMac.app` need:
+Most display configuration operations use CoreGraphics/IOKit and need no extra
+permission prompt.
 
-- **Screen Recording** — for Flip H/V's overlay, PiP, screenshot, record (anything that uses ScreenCaptureKit).
-- **Accessibility** — only when using `wdm focus` / `wdm follow` / `wdm move-window` (window-management utilities). The display-manipulation core (mode/main/mirror/move/rotate/profiles) needs nothing.
+Some commands require macOS privacy permissions:
 
-System Settings → Privacy & Security → Screen Recording (or Accessibility) → toggle wdm-mac.
+- **Screen Recording**: `flip-overlay`, `pip`, `screenshot`, `shot-all`,
+  `record`, `stream`.
+- **Accessibility**: `focus`, `follow`, `move-window`, `tile-app`, and remote
+  PiP input forwarding.
 
-## Updating
-
-```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/Arthur-Ficial/workshop-display-manager/main/scripts/wdm-update.sh)
-```
-
-The script downloads the latest GitHub release zip, replaces `/Applications/WDMMac.app`, and re-launches. Plain shell — no auto-updater dependency yet (see `docs/adr/0002-auto-update-deferred.md`).
-
-## Verifying authenticity
-
-After download:
+## Verify A Local Build
 
 ```sh
-spctl -a -t exec -vv /Applications/WDMMac.app
-# Expected:
-#   /Applications/WDMMac.app: accepted
-#   source=Notarized Developer ID
-#   origin=Developer ID Application: Franz Enzenhofer (7D2YX5DQ6M)
-xcrun stapler validate /Applications/WDMMac.app
-# Expected: "The validate action worked!"
+make test
+make perf-cli
+make smoke        # opt-in real display read smoke
 ```
+
+`make test` is fixture-backed and hermetic. `make smoke` sets
+`WDM_REAL_HARDWARE=1` and reads real display state.
 
 ## Uninstall
 
 ```sh
-rm -rf /Applications/WDMMac.app
 sudo rm -f /usr/local/bin/wdm
-```
-
-Settings + saved profiles live under `~/.config/wdm/` — remove if you want a clean slate:
-
-```sh
-rm -rf ~/.config/wdm/
+rm -rf ~/.config/wdm
 ```

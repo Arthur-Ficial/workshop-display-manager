@@ -15,7 +15,7 @@
 #      contract. CLAUDE.md: "no signal(SIG_IGN) in libraries."
 #
 #   3. `setActivationPolicy(.accessory)` without a `readActivationPolicy`
-#      check — switching from .regular to .accessory hides the GUI
+#      check — switching from .regular to .accessory hides a regular
 #      host's main window. CLAUDE.md: "activation-policy switches are
 #      scoped."
 #

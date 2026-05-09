@@ -21,7 +21,7 @@ struct FollowCommandE2ETests {
             "WDM_TEST_PIP_LOG": pipLog.path,
             "WDM_TEST_CURSOR_SEQ": cursorSeq,
         ]
-        let code = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
+        let code = CLITestHarness.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: code, stdout: stdout.contents, stderr: stderr.contents)
     }
 

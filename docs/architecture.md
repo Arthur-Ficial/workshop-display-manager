@@ -3,7 +3,8 @@
 `wdm` is intentionally tiny. The codebase is five layers with strict downward
 dependencies. The CLI (`wdm`) is the primary frontend; a local web server
 (`wdm-web`) ships as a proof of concept that the lib is interface-agnostic.
-A future Mac GUI sits as a sibling on the same lib.
+The retired Mac GUI is archived under `Archive/gui/2026-05-09` and is not part
+of the active package.
 
 ```
    ┌───────────────────────────────┐    ┌────────────────────────────────┐
@@ -67,15 +68,15 @@ A future Mac GUI sits as a sibling on the same lib.
 A frontend's job is parsing and presenting. The shape:
 
 ```
-input  → frontend-specific parsing (argv / HTTP / GUI events / RPC)
+input  → frontend-specific parsing (argv / HTTP / RPC)
        → typed Kit call (WDMController.<verb>(...))
        → typed Kit result (value / ApplyResult / typed throw)
-       → frontend-specific output (stdout+exit code / JSON+HTTP status / GUI redraw / RPC reply)
+       → frontend-specific output (stdout+exit code / JSON+HTTP status / RPC reply)
 ```
 
 If the same logic appears in two frontends, the extraction is incomplete. Push it into `Sources/WDMKit/Operations/`.
 
-The `wdm arrange` verb is the canonical example: one Kit op (`WDMController.arrangement()` / `setArrangement(_:confirmer:)`), one CLI verb (`wdm arrange list / move / set @-`), one HTTP route pair (`GET/POST /arrangement`). All three round-trip the same JSON shape — a future Mac GUI subscribes to the same data via `WDMController.arrangement()` directly.
+The `wdm arrange` verb is the canonical example: one Kit op (`WDMController.arrangement()` / `setArrangement(_:confirmer:)`), one CLI verb (`wdm arrange list / move / set @-`), one HTTP route pair (`GET/POST /arrangement`). Both active frontends round-trip the same JSON shape.
 
 ## Why protocols, not concretes
 

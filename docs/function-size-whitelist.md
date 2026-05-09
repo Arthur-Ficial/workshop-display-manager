@@ -27,13 +27,6 @@ Sources/WDMKit/Operations/WDMControllerArrangement.swift:setArrangement  # compl
 Sources/WDMKit/Operations/WDMControllerCapture.swift:record           # capture pipeline
 Sources/WDMKit/Safety/CountdownConfirmer.swift:confirm                # countdown loop
 Sources/WDMKit/Safety/NativePopupConfirmer.swift:show                 # AppKit popup assembly
-Sources/WDMMac/ViewModels/DisplaysListVM.swift:applyFlip              # task-detached lifecycle
-Sources/WDMMac/Views/Inspector/InspectorBrightness.swift:body         # SwiftUI body — composition
-Sources/WDMMacRemote/AccessibilityWalker.swift:walk                   # AX tree walker — recursive
-Sources/WDMMacRemote/WDMMacRemoteAdapter.swift:dispatch               # action dispatch table
-Sources/WDMMacRemote/WDMMacRemoteAdapter.swift:screenshot             # screenshot lifecycle
-Sources/WDMMacRemote/WDMMacRemoteRunner.swift:sync                    # registry-rebuild monolith — top refactor target
-Sources/WDMRemoteControl/Codec/RemoteActionJSON.swift:decode          # JSON dispatch
 Sources/WDMSystem/AXWindowMover.swift:move                            # multi-step AX assembly
 Sources/WDMSystem/AXWindowMover.swift:focus                           # AX focus dance
 Sources/WDMSystem/AXWindowMover.swift:tileAcross                      # tile layout math

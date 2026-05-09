@@ -56,7 +56,7 @@ struct ScaleCommandE2ETests {
         ]
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let r = CLIRunner.run(
+        let r = CLITestHarness.run(
             args: ["scale", "1", "1920x1200", "--no-confirm"],
             env: env, stdout: stdout, stderr: stderr
         )
@@ -75,7 +75,7 @@ struct ScaleCommandE2ETests {
         ]
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let r = CLIRunner.run(
+        let r = CLITestHarness.run(
             args: ["scale", "1", "looks-like", "2560x1440", "--no-confirm"],
             env: env, stdout: stdout, stderr: stderr
         )
@@ -93,7 +93,7 @@ struct ScaleCommandE2ETests {
         ]
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let r = CLIRunner.run(
+        let r = CLITestHarness.run(
             args: ["scale", "1", "1234x5678", "--no-confirm"],
             env: env, stdout: stdout, stderr: stderr
         )

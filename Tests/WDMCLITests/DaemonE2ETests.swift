@@ -30,7 +30,7 @@ struct DaemonE2ETests {
             "WDM_PROFILES_DIR": profilesDir.path,
         ]
         if let events { env["WDM_TEST_EVENTS_FILE"] = events.path }
-        let code = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
+        let code = CLITestHarness.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: code, stdout: stdout.contents, stderr: stderr.contents)
     }
 

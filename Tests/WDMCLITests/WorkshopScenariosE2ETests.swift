@@ -146,7 +146,7 @@ struct WorkshopScenariosE2ETests {
             }
         }
 
-        let code = CLIRunner.run(
+        let code = CLITestHarness.run(
             args: ["watch", "--json", "--max-events", "20"],
             env: env, stdout: stdout, stderr: stderr
         )
@@ -188,7 +188,7 @@ struct WorkshopScenariosE2ETests {
             atomically: true, encoding: .utf8
         )
 
-        let r = CLIRunner.run(
+        let r = CLITestHarness.run(
             args: ["restore", "ghost"],
             env: env, stdout: stdout, stderr: stderr
         )
@@ -211,19 +211,19 @@ struct WorkshopScenariosE2ETests {
         let stderr = BufferOutputWriter()
 
         // 1. Save a profile, verify it lists.
-        _ = CLIRunner.run(args: ["save", "demo"], env: env, stdout: stdout, stderr: stderr)
-        let listed = CLIRunner.run(args: ["profiles"], env: env, stdout: stdout, stderr: stderr)
+        _ = CLITestHarness.run(args: ["save", "demo"], env: env, stdout: stdout, stderr: stderr)
+        let listed = CLITestHarness.run(args: ["profiles"], env: env, stdout: stdout, stderr: stderr)
         #expect(listed == 0)
         #expect(stdout.contents.contains("demo"))
 
         // 2. Remove it.
-        let removed = CLIRunner.run(args: ["profiles", "remove", "demo"], env: env, stdout: stdout, stderr: stderr)
+        let removed = CLITestHarness.run(args: ["profiles", "remove", "demo"], env: env, stdout: stdout, stderr: stderr)
         #expect(removed == 0)
         let path = dir.appendingPathComponent("demo.json").path
         #expect(!FileManager.default.fileExists(atPath: path))
 
         // 3. Removing again exits 6 (profile-not-found).
-        let again = CLIRunner.run(args: ["profiles", "remove", "demo"], env: env, stdout: stdout, stderr: stderr)
+        let again = CLITestHarness.run(args: ["profiles", "remove", "demo"], env: env, stdout: stdout, stderr: stderr)
         #expect(again == ExitCodes.profileNotFound)
     }
 
@@ -237,7 +237,7 @@ struct WorkshopScenariosE2ETests {
             "WDM_FIXTURE_FAIL_ROTATE": "1",
             "WDM_AUTO_CONFIRM": "1",
         ]
-        let r = CLIRunner.run(
+        let r = CLITestHarness.run(
             args: ["rotate", "2", "90", "--no-confirm"],
             env: env, stdout: stdout, stderr: stderr
         )
@@ -245,7 +245,7 @@ struct WorkshopScenariosE2ETests {
         #expect(stderr.contents.contains("hot-unplug") || stderr.contents.contains("mid-mutation"))
 
         // Verify no partial apply: rotation in fixture file is still 0.
-        let after = CLIRunner.run(
+        let after = CLITestHarness.run(
             args: ["get", "2", "rotation"],
             env: ["WDM_TEST_FIXTURE": fx.path],
             stdout: stdout, stderr: stderr

@@ -9,7 +9,6 @@ Each of these reads `WDM_TEST_FIXTURE` to decide whether to inject the fixture p
 Sources/WDMWeb/WDMWebControllerFactory.swift            # web frontend factory
 Sources/WDMKit/DDC/DDCProviderFactory.swift             # DDC provider factory
 Sources/WDMKit/HDR/HDRProviderFactory.swift             # HDR provider factory
-Sources/WDMMac/WDMMacAppDeps.swift                      # wdm-mac DI container
 
 ## Documentation — describing the env var
 

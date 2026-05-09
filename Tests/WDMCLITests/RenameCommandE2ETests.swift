@@ -59,7 +59,7 @@ struct RenameCommandE2ETests {
         combined["WDM_TEST_FIXTURE"] = fixture.path
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let exit = CLIRunner.run(args: args, env: combined, stdout: stdout, stderr: stderr)
+        let exit = CLITestHarness.run(args: args, env: combined, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: exit, stdout: stdout.contents, stderr: stderr.contents)
     }
 

@@ -2,13 +2,11 @@ import Foundation
 import AppKit
 
 /// Read-side abstraction for the desktop wallpaper currently set on a
-/// display. Powers tile previews (every monitor's tile in WDMMac shows a
-/// miniature of its real desktop) and `wdm wallpaper <id>` JSON output.
+/// display. Powers `wdm wallpaper <id>` JSON output.
 ///
 /// The protocol is sync because `NSWorkspace.desktopImageURL(for:)` is
 /// already synchronous and very fast (in-memory lookup against the
-/// workspace's plist cache). Higher-level caching is a separate concern
-/// (e.g. the WDMMac VM reloads on `NSWorkspace.didChangeDesktopImage`).
+/// workspace's plist cache). Higher-level caching is a separate concern.
 public protocol WallpaperProvider: Sendable {
     /// File URL of the wallpaper currently set on `displayID`. Returns
     /// nil for an unknown display, a display with no wallpaper set, or

@@ -7,6 +7,15 @@ extension WDMController {
         }
     }
 
+    public func saveAutoProfile() throws -> Int {
+        try mapErrors {
+            let snap = try provider.snapshot()
+            let auto = AutoProfileStore.resolve(from: profileStore)
+            try auto.save(snap)
+            return snap.displays.count
+        }
+    }
+
     public func profiles() throws -> [String] {
         try mapErrors {
             try profileStore.list()

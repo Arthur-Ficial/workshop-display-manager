@@ -3,8 +3,8 @@ import WDMSystem
 
 /// Reusable alias-based mutation primitive: resolve `alias` to a display ID,
 /// build a human-readable description from the resolved name, and run the
-/// supplied apply closure inside a `SafeMutation` cycle. Frontends (CLI, GUI,
-/// web, …) all build on this — they only differ in how they construct the
+/// supplied apply closure inside a `SafeMutation` cycle. Frontends (CLI, web,
+/// future RPC, …) all build on this — they only differ in how they construct the
 /// `Confirmer` and what they do with the returned `ApplyResult`.
 public enum DisplayMutator {
     public static func dispatch(

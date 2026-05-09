@@ -2,6 +2,25 @@ import Foundation
 import WDMSystem
 
 extension WDMController {
+    public func virtualDisplays() throws -> [DisplayInfo] {
+        try snapshot().displays
+    }
+
+    public func removeVirtual(
+        target: String,
+        lister: ProcessLister,
+        signaler: ProcessSignaler
+    ) throws -> [Int32] {
+        try WDMController.virtual.remove(
+            target: target,
+            lister: lister,
+            signaler: signaler,
+            displayLookup: { id in
+                (try? self.snapshot())?.display(id: id)?.name
+            }
+        )
+    }
+
     public enum virtual {
         public static func presets() -> [MobilePresets.Preset] { MobilePresets.all }
 

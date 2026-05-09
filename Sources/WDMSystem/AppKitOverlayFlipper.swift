@@ -26,7 +26,7 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
     nonisolated(unsafe) private var frameSink: NSObject?
     nonisolated(unsafe) private var cursorHiddenOnDisplay: CGDirectDisplayID?
     /// Activation policy at the moment we entered run() — restored in
-    /// teardown(). For a GUI app (wdm-mac), this is .regular; switching
+    /// teardown(). For a regular AppKit host, this is .regular; switching
     /// to .accessory and never restoring would hide the Dock icon and
     /// main menu permanently after one flip.
     nonisolated(unsafe) private var savedActivationPolicy: NSApplication.ActivationPolicy?
@@ -46,8 +46,8 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         lock.withLock { stopRequested = false }
         // Only switch to .accessory when the host is .prohibited
         // (a bare CLI process — we want to suppress the Dock icon
-        // flash during flip). For .regular hosts (GUI apps like
-        // wdm-mac), switching would HIDE the user's main window and
+        // flash during flip). For .regular hosts, switching would hide
+        // the user's main window and
         // dock icon — looks like a crash to the user even though we
         // restore the policy in teardown. Per the user's "looks like
         // a crash" report 2026-05-05.
@@ -243,7 +243,7 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
         // Hide synchronously, but do not close/free the shielding window
         // on the hot teardown path. ScreenCaptureKit can still have
         // late WindowServer bookkeeping immediately after stopCapture's
-        // completion fires; closing here killed the headed GUI during
+        // completion fires; closing here can kill a headed host during
         // rapid Flip re-entry. Retaining retired windows until process
         // exit is boring and stable; they are ordered out and invisible.
         let toClose = window
@@ -260,7 +260,7 @@ public final class AppKitOverlayFlipper: OverlayFlipper, @unchecked Sendable {
             }
         }
         // Restore the calling app's activation policy. Without this,
-        // a GUI host (wdm-mac) loses its Dock icon and main menu
+        // a regular AppKit host loses its Dock icon and main menu
         // permanently after one flip — `runOnMainSetActivationPolicy(.accessory)`
         // is a one-way switch otherwise.
         if let saved = savedActivationPolicy {

@@ -1,8 +1,8 @@
 import Foundation
 import WDMKit
 
-/// `wdm arrange` — bulk arrangement read/write. The companion to drag-to-
-/// rearrange GUIs and the WDMWeb `/arrangement` route.
+/// `wdm arrange` — bulk arrangement read/write. The companion to the WDMWeb
+/// `/arrangement` route.
 public enum ArrangeCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         let pos = Args.positional(args)

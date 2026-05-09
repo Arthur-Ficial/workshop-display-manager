@@ -24,7 +24,7 @@ struct HotkeysCommandE2ETests {
         let stderr = BufferOutputWriter()
         var combined = env
         combined["WDM_TEST_FIXTURE"] = fixture.path
-        let exitCode = CLIRunner.run(args: args, env: combined, stdout: stdout, stderr: stderr)
+        let exitCode = CLITestHarness.run(args: args, env: combined, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: exitCode, stdout: stdout.contents, stderr: stderr.contents)
     }
 

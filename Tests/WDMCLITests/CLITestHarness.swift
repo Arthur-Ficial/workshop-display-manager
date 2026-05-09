@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 @testable import WDMCLI
 
 /// Captures one CLI invocation for assertions.
@@ -21,16 +22,93 @@ enum CLITestHarness {
         return url
     }
 
-    /// Invoke the CLI in-process. Equivalent to spawning the binary, but faster.
-    /// The exact same code path is exercised end-to-end (parse → dispatch → write → exit code).
+    /// Invoke the actual wdm binary against a fresh fixture backend.
     static func run(_ args: [String], fixture: URL, extraEnv: [String: String] = [:]) -> CLIResult {
-        let stdout = BufferOutputWriter()
-        let stderr = BufferOutputWriter()
         var env: [String: String] = ["WDM_TEST_FIXTURE": fixture.path]
         for (k, v) in extraEnv { env[k] = v }
-        let exitCode = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
-        return CLIResult(exitCode: exitCode, stdout: stdout.contents, stderr: stderr.contents)
+        return run(args, env: env)
     }
+
+    static func run(
+        args: [String],
+        env: [String: String],
+        stdout: OutputWriter,
+        stderr: OutputWriter
+    ) -> Int32 {
+        let result = run(args, env: env)
+        stdout.write(result.stdout)
+        stderr.write(result.stderr)
+        return result.exitCode
+    }
+
+    /// Invoke the actual wdm binary as a subprocess.
+    static func run(_ args: [String], env extraEnv: [String: String], timeout: TimeInterval = 30) -> CLIResult {
+        processSlots.wait()
+        defer { processSlots.signal() }
+        do {
+            let proc = Process()
+            proc.executableURL = try binaryURL()
+            proc.arguments = args
+            proc.environment = mergedEnv(extraEnv)
+            let out = Pipe()
+            let err = Pipe()
+            proc.standardOutput = out
+            proc.standardError = err
+            let done = DispatchSemaphore(value: 0)
+            proc.terminationHandler = { _ in done.signal() }
+            try proc.run()
+            let timedOut = wait(proc, done: done, timeout: timeout) == false
+            let stdout = String(data: out.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let stderr = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if timedOut {
+                return CLIResult(exitCode: 124, stdout: stdout, stderr: stderr + "\nerror: wdm timed out")
+            }
+            return CLIResult(exitCode: proc.terminationStatus, stdout: stdout, stderr: stderr)
+        } catch {
+            return CLIResult(exitCode: 127, stdout: "", stderr: "error: \(error)\n")
+        }
+    }
+
+    private static func mergedEnv(_ extraEnv: [String: String]) -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        var scoped = extraEnv
+        if scoped["HOME"] == nil, let fixture = scoped["WDM_TEST_FIXTURE"], !fixture.isEmpty {
+            scoped["HOME"] = URL(fileURLWithPath: fixture).deletingLastPathComponent().path
+        }
+        for (k, v) in scoped { env[k] = v }
+        return env
+    }
+
+    private static func wait(_ proc: Process, done: DispatchSemaphore, timeout: TimeInterval) -> Bool {
+        if done.wait(timeout: .now() + timeout) == .success { return true }
+        proc.terminate()
+        if done.wait(timeout: .now() + 1) == .success { return false }
+        kill(proc.processIdentifier, SIGKILL)
+        _ = done.wait(timeout: .now() + 1)
+        return false
+    }
+
+    private static func binaryURL() throws -> URL {
+        if let path = ProcessInfo.processInfo.environment["WDM_CLI_BINARY"], !path.isEmpty {
+            return URL(fileURLWithPath: path)
+        }
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let candidates = [
+            root.appendingPathComponent(".build/debug/wdm"),
+            root.appendingPathComponent(".build/arm64-apple-macosx/debug/wdm"),
+        ]
+        if let found = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) {
+            return found
+        }
+        throw NSError(domain: "CLITestHarness", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "wdm binary missing; run `swift build --product wdm` first",
+        ])
+    }
+
+    private static let processSlots = DispatchSemaphore(value: 4)
 
     static let defaultFixture = """
     {

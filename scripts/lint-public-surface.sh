@@ -23,10 +23,7 @@ if [ -f "$WHITELIST_FILE" ]; then
 fi
 
 LIB_MODULES=("WDMCore" "WDMSystem" "WDMKit")
-CONSUMER_DIRS=("Sources/WDMMac" "Sources/WDMMacRemote" "Sources/WDMCLI"
-               "Sources/WDMWeb" "Sources/WDMRemoteControl"
-               "Sources/wdm" "Sources/wdm-mac" "Sources/wdm-mac-control"
-               "Sources/wdm-web" "Tests/")
+CONSUMER_DIRS=("Sources/WDMCLI" "Sources/WDMWeb" "Sources/wdm" "Sources/wdm-web" "Tests/")
 
 # Print every public symbol declared in lib modules.
 public_symbols() {

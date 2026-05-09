@@ -9,15 +9,26 @@
 # Discovery:
 #   - CLI verbs come from Sources/WDMCLI/Commands/*Command.swift
 #     (filename minus "Command.swift", kebab-case).
-#   - A verb is "covered" iff its kebab-case token appears as an
-#     argument in a `proc.arguments = [..., "<verb>", ...]` literal
-#     OR as a test-name string under Tests/WDMCLITests/**/*.swift.
+#   - A verb is "covered" iff its kebab-case token appears as the first
+#     argument in a CLITestHarness.run([...]) subprocess invocation.
 #
 # Exit code: 0 if every verb is covered, 1 otherwise.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+if grep -R "CLIRunner.run" Tests/WDMCLITests --include='*.swift' \
+    | grep -v "Tests/WDMCLITests/CLITestHarness.swift" >/dev/null; then
+    echo "lint-every-verb-has-e2e: direct CLIRunner.run calls are not e2e." >&2
+    echo "Use CLITestHarness.run so tests spawn the actual wdm binary." >&2
+    exit 1
+fi
+
+if ! grep -q "Process()" Tests/WDMCLITests/CLITestHarness.swift; then
+    echo "lint-every-verb-has-e2e: CLITestHarness must spawn Process()." >&2
+    exit 1
+fi
 
 camel_to_kebab() {
     sed -E 's/([A-Z]+)([A-Z][a-z])/\1-\2/g; s/([a-z0-9])([A-Z])/\1-\2/g' \
@@ -36,11 +47,15 @@ done | sort -u)
 violations=0
 while IFS= read -r verb; do
     [ -z "$verb" ] && continue
-    # The verb is covered iff it appears as a quoted string in any
-    # WDMCLITests source. This catches both:
-    #   proc.arguments = ["rotate", "1", "90"]
-    #   @Suite("wdm rotate (e2e)")
-    if grep -rqE "\"${verb}\"" Tests/WDMCLITests --include='*.swift' 2>/dev/null; then
+    # The verb is covered iff it is the first argument to the subprocess
+    # harness. Suite names and incidental string literals do not count.
+    if VERB="$verb" perl -0ne '
+        BEGIN { $verb = quotemeta($ENV{"VERB"}); $found = 0 }
+        if (/(?:[A-Za-z_][A-Za-z0-9_]*\.)?(?:[A-Za-z_][A-Za-z0-9_]*)?[Rr]un[A-Za-z0-9_]*\(\s*(?:args:\s*)?\[\s*"$verb"/) {
+            $found = 1
+        }
+        END { exit($found ? 0 : 1) }
+    ' Tests/WDMCLITests/*.swift; then
         continue
     fi
     if [ $violations -eq 0 ]; then
@@ -53,7 +68,7 @@ done <<< "$VERBS"
 if [ $violations -gt 0 ]; then
     echo >&2
     echo "Add a test under Tests/WDMCLITests/<Verb>CommandE2ETests.swift that" >&2
-    echo "spawns the wdm binary with [\"$verb\", …] in proc.arguments and asserts" >&2
+    echo "uses CLITestHarness.run([\"<verb>\", …]) and asserts" >&2
     echo "the resulting state. Per CLAUDE.md iron law: a feature without an e2e" >&2
     echo "test does not exist." >&2
     exit 1

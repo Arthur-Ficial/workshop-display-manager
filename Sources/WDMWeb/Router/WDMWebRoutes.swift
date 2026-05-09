@@ -44,7 +44,7 @@ public enum WDMWebRoutes {
         WDMWebRoute(method: "POST", pattern: "/profiles/{name}/restore", handler: WDMWebProfileHandlers.restore),
         WDMWebRoute(method: "DELETE", pattern: "/profiles/{name}", handler: WDMWebProfileHandlers.remove),
 
-        // Live arrangement (drag-to-rearrange GUI)
+        // Live arrangement
         WDMWebRoute(method: "GET", pattern: "/arrangement", handler: WDMWebArrangementHandlers.read),
         WDMWebRoute(method: "POST", pattern: "/arrangement", handler: WDMWebArrangementHandlers.write),
 

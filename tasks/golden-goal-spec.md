@@ -1,40 +1,49 @@
-# Golden Goal — Ship-Ready Spec
+# Golden Goal — CLI/Lib Ship-Ready Spec
 
-The contract that defines "wdm is done." Re-checked at every milestone end via `make golden-goal`.
+The contract that defines the active `wdm` package as ready to ship. The retired
+Mac GUI has been archived under `Archive/gui/2026-05-09` and is not part of this
+gate.
 
 ## Definition
 
-A signed + notarized + stapled `WDMMac.app` plus its companion binaries (`wdm`, `wdm-web`, `wdm-mac-control`), where:
+A release-ready `wdm` Unix CLI and Swift library stack where:
 
-- (a) Every CLI verb has a Kit op AND a GUI surface — or sits on the documented `docs/cli-only-verbs.md` allowlist.
-- (b) Every GUI element has a headless e2e test plus a headed visual e2e test.
-- (c) Every CLAUDE.md architectural pillar is enforced by an automated lint that runs in `scripts/pre-commit` AND as a hermetic Swift test (so `--no-verify` cannot bypass).
-- (d) Every release is reproducible from a single tagged commit via `bash scripts/release.sh <version>`.
-- (e) The resulting `.app` opens on a clean Mac (no dev-cert TCC) and survives a 30-minute mixed-driver soak without crashing.
+- Every CLI verb is backed by one `WDMKit` operation.
+- Every CLI verb has an e2e test that spawns the actual `wdm` binary with
+  `WDM_TEST_FIXTURE`.
+- The active package builds with warnings as errors.
+- The CLI/lib/web tests pass without GUI targets in the SwiftPM manifest.
+- The release CLI meets the fixture-backed latency budget.
+- Real-hardware smoke remains available as an explicit opt-in.
 
-## Acceptance ledger
+## Acceptance Ledger
 
-`scripts/golden-goal.sh` returns 0 iff every line passes:
+`scripts/golden-goal.sh` prints ten lines:
 
-| # | Check | Unblocks at |
-|---|---|---|
-| 1 | release-build-clean (`swift build -c release -Xswiftc -warnings-as-errors`) | M0 |
-| 2 | swift-test (count ≥ baseline 508) | M0 |
-| 3 | headed-e2e (`WDM_HEADED_E2E=1 swift test --filter "Headed.*"`) | M0 |
-| 4 | lint-quality (every `scripts/lint-*.sh` exits 0; count grows M1..M4..M7) | M0 (grows) |
-| 5 | codesign-verify (`spctl -a -t exec -vv` on `.build/release/WDMMac.app`) | M6 |
-| 6 | notarized-stapled (`xcrun stapler validate`; latest CFBundleVersion in notarytool history = Accepted) | M6 |
-| 7 | cli-gui-parity (`scripts/lint-gui-parity.sh`) — Web parity dropped from v1.0.0 scope | M1 |
-| 8 | every-verb-has-e2e (`scripts/lint-every-verb-has-e2e.sh`) | M2 |
-| 9 | every-gui-element-has-e2e (`scripts/lint-remote-coverage.sh` extended) | M3 (full) |
-| 10 | soak (60-sec smoke default; full 30-min when `WDM_SOAK=1`) | M8 |
+| # | Check |
+|---|---|
+| 1 | GUI archive lint |
+| 2 | Release build clean |
+| 3 | Quality lints |
+| 4 | `WDMCoreTests` |
+| 5 | `WDMSystemTests` |
+| 6 | `WDMKitTests` |
+| 7 | `WDMCLITests` subprocess e2e |
+| 8 | `WDMWebTests` |
+| 9 | `perf-cli` |
+| 10 | Real-hardware smoke, deferred unless `WDM_REAL_HARDWARE=1` |
 
-## Cadence
+## Commands
 
-- Run `make golden-goal` at every milestone end.
-- DEFERRED count must monotonically decrease vs the previous milestone.
-- If DEFERRED stays flat or grows: stop, report, replan.
+```sh
+make test
+make perf-cli
+make golden-goal
+WDM_REAL_HARDWARE=1 make smoke
+```
 
-## Tied to a hermetic test
+## Tied To A Hermetic Test
 
-`Tests/WDMCoreTests/GoldenGoalScriptTests.swift` shells the script and asserts the documented exit-code shape. A bypassed `git commit --no-verify` cannot land a regression that breaks the harness without also failing the test suite.
+`Tests/WDMCoreTests/GoldenGoalScriptTests.swift` shells the script with
+`WDM_GOLDEN_GOAL_SKIP_HEAVY=1` and asserts the ledger shape. A bypassed
+pre-commit hook cannot silently break the acceptance harness.

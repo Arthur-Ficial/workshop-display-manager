@@ -20,7 +20,7 @@ struct VirtualCommandE2ETests {
             "WDM_TEST_FIXTURE": fixture.path,
             "WDM_TEST_VIRTUAL_LOG": log.path,
         ]
-        let code = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
+        let code = CLITestHarness.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: code, stdout: stdout.contents, stderr: stderr.contents)
     }
 
@@ -195,7 +195,7 @@ struct VirtualCommandE2ETests {
         // The recording PIP uses the *requested* sourceID — for the test it can
         // be any positive id since we're verifying the call was made, not which
         // CG-issued id the virtual got.
-        let code = CLIRunner.run(
+        let code = CLITestHarness.run(
             args: ["virtual", "create",
                    "--name", "Auto",
                    "--mode", "1280x720@60",
@@ -230,7 +230,7 @@ struct VirtualCommandE2ETests {
             "WDM_TEST_VIRTUAL_LOG": virtLog.path,
             "WDM_TEST_PIP_LOG": pipLog.path,
         ]
-        let code = CLIRunner.run(
+        let code = CLITestHarness.run(
             args: ["virtual", "create", "--name", "NoPip", "--duration-ms", "50"],
             env: env, stdout: stdout, stderr: stderr
         )

@@ -1,5 +1,5 @@
 /// One row in an `ArrangementPlan` — the new origin for a display, plus
-/// optional rotation. Used by drag-to-rearrange GUIs and bulk CLI/web ops
+/// optional rotation. Used by bulk CLI/web arrangement ops
 /// to apply many display moves in a single transaction.
 public struct ArrangementEntry: Sendable, Codable, Equatable, Hashable {
     public let id: UInt32

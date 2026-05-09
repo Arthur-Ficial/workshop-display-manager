@@ -5,7 +5,7 @@ import WDMSystem
 /// it as the crash-recovery profile (`last`), then run the apply closure
 /// inside a `SafeTransaction` with the supplied confirmer.
 ///
-/// Frontends (CLI, GUI, web, …) all want the same flow around any change to
+/// Frontends (CLI, web, future RPC, …) all want the same flow around any change to
 /// the display configuration. This is that flow with no argv coupling, no
 /// stdout writing, no exit codes — pure data in, `ApplyResult` out.
 public enum SafeMutation {

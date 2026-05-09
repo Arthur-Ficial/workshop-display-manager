@@ -20,7 +20,7 @@ struct FlipOverlayE2ETests {
             "WDM_TEST_FIXTURE": fixture.path,
             "WDM_TEST_OVERLAY_LOG": log.path,
         ]
-        let code = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
+        let code = CLITestHarness.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: code, stdout: stdout.contents, stderr: stderr.contents)
     }
 

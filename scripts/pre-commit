@@ -25,11 +25,8 @@ if grep -RnE '^[[:space:]]*import[[:space:]]+ScreenCaptureKit[[:space:]]*$' \
     exit 1
 fi
 
-echo "pre-commit: lint-no-gui-logic..."
-bash scripts/lint-no-gui-logic.sh
-
-echo "pre-commit: lint-gui-parity..."
-bash scripts/lint-gui-parity.sh
+echo "pre-commit: lint-gui-archived..."
+bash scripts/lint-gui-archived.sh
 
 echo "pre-commit: lint-every-verb-has-e2e..."
 bash scripts/lint-every-verb-has-e2e.sh
@@ -57,9 +54,6 @@ bash scripts/lint-rendering-pixel-dims.sh
 
 echo "pre-commit: lint-no-fakes..."
 bash scripts/lint-no-fakes.sh
-
-echo "pre-commit: lint-icon-completeness..."
-bash scripts/lint-icon-completeness.sh
 
 echo "pre-commit: lint-github-tickets (soft)..."
 bash scripts/lint-github-tickets.sh
