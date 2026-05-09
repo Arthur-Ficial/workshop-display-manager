@@ -37,6 +37,14 @@ public final class DisplaysListVM: ObservableObject {
         /// Display ID this one mirrors, if any. Surfaced as the
         /// "Mirror of 0X" tag in the Inspector HEADER per design briefing.
         public let mirrorSource: UInt32?
+        /// File URL of the desktop wallpaper currently set on this
+        /// display, populated by `reload()` from
+        /// `controller.wallpaper(displayID)`. Powers tile previews
+        /// (sidebar thumbnail, Stage tile background) so each monitor's
+        /// tile in the GUI looks like a miniature of the real screen.
+        /// `nil` for displays without a wallpaper (e.g. virtual /
+        /// AirPlay) — the view falls back to the chassis fill colour.
+        public let wallpaperURL: URL?
         public var isSelected: Bool
 
         public var id: String { remoteID }
@@ -331,6 +339,7 @@ public final class DisplaysListVM: ObservableObject {
                     originY: d.origin.y,
                     brightness: tryBrightness(displayID: d.id),
                     mirrorSource: d.mirrorSource,
+                    wallpaperURL: tryWallpaper(displayID: d.id),
                     isSelected: d.id == displayIDFor(remoteID: selectedRemoteID)
                 )
             }
@@ -339,6 +348,12 @@ public final class DisplaysListVM: ObservableObject {
             lastError = "\(error)"
             tiles = []
         }
+    }
+
+    /// Best-effort wallpaper URL read; nil on any error or display
+    /// without a wallpaper. Honest-unsupported-path per CLAUDE.md.
+    private func tryWallpaper(displayID: UInt32) -> URL? {
+        try? controller.wallpaper(String(displayID))
     }
 
     /// Best-effort brightness read; nil on any error or unsupported display.

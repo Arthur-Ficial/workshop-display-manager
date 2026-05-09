@@ -80,6 +80,19 @@ public final class WDMMacRemoteRunner {
             entries.append((displaysID, entry))
             entries.append((stageID, entry))
         }
+        // Wallpaper URL passive nodes — emitted AFTER the per-tile
+        // click targets so the @e refs remain stable for click tests.
+        // Namespace `displays.wallpaper.<id>` (not `displays.tile.<id>.*`)
+        // keeps the existing `displays.tile.` prefix-filter in
+        // SnapshotE2ETests intact.
+        for tile in tiles {
+            guard let wpURL = tile.wallpaperURL else { continue }
+            entries.append(("displays.wallpaper.\(tile.displayID)", RemoteRegistry.Entry(
+                role: "text", label: "Wallpaper", value: wpURL.path,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+        }
         // VIRTUAL section — `+` CTA + honest-refusal message. The CTA
         // is always present (matches the design briefing's bottom-CTA
         // pattern); clicking it surfaces a concrete refusal message
