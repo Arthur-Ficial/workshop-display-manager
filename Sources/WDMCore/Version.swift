@@ -16,5 +16,5 @@ import Foundation
 /// for git-tag derivation are deferred to a later milestone.
 public enum Version: Sendable {
     /// Marketing version (semver). Updated by `scripts/release.sh`.
-    public static let current: String = "1.0.0"
+    public static let current: String = "2.0.0"
 }
