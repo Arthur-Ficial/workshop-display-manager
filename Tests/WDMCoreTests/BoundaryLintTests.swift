@@ -3,8 +3,7 @@ import Foundation
 
 /// Architectural boundary lint, enforced as a hermetic test so a
 /// bypassed pre-commit hook cannot land a violation. Wraps
-/// `scripts/lint-no-gui-logic.sh` — the same script `make
-/// lint-no-gui-logic` runs.
+/// the lint scripts that `make lint` runs.
 ///
 /// Why this lives in `Tests/WDMCoreTests/`: WDMCore is the bottom of
 /// the layer stack, so its tests run early and fail fast. The lint
@@ -13,14 +12,9 @@ import Foundation
 @Suite("Architectural boundaries")
 struct BoundaryLintTests {
 
-    @Test("GUI modules contain no business-logic extensions on lib types")
-    func noGuiLogic() throws {
-        try Self.runLint(named: "lint-no-gui-logic.sh")
-    }
-
-    @Test("Every CLI verb has a GUI surface or is on the documented allowlist")
-    func guiParity() throws {
-        try Self.runLint(named: "lint-gui-parity.sh")
+    @Test("Retired GUI modules are archived outside the active package")
+    func guiArchived() throws {
+        try Self.runLint(named: "lint-gui-archived.sh")
     }
 
     @Test("Every CLI verb has at least one e2e test under Tests/WDMCLITests")
@@ -69,11 +63,6 @@ struct BoundaryLintTests {
     @Test("No fakes / stub markers in production (NO FAKES pillar)")
     func noFakes() throws {
         try Self.runLint(named: "lint-no-fakes.sh")
-    }
-
-    @Test("Every Apple icon slot present at right dimensions")
-    func iconCompleteness() throws {
-        try Self.runLint(named: "lint-icon-completeness.sh")
     }
 
     private static func runLint(named: String) throws {

@@ -11,7 +11,7 @@ struct VirtualCursorPortalE2ETests {
         let log = try makeLogFile()
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let code = CLIRunner.run(
+        let code = CLITestHarness.run(
             args: [
                 "virtual", "create", "--name", "Phone",
                 "--preset", "iphone-17-pro-max",

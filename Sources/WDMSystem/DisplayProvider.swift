@@ -41,7 +41,7 @@ public protocol DisplayProvider: Sendable {
 
     /// Atomic bulk arrangement: move every entry to its origin in one CG
     /// transaction. Either every move applies or every move reverts. Used by
-    /// drag-to-rearrange GUIs that update many displays per gesture.
+    /// live editors that update many displays per gesture.
     /// Default impl applies sequentially (non-atomic) — adopters can override
     /// for true atomic semantics.
     @discardableResult func setArrangement(

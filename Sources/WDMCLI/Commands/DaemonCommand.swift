@@ -23,12 +23,11 @@ public enum DaemonCommand {
 
     private static func watchAndRestore(args: [String], deps: CLIDeps) throws -> Int32 {
         let max = Args.flagInt(args, name: "--max-events")
-        let auto = AutoProfileStore.resolve(from: deps.profileStore)
         let semaphore = DispatchSemaphore(value: 0)
         let task = Task {
             do {
-                _ = try await WDMController.daemon.watchAndRestore(
-                    stream: deps.eventStream, provider: deps.provider, auto: auto, max: max,
+                _ = try await deps.controller.runAutoProfileDaemon(
+                    stream: deps.eventStream, max: max,
                     onEvent: { applied in
                         if applied {
                             deps.stderr.writeLine("daemon: restored auto profile")

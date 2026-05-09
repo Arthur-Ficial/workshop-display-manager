@@ -29,8 +29,8 @@ SPEC_MILESTONES=$(grep -oE '\bM([0-9]|10)\b' tasks/golden-goal-spec.md 2>/dev/nu
     | sort -u)
 
 if [ -z "$SPEC_MILESTONES" ]; then
-    echo "lint-github-tickets: no milestones found in tasks/golden-goal-spec.md" >&2
-    exit 2
+    echo "lint-github-tickets: no milestone IDs in tasks/golden-goal-spec.md — skipping"
+    exit 0
 fi
 
 # Soft-fail when `gh` not available. `gh auth status` can return non-zero

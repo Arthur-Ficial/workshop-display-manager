@@ -1,9 +1,7 @@
 import Foundation
 
-/// Combinable-toggle math for the GEOMETRY flip row. Pure value-typed
-/// — no I/O, no state. Lives in WDMCore so every frontend (GUI, future
-/// CLI verb, remote-control adapter, MCP server) computes the same
-/// answer. Single source of truth for "click H while V is on → both".
+/// Combinable-toggle math for flip controls. Pure value-typed — no I/O,
+/// no state. Single source of truth for "select H while V is on → both".
 extension Flip {
     /// Combinable toggle: clicking "—" clears all; clicking H toggles
     /// the H bit while preserving V; clicking V toggles V while
@@ -31,7 +29,7 @@ extension Flip {
         }
     }
 
-    /// Per-segment "lit" predicate for the GEOMETRY flip row. `.none`
+    /// Per-segment selected predicate for flip controls. `.none`
     /// lights only when the current flip is `.none`. `.horizontal`
     /// lights for `.horizontal` AND `.both` (because `.both` carries
     /// the H axis). `.vertical` lights for `.vertical` AND `.both`.

@@ -12,11 +12,6 @@ let package = Package(
         .library(name: "WDMCLI", targets: ["WDMCLI"]),
         .library(name: "WDMWeb", targets: ["WDMWeb"]),
         .executable(name: "wdm-web", targets: ["wdm-web"]),
-        .library(name: "WDMRemoteControl", targets: ["WDMRemoteControl"]),
-        .library(name: "WDMMac", targets: ["WDMMac"]),
-        .library(name: "WDMMacRemote", targets: ["WDMMacRemote"]),
-        .executable(name: "wdm-mac", targets: ["wdm-mac"]),
-        .executable(name: "wdm-mac-control", targets: ["wdm-mac-control"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-docc-plugin.git", from: "1.4.6"),
@@ -61,59 +56,6 @@ let package = Package(
             dependencies: ["WDMWeb"],
             path: "Sources/wdm-web"
         ),
-        .target(
-            name: "WDMRemoteControl",
-            dependencies: ["WDMKit"],
-            path: "Sources/WDMRemoteControl"
-        ),
-        .target(
-            name: "WDMMac",
-            dependencies: ["WDMKit"],
-            path: "Sources/WDMMac",
-            exclude: [
-                // Code-signing entitlements consumed by
-                // scripts/bundle-wdm-mac.sh — not a SwiftPM resource.
-                "WDMMac.entitlements"
-            ],
-            resources: [
-                // Bundled web resources for the embedded Stage canvas.
-                // The Stage is the only WebKit-rendered surface in WDMMac;
-                // the rest of the app stays 100% native SwiftUI / AppKit.
-                .copy("Resources/stage")
-            ],
-            swiftSettings: [
-                // Per-target deployment bump: WDMMac uses macOS 26 Liquid Glass
-                // APIs (NSGlassEffectView, .glassEffect, .buttonStyle(.glass)).
-                // Other libs (WDMCore, WDMKit, …) stay at the package's .v13.
-                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
-            ]
-        ),
-        .target(
-            name: "WDMMacRemote",
-            dependencies: ["WDMMac", "WDMRemoteControl"],
-            path: "Sources/WDMMacRemote",
-            swiftSettings: [
-                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
-            ]
-        ),
-        .executableTarget(
-            name: "wdm-mac",
-            dependencies: ["WDMMac", "WDMMacRemote"],
-            path: "Sources/wdm-mac",
-            swiftSettings: [
-                // The binary's LC_BUILD_VERSION must say macOS 26 for the OS
-                // to grant the launched app Liquid Glass chrome treatment.
-                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
-            ]
-        ),
-        .executableTarget(
-            name: "wdm-mac-control",
-            dependencies: ["WDMRemoteControl"],
-            path: "Sources/wdm-mac-control"
-        ),
         .testTarget(
             name: "WDMWebTests",
             dependencies: ["WDMWeb"],
@@ -138,25 +80,6 @@ let package = Package(
             name: "WDMCLITests",
             dependencies: ["WDMCore", "WDMSystem", "WDMCLI"],
             path: "Tests/WDMCLITests"
-        ),
-        .testTarget(
-            name: "WDMRemoteControlTests",
-            dependencies: ["WDMRemoteControl"],
-            path: "Tests/WDMRemoteControlTests"
-        ),
-        .testTarget(
-            name: "WDMMacRemoteTests",
-            dependencies: ["WDMMacRemote", "WDMMac"],
-            path: "Tests/WDMMacRemoteTests",
-            swiftSettings: [
-                // WDMMac is built for macOS 26 — the test target must match.
-                .unsafeFlags(["-target", "arm64-apple-macosx26.0"])
-            ]
-        ),
-        .testTarget(
-            name: "WDMMacE2ETests",
-            dependencies: ["WDMMac", "WDMMacRemote", "WDMRemoteControl"],
-            path: "Tests/WDMMacE2ETests"
         ),
     ]
 )

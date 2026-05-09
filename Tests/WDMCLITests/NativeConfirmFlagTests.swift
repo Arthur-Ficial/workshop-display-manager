@@ -12,7 +12,7 @@ struct NativeConfirmFlagTests {
             "WDM_TEST_FIXTURE": fixture.path,
             "WDM_NATIVE_CONFIRMER_STUB": native,   // "yes" or "no"
         ]
-        let code = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
+        let code = CLITestHarness.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: code, stdout: stdout.contents, stderr: stderr.contents)
     }
 

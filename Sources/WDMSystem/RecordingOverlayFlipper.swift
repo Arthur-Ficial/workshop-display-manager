@@ -11,7 +11,7 @@ public final class RecordingOverlayFlipper: OverlayFlipper, @unchecked Sendable 
     private let lock = NSLock()
     private var stopRequested = false
     /// When non-nil, `run(...)` throws `ProviderError.configurationFailed`
-    /// with this message before recording — used to test the GUI's
+    /// with this message before recording — used to test caller
     /// honest-unsupported-path surfacing of permission denials.
     private let throwMessage: String?
 

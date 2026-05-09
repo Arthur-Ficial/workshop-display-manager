@@ -51,7 +51,7 @@ public enum VirtualCommand {
     }
 
     private static func list(args: [String], deps: CLIDeps) throws -> Int32 {
-        for d in try WDMController.virtual.list(provider: deps.provider) {
+        for d in try deps.controller.virtualDisplays() {
             deps.stdout.writeLine("\(d.id)\t\(d.name ?? "(unnamed)")\t\(d.currentMode.width)x\(d.currentMode.height)@\(d.currentMode.refreshHz)")
         }
         return ExitCodes.success
@@ -64,14 +64,10 @@ public enum VirtualCommand {
         else if pos.count >= 2 { target = pos[1] }
         else { throw WDMError.usage("usage: wdm virtual remove <id|name|--all>") }
 
-        let lookup: (UInt32) -> String? = { id in
-            (try? deps.provider.snapshot())?.display(id: id)?.name
-        }
-        let killed = try WDMController.virtual.remove(
+        let killed = try deps.controller.removeVirtual(
             target: target,
             lister: PgrepProcessLister(),
-            signaler: RealProcessSignaler(),
-            displayLookup: lookup
+            signaler: RealProcessSignaler()
         )
         deps.stderr.writeLine(
             "wdm virtual remove: SIGTERM → pids " +
@@ -207,15 +203,14 @@ public enum VirtualCommand {
     private static func detachMirror(
         mirrorAlias: String, virtualName: String, durationMs: Int?, deps: CLIDeps
     ) throws {
-        let preSnap = try deps.provider.snapshot()
-        let dstID = try DisplayResolver.resolve(mirrorAlias, in: preSnap)
+        let dstID = try deps.controller.get(mirrorAlias).id
         let pipFlipper = deps.pipFlipper
-        let provider = deps.provider
+        let controller = deps.controller
         let testMode = isTestMode(deps: deps)
         let pipDuration = testMode ? 10 : durationMs
         Task.detached(priority: .userInitiated) {
             let srcID = await resolveVirtualID(
-                provider: provider, name: virtualName, testMode: testMode
+                controller: controller, name: virtualName, testMode: testMode
             )
             guard srcID != 0 else { return }
             do {
@@ -234,13 +229,12 @@ public enum VirtualCommand {
     }
 
     private static func resolveVirtualID(
-        provider: DisplayProvider, name: String, testMode: Bool
+        controller: WDMController, name: String, testMode: Bool
     ) async -> UInt32 {
         if testMode { return 1 }
         let deadline = Date(timeIntervalSinceNow: 5.0)
         while Date() < deadline {
-            if let s = try? provider.snapshot(),
-               let m = s.displays.first(where: { $0.name == name }) {
+            if let m = try? controller.virtualDisplays().first(where: { $0.name == name }) {
                 return m.id
             }
             try? await Task.sleep(nanoseconds: 100_000_000)

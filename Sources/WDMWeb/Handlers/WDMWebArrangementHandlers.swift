@@ -3,7 +3,7 @@ import WDMKit
 
 /// `GET /arrangement` returns the live layout (origin + rotation per display);
 /// `POST /arrangement` applies a bulk plan in one safe transaction. Designed
-/// for drag-to-rearrange GUIs and other live editors.
+/// for scripts and live editors.
 public enum WDMWebArrangementHandlers {
     public static func read(_: WDMWebRequest, _: [String: String], deps: WDMWebDeps) -> WDMWebResponse {
         WDMWebHandlerSupport.run {

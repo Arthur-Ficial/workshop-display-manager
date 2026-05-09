@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Hermetic demo of CLAUDE.md's "every GUI interaction reproducible from
-# a pipe" litmus test, applied to drag-to-rearrange. Reads the live
-# arrangement, shifts every display +100px on X via jq, writes it back
-# in a single safe-tx, then verifies the post-state matches and
-# restores the original arrangement.
+# Hermetic Unix-pipe demo. Reads the live arrangement, shifts every display
+# +100px on X via jq, writes it back in a single safe transaction, then verifies
+# the post-state matches.
 #
 #   make demo-arrange-pipe
 #

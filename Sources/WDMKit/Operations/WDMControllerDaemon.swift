@@ -2,6 +2,20 @@ import Foundation
 import WDMSystem
 
 extension WDMController {
+    public func runAutoProfileDaemon(
+        stream: DisplayEventStream,
+        max: Int?,
+        onEvent: ((Bool) -> Void)? = nil
+    ) async throws -> daemon.Outcome {
+        try await daemon.watchAndRestore(
+            stream: stream,
+            provider: provider,
+            auto: AutoProfileStore.resolve(from: profileStore),
+            max: max,
+            onEvent: onEvent
+        )
+    }
+
     public enum daemon {
         public struct Outcome: Equatable, Sendable {
             public let eventsHandled: Int

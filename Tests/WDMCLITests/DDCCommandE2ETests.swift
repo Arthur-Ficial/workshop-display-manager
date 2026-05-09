@@ -54,7 +54,7 @@ struct DDCCommandE2ETests {
         ]
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let exit = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
+        let exit = CLITestHarness.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return (CLIResult(exitCode: exit, stdout: stdout.contents, stderr: stderr.contents), log)
     }
 

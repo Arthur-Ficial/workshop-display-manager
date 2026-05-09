@@ -4,7 +4,7 @@ import WDMKit
 
 /// Tiny HTTP server backed by Apple's Network framework — no third-party deps.
 /// Single connection per request (Connection: close), good enough for local
-/// CLI/GUI/web bridging traffic.
+/// CLI/web bridging traffic.
 public final class WDMWebServer: @unchecked Sendable {
     private let listener: NWListener
     public let port: UInt16

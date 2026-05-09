@@ -27,15 +27,6 @@ Sources/WDMKit/Operations/WDMControllerPrivate.swift:map
 Sources/WDMKit/Operations/WDMFieldValueFactory.swift:fieldValue
 Sources/WDMKit/Profiles/ProfileApplier.swift:apply
 Sources/WDMKit/Safety/NativePopupConfirmer.swift:runOnMain
-Sources/WDMMacRemote/AccessibilityWalker.swift:walk
-Sources/WDMMacRemote/AccessibilityWalker.swift:shortRole
-Sources/WDMMacRemote/MacArgs.swift:parse
-Sources/WDMMacRemote/WDMMacRemoteAdapter.swift:keystroke
-Sources/WDMMacRemote/WDMMacRemoteAdapter.swift:screenshot
-Sources/WDMMacRemote/WDMMacRemoteAdapter.swift:virtualKeyCode
-Sources/WDMRemoteControl/Codec/RemoteActionJSON.swift:decode
-Sources/WDMRemoteControl/HTTP/RemoteResponse.swift:reason
-Sources/WDMRemoteControl/Server/RemoteControlRoutes.swift:dispatch
 Sources/WDMSystem/AXWindowMover.swift:focus
 Sources/WDMSystem/AXWindowMover.swift:tileAcross
 Sources/WDMSystem/AppKitOverlayFlipper.swift:public

@@ -1,10 +1,8 @@
 public enum SaveCommand {
     public static func run(args: [String], deps: CLIDeps) throws -> Int32 {
         if args.contains("--auto") {
-            let snap = try deps.provider.snapshot()
-            let auto = AutoProfileStore.resolve(from: deps.profileStore)
-            try auto.save(snap)
-            deps.stderr.writeLine("saved auto profile (\(snap.displays.count) displays)")
+            let count = try deps.controller.saveAutoProfile()
+            deps.stderr.writeLine("saved auto profile (\(count) displays)")
             return ExitCodes.success
         }
         let positional = Args.positional(args)
