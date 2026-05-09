@@ -410,6 +410,48 @@ public final class DisplaysListVM: ObservableObject {
         Array(activePipTasks.keys).sorted()
     }
 
+    /// Mirror the main display's content onto `targetDisplayID`.
+    /// Workshop facilitator's "show what's on my laptop on the
+    /// projector" gesture. The selected display in the Inspector
+    /// becomes the target, source is always main.
+    /// Same Kit op as `wdm mirror main <target>`. AutoYesConfirmer
+    /// for now; SafeTxVM banner integration arrives in the M11
+    /// retrofit slice.
+    public func mirrorOntoMain(sourceDisplayID: UInt32) {
+        let controller = self.controller
+        let target = String(sourceDisplayID)
+        Task.detached { [weak self] in
+            do {
+                _ = try controller.mirror(source: "main", targets: [target],
+                                          confirmer: AutoYesConfirmer())
+                await MainActor.run {
+                    self?.lastError = nil
+                    self?.reload()
+                }
+            } catch {
+                await MainActor.run { self?.lastError = "Mirror failed: \(error)" }
+            }
+        }
+    }
+
+    /// Stop mirroring on the given display. Same Kit op as
+    /// `wdm unmirror <id>`.
+    public func unmirrorDisplay(displayID: UInt32) {
+        let controller = self.controller
+        let alias = String(displayID)
+        Task.detached { [weak self] in
+            do {
+                _ = try controller.unmirror(alias, confirmer: AutoYesConfirmer())
+                await MainActor.run {
+                    self?.lastError = nil
+                    self?.reload()
+                }
+            } catch {
+                await MainActor.run { self?.lastError = "Unmirror failed: \(error)" }
+            }
+        }
+    }
+
     /// Path of the most-recently-finished recording — used by views to
     /// surface a "saved to …" toast.
     @Published public private(set) var lastRecordingPath: String?

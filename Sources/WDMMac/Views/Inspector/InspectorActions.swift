@@ -41,6 +41,18 @@ public struct InspectorActions: View {
                     vm.changeBackground(displayID: tile.displayID, to: url)
                 }
             }
+            if !tile.isMain {
+                ActionRow(label: "Mirror onto main", symbol: "rectangle.on.rectangle",
+                          remoteID: "inspector.action.mirror") {
+                    vm.mirrorOntoMain(sourceDisplayID: tile.displayID)
+                }
+            }
+            if tile.mirrorSource != nil {
+                ActionRow(label: "Stop mirroring", symbol: "rectangle.slash",
+                          remoteID: "inspector.action.unmirror") {
+                    vm.unmirrorDisplay(displayID: tile.displayID)
+                }
+            }
         }
     }
 

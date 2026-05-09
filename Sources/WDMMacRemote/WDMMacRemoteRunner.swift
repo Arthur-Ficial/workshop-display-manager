@@ -268,6 +268,27 @@ public final class WDMMacRemoteRunner {
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 }
             )))
+            // Mirror — only present for non-main displays. Same Kit op as
+            // `wdm mirror <source> main`.
+            if let selectedTile = tiles.first(where: { $0.remoteID == selected }) ?? tiles.first,
+               !selectedTile.isMain {
+                let srcID = selectedTile.displayID
+                entries.append(("inspector.action.mirror", RemoteRegistry.Entry(
+                    role: "button", label: "Mirror onto main", value: nil,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: mainClick { [vm] in vm.mirrorOntoMain(sourceDisplayID: srcID) }
+                )))
+            }
+            // Unmirror — only present when this display IS mirroring another.
+            if let selectedTile = tiles.first(where: { $0.remoteID == selected }) ?? tiles.first,
+               selectedTile.mirrorSource != nil {
+                let srcID = selectedTile.displayID
+                entries.append(("inspector.action.unmirror", RemoteRegistry.Entry(
+                    role: "button", label: "Stop mirroring", value: nil,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: mainClick { [vm] in vm.unmirrorDisplay(displayID: srcID) }
+                )))
+            }
             // Change background — opens NSOpenPanel in headed mode; in
             // hermetic headless tests, WDM_TEST_WALLPAPER_PATH env var
             // substitutes for the panel so the click can drive the same
