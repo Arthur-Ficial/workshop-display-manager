@@ -59,6 +59,12 @@ public final class DisplaysListVM: ObservableObject {
     private var flipTask: Task<Void, Never>?
     private var flipGeneration: UInt64 = 0
 
+    /// SafeTx banner state. Mutating Kit ops route their `Confirmer`
+    /// through this VM so the user gets the macOS-native equivalent of
+    /// the CLI's "press y in 15s" prompt. Visible to AppFrameView via
+    /// `@ObservedObject`.
+    public let safeTx: SafeTxVM = SafeTxVM()
+
     public init(controller: WDMController, overlayFlipper: OverlayFlipper) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
@@ -135,16 +141,27 @@ public final class DisplaysListVM: ObservableObject {
     }
 
     /// Set the primary (main) display — same Kit op as `wdm main <id>`.
-    /// Surfaces failures via `lastError` per CLAUDE.md "honest
-    /// unsupported-path policy".
+    /// Routes through `safeTx.confirmer`: the change applies, the banner
+    /// appears with a 15s revert countdown, and the controller call
+    /// blocks on a background thread until keep/revert. Surfaces
+    /// failures via `lastError` per CLAUDE.md honest-unsupported-path.
     public func makeMain(displayID: UInt32) {
-        do {
-            _ = try controller.main(String(displayID), confirmer: AutoYesConfirmer())
-            lastError = nil
-        } catch {
-            lastError = "Make main failed: \(error)"
+        let confirmer = safeTx.confirmer
+        let controller = self.controller
+        let id = String(displayID)
+        Task.detached { [weak self] in
+            let outcome: String?
+            do {
+                _ = try controller.main(id, confirmer: confirmer)
+                outcome = nil
+            } catch {
+                outcome = "Make main failed: \(error)"
+            }
+            await MainActor.run {
+                self?.lastError = outcome
+                self?.reload()
+            }
         }
-        reload()
     }
 
     /// Honest refusal for Inspector actions whose GUI wiring is on the

@@ -19,22 +19,45 @@ public final class WDMMacRemoteRunner {
     public init(registry: RemoteRegistry, vm: DisplaysListVM) {
         self.registry = registry
         self.vm = vm
-        // Tiles, selection, profiles, virtual-refusal-message OR last error
-        // changing must restamp the registry.
+        // Original wiring — preserves the combineLatest timing the existing
+        // headless tests depend on.
         vm.$tiles.combineLatest(vm.$selectedRemoteID, vm.$profiles)
             .combineLatest(vm.$virtualUnavailableMessage, vm.$lastError)
             .sink { [weak self] triple, virtualMsg, lastError in
                 let (tiles, selected, profiles) = triple
                 self?.sync(tiles: tiles, selected: selected, profiles: profiles,
                            virtualUnavailableMessage: virtualMsg,
-                           lastError: lastError)
+                           lastError: lastError,
+                           safeTxVisible: self?.vm.safeTx.visible ?? false,
+                           safeTxMessage: self?.vm.safeTx.message ?? "",
+                           safeTxSecondsRemaining: self?.vm.safeTx.secondsRemaining ?? 0)
+            }
+            .store(in: &cancellables)
+        // SafeTx banner state restamps separately. The banner only appears
+        // mid-mutation (after the user clicks a destructive action and
+        // before the keep/revert decision), so it's a low-frequency signal
+        // and the duplicate-restamp cost is negligible.
+        vm.safeTx.$visible.combineLatest(vm.safeTx.$message, vm.safeTx.$secondsRemaining)
+            .dropFirst()  // skip initial-value emit; main pipeline already restamped
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.sync(tiles: self.vm.tiles, selected: self.vm.selectedRemoteID,
+                          profiles: self.vm.profiles,
+                          virtualUnavailableMessage: self.vm.virtualUnavailableMessage,
+                          lastError: self.vm.lastError,
+                          safeTxVisible: self.vm.safeTx.visible,
+                          safeTxMessage: self.vm.safeTx.message,
+                          safeTxSecondsRemaining: self.vm.safeTx.secondsRemaining)
             }
             .store(in: &cancellables)
     }
 
     private func sync(tiles: [DisplaysListVM.Tile], selected: String?, profiles: [String],
                       virtualUnavailableMessage: String?,
-                      lastError: String?) {
+                      lastError: String?,
+                      safeTxVisible: Bool = false,
+                      safeTxMessage: String = "",
+                      safeTxSecondsRemaining: Int = 0) {
         let vm = self.vm
         var entries: [(String, RemoteRegistry.Entry)] = []
         for tile in tiles {
@@ -264,6 +287,35 @@ public final class WDMMacRemoteRunner {
                 role: "button", label: "Delete \(name)", value: nil,
                 state: NodeState(selected: false, enabled: true),
                 onClick: deleteClick
+            )))
+        }
+        // SAFETX banner — only present while a Kit op awaits keep/revert.
+        // Adds 4 entries: passive (countdown + banner) and clickable
+        // (keep + revert). All routed to vm.safeTx.{keep,revert}.
+        if safeTxVisible {
+            let safeTx = vm.safeTx
+            let labelText = safeTxMessage.isEmpty ? "Display change applied" : safeTxMessage
+            entries.append(("safetx.banner", RemoteRegistry.Entry(
+                role: "panel", label: "Safe-tx confirmation banner",
+                value: labelText,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+            entries.append(("safetx.banner.countdown", RemoteRegistry.Entry(
+                role: "text", label: "Reverting in",
+                value: "\(safeTxSecondsRemaining)s",
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+            entries.append(("safetx.banner.keep", RemoteRegistry.Entry(
+                role: "button", label: "Keep", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { safeTx.keep() }
+            )))
+            entries.append(("safetx.banner.revert", RemoteRegistry.Entry(
+                role: "button", label: "Revert", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { safeTx.revert() }
             )))
         }
         registry.replace(entries: entries)
