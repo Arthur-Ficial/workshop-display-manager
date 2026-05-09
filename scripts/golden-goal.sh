@@ -51,7 +51,7 @@ fi
 # 2. swift-test
 if [ "${WDM_GOLDEN_GOAL_SKIP_HEAVY:-}" = "1" ]; then
     pass "2. swift-test (skipped — caller asserted)"
-elif swift test --parallel >/tmp/golden-goal-test.log 2>&1; then
+elif swift test --no-parallel >/tmp/golden-goal-test.log 2>&1; then
     TEST_COUNT=$(grep -oE 'Test run with [0-9]+ tests' /tmp/golden-goal-test.log | tail -1 | grep -oE '[0-9]+' || echo "?")
     pass "2. swift-test (${TEST_COUNT} tests)"
 else
