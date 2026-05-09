@@ -104,11 +104,13 @@ if ! spctl -a -t exec -vv "$APP" 2>&1 | grep -q "Notarized Developer ID"; then
     fi
 fi
 
-# Step 8 — distribution zip (if not already made for notarization).
+# Step 8 — distribution zip. Always rebuild AFTER stapling so the
+# distributed bundle ships with the offline-launch ticket. The earlier
+# zip in step 5 was for notarytool submission only and predates the
+# staple; ditto below replaces it with the stapled artifact.
 DIST_ZIP="$ROOT/.build/release/WDMMac-${VERSION}.zip"
-if [ ! -e "$DIST_ZIP" ]; then
-    (cd "$ROOT/.build/release" && /usr/bin/ditto -c -k --sequesterRsrc --keepParent WDMMac.app "$DIST_ZIP")
-fi
+rm -f "$DIST_ZIP"
+(cd "$ROOT/.build/release" && /usr/bin/ditto -c -k --sequesterRsrc --keepParent WDMMac.app "$DIST_ZIP")
 
 # Step 9 — tag + push.
 if [ "${WDM_RELEASE_TAG:-}" = "1" ]; then
