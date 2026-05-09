@@ -11,15 +11,18 @@ public struct WDMMacAppDeps {
     public let controller: WDMController
     public let overlayFlipper: OverlayFlipper
     public let virtualDisplayManagerFactory: @Sendable () -> VirtualDisplayManager
+    public let pipFlipperFactory: @Sendable () -> PipFlipper
     public let appearance: AppearanceStore
     public let env: [String: String]
 
     public init(controller: WDMController, overlayFlipper: OverlayFlipper,
                 virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager,
+                pipFlipperFactory: @escaping @Sendable () -> PipFlipper,
                 appearance: AppearanceStore, env: [String: String]) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
         self.virtualDisplayManagerFactory = virtualDisplayManagerFactory
+        self.pipFlipperFactory = pipFlipperFactory
         self.appearance = appearance
         self.env = env
     }
@@ -33,9 +36,22 @@ public struct WDMMacAppDeps {
             controller: WDMController(provider: provider, profileStore: profileStore, env: env),
             overlayFlipper: makeOverlayFlipper(env: env),
             virtualDisplayManagerFactory: makeVirtualFactory(env: env),
+            pipFlipperFactory: makePipFactory(env: env),
             appearance: AppearanceStore(),
             env: env
         )
+    }
+
+    /// Honour WDM_TEST_PIP_LOG so hermetic tests get a recording PIP
+    /// flipper; real runs get the AppKit ScreenCaptureKit-backed one.
+    private static func makePipFactory(env: [String: String]) -> @Sendable () -> PipFlipper {
+        let path = env["WDM_TEST_PIP_LOG"]
+        return {
+            if let p = path, !p.isEmpty {
+                return RecordingPipFlipper(url: URL(fileURLWithPath: p))
+            }
+            return AppKitPipFlipper()
+        }
     }
 
     /// Honour WDM_TEST_OVERLAY_LOG so hermetic tests get a recording

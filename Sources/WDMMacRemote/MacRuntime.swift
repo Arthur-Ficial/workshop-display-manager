@@ -25,7 +25,8 @@ public struct MacRuntime {
         let vm = DisplaysListVM(
             controller: deps.controller,
             overlayFlipper: deps.overlayFlipper,
-            virtualDisplayManagerFactory: deps.virtualDisplayManagerFactory
+            virtualDisplayManagerFactory: deps.virtualDisplayManagerFactory,
+            pipFlipperFactory: deps.pipFlipperFactory
         )
         vm.reload()
         vm.reloadProfiles()

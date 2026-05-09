@@ -244,8 +244,7 @@ public final class WDMMacRemoteRunner {
                 role: "button", label: "Open PiP window", value: nil,
                 state: NodeState(selected: false, enabled: true),
                 onClick: mainClick { [vm] in
-                    vm.refuseAction(named: "PiP window",
-                                    cliEquivalent: "wdm pip \(displayID)")
+                    vm.openPiP(sourceDisplayID: displayID)
                 }
             )))
             entries.append(("inspector.action.record", RemoteRegistry.Entry(

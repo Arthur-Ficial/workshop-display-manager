@@ -63,6 +63,7 @@ public final class DisplaysListVM: ObservableObject {
     private let controller: WDMController
     private let overlayFlipper: OverlayFlipper
     private let virtualManagerFactory: @Sendable () -> VirtualDisplayManager
+    private let pipFlipperFactory: @Sendable () -> PipFlipper
     private var observer: Task<Void, Never>?
     private var profilePoller: Task<Void, Never>?
     private var flipTask: Task<Void, Never>?
@@ -72,6 +73,11 @@ public final class DisplaysListVM: ObservableObject {
     /// manager it's running on — `removeVirtualDisplay(named:)` calls
     /// `manager.stop()` to unblock the Task and tear the display down.
     private var activeVirtualTasks: [String: (task: Task<Void, Never>, manager: VirtualDisplayManager)] = [:]
+    /// Active PiP windows keyed by source displayID. Each entry holds
+    /// the Task running `controller.pip(plan:using:)` and the flipper
+    /// it's running on — `closePiP(sourceDisplayID:)` calls
+    /// `flipper.stop()` to unblock the Task and tear the window down.
+    private var activePipTasks: [UInt32: (task: Task<Void, Never>, flipper: PipFlipper)] = [:]
 
     /// SafeTx banner state. Mutating Kit ops route their `Confirmer`
     /// through this VM so the user gets the macOS-native equivalent of
@@ -80,10 +86,12 @@ public final class DisplaysListVM: ObservableObject {
     public let safeTx: SafeTxVM = SafeTxVM()
 
     public init(controller: WDMController, overlayFlipper: OverlayFlipper,
-                virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager) {
+                virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager,
+                pipFlipperFactory: @escaping @Sendable () -> PipFlipper) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
         self.virtualManagerFactory = virtualDisplayManagerFactory
+        self.pipFlipperFactory = pipFlipperFactory
     }
 
     deinit {
@@ -358,6 +366,42 @@ public final class DisplaysListVM: ObservableObject {
     /// remote registry to expose remove buttons per virtual.
     public func activeVirtualNames() -> [String] {
         Array(activeVirtualTasks.keys).sorted()
+    }
+
+    /// Open a Picture-in-Picture window mirroring `sourceDisplayID`
+    /// onto the main display. Same Kit op as `wdm pip <id>`. Errors
+    /// surface in `lastError`; the window closes when
+    /// `closePiP(sourceDisplayID:)` is invoked or the Task is cancelled.
+    public func openPiP(sourceDisplayID: UInt32) {
+        if activePipTasks[sourceDisplayID] != nil { return }
+        let flipper = pipFlipperFactory()
+        let plan = WDMController.PipPlan(
+            sourceAlias: String(sourceDisplayID),
+            destinationAlias: nil,
+            durationMs: nil
+        )
+        let controller = self.controller
+        let task = Task.detached { [weak self] in
+            do {
+                try controller.pip(plan: plan, using: flipper)
+            } catch {
+                await MainActor.run { self?.lastError = "PiP failed: \(error)" }
+            }
+        }
+        activePipTasks[sourceDisplayID] = (task, flipper)
+        lastError = nil
+    }
+
+    /// Close the PiP window sourced from `sourceDisplayID`. Idempotent.
+    public func closePiP(sourceDisplayID: UInt32) {
+        guard let entry = activePipTasks.removeValue(forKey: sourceDisplayID) else { return }
+        entry.flipper.stop()
+        entry.task.cancel()
+    }
+
+    /// Snapshot of currently-active PiP source IDs — for the registry.
+    public func activePipSourceIDs() -> [UInt32] {
+        Array(activePipTasks.keys).sorted()
     }
 
     /// Save the current arrangement as a new profile. The GUI has no text
