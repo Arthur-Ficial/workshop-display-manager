@@ -17,9 +17,11 @@ public struct SidebarDisplayRow: View {
     public var body: some View {
         Button { onSelect(tile.remoteID) } label: {
             HStack(spacing: 10) {
-                Image(systemName: tile.isMain ? "laptopcomputer" : "display")
-                    .font(.system(size: 14))
-                    .foregroundStyle(isSelected ? .green : .secondary)
+                WallpaperThumbnail(
+                    url: tile.wallpaperURL,
+                    kind: tile.isMain ? .laptop : .monitor,
+                    isMain: tile.isMain
+                )
                 VStack(alignment: .leading, spacing: 1) {
                     Text(tile.title).font(.system(size: 13, weight: .medium))
                         .lineLimit(1)
