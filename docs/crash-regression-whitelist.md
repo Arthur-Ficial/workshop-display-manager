@@ -7,8 +7,8 @@
 The following `setActivationPolicy(.accessory)` calls have been individually reviewed and confirmed scoped (each restores the original policy in a `defer` or `teardown` block). The lint reads only the backtick-quoted `<path>:<line>` tokens below:
 
 - `Sources/WDMSystem/NativeStreamer.swift:60` — recording session; restored at session end.
-- `Sources/WDMSystem/CGVirtualDisplayManager.swift:122` — virtual-display CLI command holds the activation policy for the duration of the run loop; restored on stop().
-- `Sources/WDMSystem/CGVirtualDisplayManager.swift:127` — same flow.
+- `Sources/WDMSystem/CGVirtualDisplayManager.swift:121` — virtual-display CLI command holds the activation policy for the duration of the run loop; restored on stop().
+- `Sources/WDMSystem/CGVirtualDisplayManager.swift:126` — same flow.
 - `Sources/WDMKit/Safety/NativePopupConfirmer.swift:40` — popup confirmer; restored when the popup closes.
 
 ## SIG_IGN handlers — temporary

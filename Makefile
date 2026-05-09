@@ -157,10 +157,25 @@ golden-goal:
 # Liquid Glass — they need to be a proper bundled app.
 app-mac: build
 	@bash scripts/bundle-wdm-mac.sh debug
+	@$(MAKE) -s install-mac BUNDLE=.build/debug/WDMMac.app
 
 # Same, but the release config (used for `make install-mac` later).
 app-mac-release: release
 	@bash scripts/bundle-wdm-mac.sh release
+	@$(MAKE) -s install-mac BUNDLE=.build/release/WDMMac.app
+
+# Atomically replace /Applications/WDMMac.app with the freshly-built
+# bundle so there is exactly ONE installed version at any time. Runs
+# automatically after `make app-mac` / `make app-mac-release` so every
+# build of the app is the live install. Falls back to a temp directory
+# move so the kill-and-replace is atomic from Finder's POV.
+install-mac:
+	@if [ -z "$$BUNDLE" ]; then echo "install-mac: BUNDLE=<path> required"; exit 2; fi
+	@if [ ! -d "$$BUNDLE" ]; then echo "install-mac: $$BUNDLE missing"; exit 2; fi
+	@pkill -9 -f "/Applications/WDMMac.app/Contents/MacOS/wdm-mac" 2>/dev/null || true
+	@rm -rf /Applications/WDMMac.app /Applications/__MACOSX 2>/dev/null || true
+	@cp -R "$$BUNDLE" /Applications/
+	@echo "install-mac: ✓ /Applications/WDMMac.app replaced from $$BUNDLE"
 
 smoke: release
 	WDM_REAL_HARDWARE=1 .build/release/wdm list

@@ -80,22 +80,21 @@ public final class CGVirtualDisplayManager: VirtualDisplayManager, @unchecked Se
             )
         }
         self.display = display
+        // Cursor edge portal needs Accessibility + Input Monitoring TCC grants.
+        // Without them the virtual display still works; only pointer-edge-warp
+        // is disabled. Honest fallback per CLAUDE.md, not a fake success.
         let portal = VirtualCursorPortal(displayID: display.displayID)
         do {
             try portal.start()
+            self.cursorPortal = portal
+            let warper = VirtualCursorEdgeWarper(displayID: display.displayID)
+            warper.start()
+            self.cursorWarper = warper
         } catch {
-            self.display = nil
-            throw error
+            FileHandle.standardError.write(Data(
+                "wdm-virtual: cursor edge portal unavailable (\(error)); virtual display will work but pointer-edge-warp is disabled until Accessibility + Input Monitoring are granted in System Settings → Privacy & Security.\n".utf8
+            ))
         }
-        self.cursorPortal = portal
-        // Polling fallback: WindowServer clamps the cursor at active-display
-        // edges before the event tap sees the over-edge delta, so the portal
-        // alone isn't enough to make a real mouse drag cross into the virtual.
-        // This 60Hz watcher detects the "stuck at edge for ≥3 samples" pattern
-        // and warps across.
-        let warper = VirtualCursorEdgeWarper(displayID: display.displayID)
-        warper.start()
-        self.cursorWarper = warper
 
         if let ms = durationMs {
             let deadline = Date(timeIntervalSinceNow: TimeInterval(ms) / 1000.0)

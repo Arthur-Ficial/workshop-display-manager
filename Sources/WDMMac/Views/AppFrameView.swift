@@ -18,7 +18,11 @@ import SwiftUI
 public struct AppFrameView: View {
     @ObservedObject var vm: DisplaysListVM
     let onSelect: (String) -> Void
-    @State private var tab: AppTab = .stage
+    /// Active tab — bound to vm.selectedTab so headless registry
+    /// `titlebar.tab.*` clicks route through `vm.selectTab(_:)`.
+    private var tab: AppTab {
+        AppTab(rawValue: vm.selectedTab) ?? .stage
+    }
 
     public init(vm: DisplaysListVM, onSelect: @escaping (String) -> Void) {
         self.vm = vm
@@ -36,14 +40,19 @@ public struct AppFrameView: View {
                 .fill(Color.secondary.opacity(0.40))
                 .frame(height: 1)
 
-            TitleBarView(vm: vm, tab: $tab)
+            TitleBarView(vm: vm)
             Divider().opacity(0.25)
 
             HStack(spacing: 0) {
                 SidebarView(vm: vm, onSelect: onSelect)
                 Divider().opacity(0.20)
-                StageView(vm: vm, onSelect: onSelect)
-                    .padding(14)
+                Group {
+                    switch tab {
+                    case .stage: StageView(vm: vm, onSelect: onSelect).padding(14)
+                    case .profiles: ProfilesPaneView(vm: vm)
+                    case .recordings: RecordingsPaneView(vm: vm)
+                    }
+                }
                 Divider().opacity(0.20)
                 InspectorView(vm: vm)
             }

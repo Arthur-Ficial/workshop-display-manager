@@ -21,9 +21,9 @@ public struct StatusBarView: View {
 
             countPill(value: vm.tiles.count, label: "real")
                 .accessibilityIdentifier("statusbar.count.real")
-            countPill(value: 0, label: "virtual")
+            countPill(value: vm.activeVirtualNames().count, label: "virtual")
                 .accessibilityIdentifier("statusbar.count.virtual")
-            countPill(value: 0, label: "pip")
+            countPill(value: vm.activePipSourceIDs().count, label: "pip")
                 .accessibilityIdentifier("statusbar.count.pip")
 
             Spacer()
@@ -49,9 +49,11 @@ public struct StatusBarView: View {
 
             Spacer()
 
-            toggle("Watch", "eye")
+            toggle("Watch", "eye") { vm.toggleWatch() }
                 .accessibilityIdentifier("statusbar.toggle.watch")
-            toggle("Advanced", "slider.horizontal.3")
+            toggle("Advanced", "slider.horizontal.3") {
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
                 .accessibilityIdentifier("statusbar.toggle.advanced")
         }
         .padding(.horizontal, 14).padding(.vertical, 6)
@@ -72,8 +74,8 @@ public struct StatusBarView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func toggle(_ label: String, _ symbol: String) -> some View {
-        Button {} label: {
+    private func toggle(_ label: String, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: symbol).font(.system(size: 10))
                 Text(label).font(.system(size: 11, weight: .medium))
@@ -86,6 +88,12 @@ public struct StatusBarView: View {
     }
 
     private var lastEvent: String {
+        if let path = vm.lastRecordingPath {
+            return "saved \((path as NSString).lastPathComponent)"
+        }
+        if vm.watchOverlayEnabled {
+            return "watching display events"
+        }
         if let main = vm.tiles.first(where: \.isMain) {
             return "\(main.title) is main"
         }

@@ -50,6 +50,25 @@ public final class WDMMacRemoteRunner {
                           safeTxSecondsRemaining: self.vm.safeTx.secondsRemaining)
             }
             .store(in: &cancellables)
+        // Tab changes restamp too. `@Published`'s publisher fires in
+        // willSet — synchronously reading vm.selectedTab inside the
+        // sink would see the OLD value. Defer to the next runloop
+        // tick so the setter has completed before we re-stamp.
+        vm.$selectedTab
+            .dropFirst()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.sync(tiles: self.vm.tiles, selected: self.vm.selectedRemoteID,
+                              profiles: self.vm.profiles,
+                              virtualUnavailableMessage: self.vm.virtualUnavailableMessage,
+                              lastError: self.vm.lastError,
+                              safeTxVisible: self.vm.safeTx.visible,
+                              safeTxMessage: self.vm.safeTx.message,
+                              safeTxSecondsRemaining: self.vm.safeTx.secondsRemaining)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func sync(tiles: [DisplaysListVM.Tile], selected: String?, profiles: [String],
@@ -351,6 +370,71 @@ public final class WDMMacRemoteRunner {
                 state: NodeState(selected: false, enabled: true),
                 onClick: deleteClick
             )))
+        }
+        // Title bar tabs — switch the center pane between Stage,
+        // Profiles, and Recordings. Headless registry exposes them so
+        // AI agents can drive the same tab strip a local human clicks.
+        for tabName in ["stage", "profiles", "recordings"] {
+            let label: String = {
+                switch tabName {
+                case "stage": return "Stage"
+                case "profiles": return "Profiles"
+                case "recordings": return "Recordings"
+                default: return tabName
+                }
+            }()
+            entries.append(("titlebar.tab.\(tabName)", RemoteRegistry.Entry(
+                role: "button", label: label, value: nil,
+                state: NodeState(selected: vm.selectedTab == tabName, enabled: true),
+                onClick: mainClick { [vm] in vm.selectTab(tabName) }
+            )))
+        }
+        // PROFILES pane — emitted when the Profiles tab is active.
+        // Mirrors the SwiftUI ProfilesPaneView: pane container, save
+        // button, per-profile apply + delete rows.
+        if vm.selectedTab == "profiles" {
+            entries.append(("profiles.pane", RemoteRegistry.Entry(
+                role: "panel", label: "Saved arrangements", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+            entries.append(("profiles.pane.save", RemoteRegistry.Entry(
+                role: "button", label: "Save current as…", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { [vm] in vm.saveCurrentAsProfile() }
+            )))
+            for name in profiles {
+                let n = name
+                entries.append(("profiles.pane.row.\(n).apply", RemoteRegistry.Entry(
+                    role: "button", label: "Apply \(n)", value: nil,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: mainClick { [vm] in vm.restoreProfile(named: n) }
+                )))
+                entries.append(("profiles.pane.row.\(n).delete", RemoteRegistry.Entry(
+                    role: "button", label: "Delete \(n)", value: nil,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: mainClick { [vm] in vm.removeProfile(named: n) }
+                )))
+            }
+        }
+        // RECORDINGS pane — emitted when the Recordings tab is active.
+        if vm.selectedTab == "recordings" {
+            entries.append(("recordings.pane", RemoteRegistry.Entry(
+                role: "panel", label: "Recordings", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: nil
+            )))
+            if let path = vm.lastRecordingPath {
+                let p = path
+                entries.append(("recordings.pane.row.reveal", RemoteRegistry.Entry(
+                    role: "button", label: "Reveal in Finder",
+                    value: p,
+                    state: NodeState(selected: false, enabled: true),
+                    onClick: mainClick {
+                        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: p)])
+                    }
+                )))
+            }
         }
         // SAFETX banner — only present while a Kit op awaits keep/revert.
         // Adds 4 entries: passive (countdown + banner) and clickable

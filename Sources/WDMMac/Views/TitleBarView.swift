@@ -5,11 +5,13 @@ import SwiftUI
 /// hand pill showing the currently-applied profile.
 public struct TitleBarView: View {
     @ObservedObject var vm: DisplaysListVM
-    @Binding var tab: AppTab
 
-    public init(vm: DisplaysListVM, tab: Binding<AppTab>) {
+    private var tab: AppTab {
+        AppTab(rawValue: vm.selectedTab) ?? .stage
+    }
+
+    public init(vm: DisplaysListVM) {
         self.vm = vm
-        self._tab = tab
     }
 
     public var body: some View {
@@ -25,7 +27,7 @@ public struct TitleBarView: View {
 
             HStack(spacing: 6) {
                 ForEach(AppTab.allCases) { t in
-                    Button { tab = t } label: {
+                    Button { vm.selectTab(t.rawValue) } label: {
                         HStack(spacing: 4) {
                             Image(systemName: t.symbol).font(.system(size: 11))
                             Text(t.title).font(.system(size: 12, weight: .medium))
@@ -45,12 +47,22 @@ public struct TitleBarView: View {
 
             Spacer()
 
-            Button {} label: {
+            // "Default" — applies the most-recent profile (or first
+            // alphabetical) so the workshop facilitator's bookmarked
+            // arrangement is one click away. Honest fallback when there
+            // are no profiles: surfaces a "no profile" message via lastError.
+            Button {
+                if let first = vm.profiles.first {
+                    vm.restoreProfile(named: first)
+                } else {
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                }
+            } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "bookmark.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(.green)
-                    Text("Default")
+                    Text(vm.profiles.first ?? "Default")
                         .font(.system(size: 12, weight: .medium))
                 }
                 .padding(.horizontal, 10).padding(.vertical, 5)

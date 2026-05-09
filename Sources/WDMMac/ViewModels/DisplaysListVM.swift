@@ -456,6 +456,52 @@ public final class DisplaysListVM: ObservableObject {
     /// surface a "saved to …" toast.
     @Published public private(set) var lastRecordingPath: String?
 
+    /// Whether the Watch overlay (live display-reconfiguration log) is
+    /// enabled. Toggled from the status bar's Watch button. Mirrors the
+    /// CLI's `wdm watch` event stream into a small log panel.
+    @Published public private(set) var watchOverlayEnabled: Bool = false
+
+    /// Currently-selected center-pane tab. Persisted on the VM (not
+    /// AppFrameView's @State) so the headless registry can drive
+    /// titlebar.tab.* clicks and the SwiftUI tree picks up the change.
+    @Published public var selectedTab: String = "stage"
+
+    /// Set the active tab. Headless registry click handlers route here.
+    public func selectTab(_ tab: String) {
+        selectedTab = tab
+    }
+
+    /// Toggle the Watch overlay. Idempotent — re-clicking flips state.
+    public func toggleWatch() {
+        watchOverlayEnabled.toggle()
+    }
+
+    /// All modes the controller reports for `displayID`. Best-effort —
+    /// nil/empty on any error or unsupported display. Used by the
+    /// Inspector Mode picker to populate its dropdown.
+    public func availableModes(displayID: UInt32) -> [Mode] {
+        (try? controller.modes(String(displayID))) ?? []
+    }
+
+    /// Apply a mode change via Task.detached + safeTx.confirmer so the
+    /// banner appears for 15s revert. Same Kit op as `wdm mode <id> WxH@Hz`.
+    public func setMode(displayID: UInt32, mode: Mode) {
+        let confirmer = safeTx.confirmer
+        let controller = self.controller
+        let id = String(displayID)
+        Task.detached { [weak self] in
+            do {
+                _ = try controller.mode(id, mode: mode, confirmer: confirmer)
+                await MainActor.run {
+                    self?.lastError = nil
+                    self?.reload()
+                }
+            } catch {
+                await MainActor.run { self?.lastError = "Mode change failed: \(error)" }
+            }
+        }
+    }
+
     /// Start a screen recording of `displayID` for `durationSec` seconds.
     /// Output goes to `~/Movies/wdm-display-<id>-<unix>.mov`. Same Kit
     /// surface the CLI's `wdm record <id> --out <path> --duration N`

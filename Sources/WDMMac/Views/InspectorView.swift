@@ -14,7 +14,7 @@ public struct InspectorView: View {
                 if let tile = vm.selectedTile() {
                     InspectorHeader(tile: tile, allTiles: vm.tiles)
                     SectionLabel("MODE")
-                    InspectorMode(tile: tile)
+                    InspectorMode(vm: vm, tile: tile)
                     SectionLabel("IDENTITY")
                     InspectorIdentity(tile: tile)
                     SectionLabel("GEOMETRY")
