@@ -30,6 +30,30 @@ struct WDMControllerWallpaperTests {
         #expect(byID?.path == byAlias?.path)
     }
 
+    @Test("setWallpaper applies and persists when confirmer keeps")
+    func setWallpaperKeeps() throws {
+        let env = try makeEnvWithFixture(json: #"{"1":"/tmp/old.jpg"}"#)
+        let controller = try makeController(env: env)
+        let result = try controller.setWallpaper(
+            "1", url: URL(fileURLWithPath: "/tmp/new.jpg"),
+            confirmer: AutoYesConfirmer()
+        )
+        #expect(result == .applied)
+        #expect(try controller.wallpaper("1")?.path == "/tmp/new.jpg")
+    }
+
+    @Test("setWallpaper reverts to previous URL when confirmer rejects")
+    func setWallpaperReverts() throws {
+        let env = try makeEnvWithFixture(json: #"{"1":"/tmp/old.jpg"}"#)
+        let controller = try makeController(env: env)
+        let result = try controller.setWallpaper(
+            "1", url: URL(fileURLWithPath: "/tmp/new.jpg"),
+            confirmer: AutoNoConfirmer()
+        )
+        #expect(result == .reverted)
+        #expect(try controller.wallpaper("1")?.path == "/tmp/old.jpg")
+    }
+
     private func makeEnvWithFixture(json: String) throws -> [String: String] {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("wdm-wp-kit-\(UUID().uuidString)")

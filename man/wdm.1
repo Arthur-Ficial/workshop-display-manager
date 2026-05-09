@@ -73,6 +73,13 @@ Print the file URL of the desktop wallpaper currently set on the
 given display. Empty stdout (exit 0) when no wallpaper is set.
 With \fB\-\-json\fR, wraps the path in \fI{"wallpaper": "<path>"}\fR.
 .TP
+.B wallpaper set <id|main> <path> [\-\-no\-confirm|\-\-confirm]
+Set the desktop wallpaper of \fI<id>\fR to the file at
+\fI<path>\fR. Routes through SafeMutation: applies the new
+wallpaper, asks for confirmation, restores the previous URL on
+revert / timeout. Use \fB\-\-no\-confirm\fR for unattended
+scripts.
+.TP
 .B save <name>
 Snapshot the current display configuration to ~/.config/wdm/profiles/<name>.json.
 .TP

@@ -50,4 +50,28 @@ struct WallpaperProviderTests {
         let prov = WallpaperProviderFactory.make(env: ["WDM_TEST_WALLPAPER": "/no/such/file.json"])
         #expect(prov.wallpaper(for: 1) == nil)
     }
+
+    @Test("RecordingWallpaperProvider.setWallpaper round-trips in memory")
+    func setWallpaperInMemory() throws {
+        let prov = RecordingWallpaperProvider(mappings: [:])
+        let url = URL(fileURLWithPath: "/tmp/new.jpg")
+        try prov.setWallpaper(for: 1, url: url)
+        #expect(prov.wallpaper(for: 1) == url)
+    }
+
+    @Test("RecordingWallpaperProvider.setWallpaper writes the fixture file when seeded from disk")
+    func setWallpaperWritesFixture() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-wp-set-\(UUID())")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let path = dir.appendingPathComponent("fixture.json")
+        try "{}".write(to: path, atomically: true, encoding: .utf8)
+
+        let prov = try RecordingWallpaperProvider(fixtureURL: path)
+        try prov.setWallpaper(for: 2, url: URL(fileURLWithPath: "/tmp/new.jpg"))
+
+        let bytes = try Data(contentsOf: path)
+        let dict = (try JSONSerialization.jsonObject(with: bytes) as? [String: String]) ?? [:]
+        #expect(dict["2"] == "/tmp/new.jpg")
+    }
 }

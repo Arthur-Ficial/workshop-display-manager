@@ -26,6 +26,8 @@ public enum HelpText {
                                           --remote forwards mouse+keys to source (AX)
       brightness <id> [0.0..1.0]          read or set brightness (built-in)
       wallpaper <id|main> [--json]        path of the current desktop wallpaper
+      wallpaper set <id|main> <path> [--no-confirm|--confirm]
+                                          set the desktop wallpaper of <id>
       save <name>                         snapshot to ~/.config/wdm/profiles/<name>.json
       restore <name> [--no-confirm]       apply named profile
       profiles [--json]                   list saved profiles

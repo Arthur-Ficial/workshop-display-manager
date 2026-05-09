@@ -66,4 +66,32 @@ struct WallpaperCommandE2ETests {
         let r = CLITestHarness.run(["wallpaper"], fixture: displayFx)
         #expect(r.exitCode == 2)
     }
+
+    @Test("wallpaper set <id> <path> --no-confirm applies and persists")
+    func setApplies() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("wdm-wp-cli-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let wpFixture = dir.appendingPathComponent("wallpapers.json")
+        try #"{"1":"/tmp/old.jpg"}"#.write(to: wpFixture, atomically: true, encoding: .utf8)
+
+        let displayFx = try CLITestHarness.makeFixture()
+        let r = CLITestHarness.run(
+            ["wallpaper", "set", "1", "/tmp/new.jpg", "--no-confirm"],
+            fixture: displayFx,
+            extraEnv: ["WDM_TEST_WALLPAPER": wpFixture.path]
+        )
+        #expect(r.exitCode == 0)
+
+        let bytes = try Data(contentsOf: wpFixture)
+        let dict = (try JSONSerialization.jsonObject(with: bytes) as? [String: String]) ?? [:]
+        #expect(dict["1"] == "/tmp/new.jpg")
+    }
+
+    @Test("wallpaper set without enough args exits 2 (usage error)")
+    func setUsageError() throws {
+        let displayFx = try CLITestHarness.makeFixture()
+        let r = CLITestHarness.run(["wallpaper", "set", "1"], fixture: displayFx)
+        #expect(r.exitCode == 2)
+    }
 }

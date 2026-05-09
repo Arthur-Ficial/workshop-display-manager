@@ -14,16 +14,28 @@ public protocol WallpaperProvider: Sendable {
     /// nil for an unknown display, a display with no wallpaper set, or
     /// a transient lookup failure (the workspace may be mid-update).
     func wallpaper(for displayID: UInt32) -> URL?
+
+    /// Set the desktop wallpaper of `displayID` to `url`. Throws if the
+    /// display is unknown, the URL is unreadable, or the workspace
+    /// rejects the request. Implementations MUST persist the new
+    /// wallpaper before returning so a subsequent `wallpaper(for:)`
+    /// reflects the change.
+    func setWallpaper(for displayID: UInt32, url: URL) throws
 }
 
 /// Hermetic test provider — feeds `[displayID: URL]` from an in-memory
 /// dictionary or a fixture JSON file `{ "1": "/path/to/wp.jpg", "2": ... }`.
 /// Activated by `WDM_TEST_WALLPAPER` env var pointing at the fixture.
-public struct RecordingWallpaperProvider: WallpaperProvider {
-    private let mappings: [UInt32: URL]
+/// `setWallpaper` mutates the on-disk fixture so the round-trip is
+/// observable from a separate process (tests poll the fixture file).
+public final class RecordingWallpaperProvider: WallpaperProvider, @unchecked Sendable {
+    private let lock = NSLock()
+    private var mappings: [UInt32: URL]
+    private let fixtureURL: URL?
 
     public init(mappings: [UInt32: URL]) {
         self.mappings = mappings
+        self.fixtureURL = nil
     }
 
     public init(fixtureURL: URL) throws {
@@ -34,10 +46,24 @@ public struct RecordingWallpaperProvider: WallpaperProvider {
             if let id = UInt32(k) { m[id] = URL(fileURLWithPath: v) }
         }
         self.mappings = m
+        self.fixtureURL = fixtureURL
     }
 
     public func wallpaper(for displayID: UInt32) -> URL? {
-        mappings[displayID]
+        lock.withLock { mappings[displayID] }
+    }
+
+    public func setWallpaper(for displayID: UInt32, url: URL) throws {
+        lock.withLock { mappings[displayID] = url }
+        if let fix = fixtureURL { try writeFixture(to: fix) }
+    }
+
+    private func writeFixture(to url: URL) throws {
+        let dict = lock.withLock {
+            mappings.reduce(into: [String: String]()) { $0["\($1.key)"] = $1.value.path }
+        }
+        let data = try JSONSerialization.data(withJSONObject: dict, options: [.sortedKeys])
+        try data.write(to: url, options: .atomic)
     }
 }
 
@@ -48,13 +74,24 @@ public struct NSWorkspaceWallpaperProvider: WallpaperProvider {
     public init() {}
 
     public func wallpaper(for displayID: UInt32) -> URL? {
-        let key = NSDeviceDescriptionKey("NSScreenNumber")
-        for screen in NSScreen.screens {
-            guard let number = screen.deviceDescription[key] as? UInt32,
-                  number == displayID else { continue }
-            return NSWorkspace.shared.desktopImageURL(for: screen)
+        guard let screen = screen(forDisplayID: displayID) else { return nil }
+        return NSWorkspace.shared.desktopImageURL(for: screen)
+    }
+
+    public func setWallpaper(for displayID: UInt32, url: URL) throws {
+        guard let screen = screen(forDisplayID: displayID) else {
+            throw NSError(domain: "WDMSystem.Wallpaper", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey:
+                            "no NSScreen for display \(displayID)"])
         }
-        return nil
+        try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
+    }
+
+    private func screen(forDisplayID displayID: UInt32) -> NSScreen? {
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
+        return NSScreen.screens.first {
+            ($0.deviceDescription[key] as? UInt32) == displayID
+        }
     }
 }
 
