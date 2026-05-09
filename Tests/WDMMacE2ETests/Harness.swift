@@ -77,18 +77,20 @@ func spawnHeadlessWithFlipperThrow(env: E2EEnv, message: String) throws -> Proce
     return proc
 }
 
-func spawnHeadless(env: E2EEnv) throws -> Process {
+func spawnHeadless(env: E2EEnv, extraEnv: [String: String] = [:]) throws -> Process {
     let binary = try resolveBinary()
     let proc = Process()
     proc.executableURL = binary
     proc.arguments = ["--remote", "--headless", "--state-file", env.stateFile.path]
-    proc.environment = [
+    var environment: [String: String] = [
         "WDM_TEST_FIXTURE": env.fixture.path,
         "WDM_PROFILES_DIR": env.dir.appendingPathComponent("profiles").path,
         "WDM_TEST_OVERLAY_LOG": env.overlayLog.path,
         "HOME": env.dir.path,
         "PATH": "/usr/bin:/bin",
     ]
+    for (k, v) in extraEnv { environment[k] = v }
+    proc.environment = environment
     let errPipe = Pipe()
     proc.standardOutput = FileHandle.nullDevice
     proc.standardError = errPipe

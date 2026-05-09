@@ -23,10 +23,11 @@ enum CLITestHarness {
 
     /// Invoke the CLI in-process. Equivalent to spawning the binary, but faster.
     /// The exact same code path is exercised end-to-end (parse → dispatch → write → exit code).
-    static func run(_ args: [String], fixture: URL) -> CLIResult {
+    static func run(_ args: [String], fixture: URL, extraEnv: [String: String] = [:]) -> CLIResult {
         let stdout = BufferOutputWriter()
         let stderr = BufferOutputWriter()
-        let env: [String: String] = ["WDM_TEST_FIXTURE": fixture.path]
+        var env: [String: String] = ["WDM_TEST_FIXTURE": fixture.path]
+        for (k, v) in extraEnv { env[k] = v }
         let exitCode = CLIRunner.run(args: args, env: env, stdout: stdout, stderr: stderr)
         return CLIResult(exitCode: exitCode, stdout: stdout.contents, stderr: stderr.contents)
     }

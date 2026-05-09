@@ -52,5 +52,8 @@ public struct AppFrameView: View {
             StatusBarView(vm: vm)
         }
         .frame(minWidth: 920, minHeight: 560)
+        .overlay(alignment: .bottom) {
+            SafeTxBannerView(vm: vm.safeTx)
+        }
     }
 }

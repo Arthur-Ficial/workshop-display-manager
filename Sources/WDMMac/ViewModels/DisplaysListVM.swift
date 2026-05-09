@@ -37,6 +37,14 @@ public final class DisplaysListVM: ObservableObject {
         /// Display ID this one mirrors, if any. Surfaced as the
         /// "Mirror of 0X" tag in the Inspector HEADER per design briefing.
         public let mirrorSource: UInt32?
+        /// File URL of the desktop wallpaper currently set on this
+        /// display, populated by `reload()` from
+        /// `controller.wallpaper(displayID)`. Powers tile previews
+        /// (sidebar thumbnail, Stage tile background) so each monitor's
+        /// tile in the GUI looks like a miniature of the real screen.
+        /// `nil` for displays without a wallpaper (e.g. virtual /
+        /// AirPlay) — the view falls back to the chassis fill colour.
+        public let wallpaperURL: URL?
         public var isSelected: Bool
 
         public var id: String { remoteID }
@@ -58,6 +66,12 @@ public final class DisplaysListVM: ObservableObject {
     private var profilePoller: Task<Void, Never>?
     private var flipTask: Task<Void, Never>?
     private var flipGeneration: UInt64 = 0
+
+    /// SafeTx banner state. Mutating Kit ops route their `Confirmer`
+    /// through this VM so the user gets the macOS-native equivalent of
+    /// the CLI's "press y in 15s" prompt. Visible to AppFrameView via
+    /// `@ObservedObject`.
+    public let safeTx: SafeTxVM = SafeTxVM()
 
     public init(controller: WDMController, overlayFlipper: OverlayFlipper) {
         self.controller = controller
@@ -135,16 +149,27 @@ public final class DisplaysListVM: ObservableObject {
     }
 
     /// Set the primary (main) display — same Kit op as `wdm main <id>`.
-    /// Surfaces failures via `lastError` per CLAUDE.md "honest
-    /// unsupported-path policy".
+    /// Routes through `safeTx.confirmer`: the change applies, the banner
+    /// appears with a 15s revert countdown, and the controller call
+    /// blocks on a background thread until keep/revert. Surfaces
+    /// failures via `lastError` per CLAUDE.md honest-unsupported-path.
     public func makeMain(displayID: UInt32) {
-        do {
-            _ = try controller.main(String(displayID), confirmer: AutoYesConfirmer())
-            lastError = nil
-        } catch {
-            lastError = "Make main failed: \(error)"
+        let confirmer = safeTx.confirmer
+        let controller = self.controller
+        let id = String(displayID)
+        Task.detached { [weak self] in
+            let outcome: String?
+            do {
+                _ = try controller.main(id, confirmer: confirmer)
+                outcome = nil
+            } catch {
+                outcome = "Make main failed: \(error)"
+            }
+            await MainActor.run {
+                self?.lastError = outcome
+                self?.reload()
+            }
         }
-        reload()
     }
 
     /// Honest refusal for Inspector actions whose GUI wiring is on the
@@ -153,6 +178,30 @@ public final class DisplaysListVM: ObservableObject {
     /// sees WHY the click didn't do anything.
     public func refuseAction(named name: String, cliEquivalent: String) {
         lastError = "\(name) via the GUI is on the v1.1 backlog. CLI: `\(cliEquivalent)`"
+    }
+
+    /// Change the desktop wallpaper of `displayID` to the file at `url`.
+    /// Same Kit op as `wdm wallpaper set <id> <path>`. Routes through
+    /// `safeTx.confirmer` so the user gets the 15s revert banner; on
+    /// revert / timeout the previous wallpaper is restored.
+    /// Errors surface in `lastError`.
+    public func changeBackground(displayID: UInt32, to url: URL) {
+        let confirmer = safeTx.confirmer
+        let controller = self.controller
+        let id = String(displayID)
+        Task.detached { [weak self] in
+            let outcome: String?
+            do {
+                _ = try controller.setWallpaper(id, url: url, confirmer: confirmer)
+                outcome = nil
+            } catch {
+                outcome = "Change wallpaper failed: \(error)"
+            }
+            await MainActor.run {
+                self?.lastError = outcome
+                self?.reload()
+            }
+        }
     }
 
     /// Set physical rotation for a display via `controller.rotate(...)`
@@ -290,6 +339,7 @@ public final class DisplaysListVM: ObservableObject {
                     originY: d.origin.y,
                     brightness: tryBrightness(displayID: d.id),
                     mirrorSource: d.mirrorSource,
+                    wallpaperURL: tryWallpaper(displayID: d.id),
                     isSelected: d.id == displayIDFor(remoteID: selectedRemoteID)
                 )
             }
@@ -298,6 +348,12 @@ public final class DisplaysListVM: ObservableObject {
             lastError = "\(error)"
             tiles = []
         }
+    }
+
+    /// Best-effort wallpaper URL read; nil on any error or display
+    /// without a wallpaper. Honest-unsupported-path per CLAUDE.md.
+    private func tryWallpaper(displayID: UInt32) -> URL? {
+        try? controller.wallpaper(String(displayID))
     }
 
     /// Best-effort brightness read; nil on any error or unsupported display.

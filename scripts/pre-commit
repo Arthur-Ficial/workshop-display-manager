@@ -68,7 +68,11 @@ echo "pre-commit: release build (warnings-as-errors)..."
 swift build -c release -Xswiftc -warnings-as-errors >/dev/null
 
 echo "pre-commit: hermetic tests..."
-swift test --parallel >/dev/null
+# Serial tests: parallel mode has been observed to deadlock when
+# Confirmer-style suites (SafeTxVM family) compete for cooperative
+# threads. Serial completes in ~40s on this codebase — faster than
+# the deadlocked parallel runner that hangs indefinitely.
+swift test --no-parallel >/dev/null
 
 # Verify the man page is in sync with the binary.
 EXPECTED=$(.build/release/wdm manpage)

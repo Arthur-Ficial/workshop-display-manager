@@ -40,6 +40,7 @@ Adding to this list MUST come with a one-line justification. The lint reads only
 | scene | (experimental) | Experimental scene composer; not user-facing |
 | screen-windows | screenWindows | Window inventory utility; out of GUI scope |
 | shot-all | shotAll | Batch screenshot; single Record action is the GUI equivalent |
+| wallpaper | wallpaper | Read-only wallpaper URL accessor; T-bg-1 (#125) wires the GUI tile-preview render in a follow-up slice |
 | sleep | sleep | System sleep; out of GUI scope (issue #1 workaround for AppleHPM unplug) |
 | stream | stream | Low-level capture stream; not user-facing |
 | switch | switchMain | CLI-only; Make-Main button covers the user case in GUI |
