@@ -25,13 +25,20 @@ public struct StageTilePayload: Codable, Equatable, Sendable {
     public let originX: Int
     public let originY: Int
     public let refreshHz: Int
+    /// File-system path of the desktop wallpaper currently set on this
+    /// display (or nil if none). Sent to stage.js so each tile renders
+    /// the actual screen background instead of a solid placeholder.
+    /// `file://` URL prefix is added on the JS side.
+    public let wallpaperPath: String?
 
     public init(id: UInt32, name: String, isMain: Bool,
                 widthPx: Int, heightPx: Int,
-                originX: Int, originY: Int, refreshHz: Int) {
+                originX: Int, originY: Int, refreshHz: Int,
+                wallpaperPath: String? = nil) {
         self.id = id; self.name = name; self.isMain = isMain
         self.widthPx = widthPx; self.heightPx = heightPx
         self.originX = originX; self.originY = originY
         self.refreshHz = refreshHz
+        self.wallpaperPath = wallpaperPath
     }
 }

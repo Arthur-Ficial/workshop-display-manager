@@ -31,7 +31,12 @@ public struct StageWebView: NSViewRepresentable {
         web.allowsBackForwardNavigationGestures = false
         if let url = Bundle.module.url(forResource: "index", withExtension: "html",
                                        subdirectory: "stage") {
-            web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+            // Read access broadened to root so the Stage's tile background
+            // CSS can load `file://` wallpaper images from
+            // /System/Library/Desktop Pictures, /Users/.../Pictures, etc.
+            // WDMMac is non-sandboxed (entitlements: app-sandbox=false),
+            // so this matches the host's existing privilege.
+            web.loadFileURL(url, allowingReadAccessTo: URL(fileURLWithPath: "/"))
         }
         context.coordinator.webView = web
         return web

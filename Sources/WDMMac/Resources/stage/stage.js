@@ -180,6 +180,21 @@
     el.querySelector(".name").textContent = t.name;
     el.querySelector(".res").textContent =
       t.widthPx + "×" + t.heightPx + " @ " + (t.refreshHz | 0) + "Hz";
+    // Wallpaper background — paints the actual desktop image set on
+    // this monitor so each tile looks like a real miniature of the
+    // physical screen. Honest fallback per CLAUDE.md: if there's no
+    // path, the screen keeps its solid dark fill.
+    const screen = el.querySelector(".screen");
+    if (t.wallpaperPath) {
+      // file:// URL with each path segment encoded — handles spaces,
+      // unicode, etc. without breaking the CSS url(...) value.
+      const enc = t.wallpaperPath.split("/").map(encodeURIComponent).join("/");
+      screen.style.backgroundImage = "url('file://" + enc + "')";
+      screen.style.backgroundSize = "cover";
+      screen.style.backgroundPosition = "center";
+    } else {
+      screen.style.backgroundImage = "";
+    }
     // Progressive label degradation — drop details that won't fit the
     // tile's current rendered size. Each density tier hides one more
     // field: tiny → only the number badge; small → +name; medium → +res;

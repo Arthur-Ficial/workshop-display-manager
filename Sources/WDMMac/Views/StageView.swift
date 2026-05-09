@@ -27,7 +27,8 @@ public struct StageView: View {
                     id: t.displayID, name: t.title, isMain: t.isMain,
                     widthPx: t.widthPx, heightPx: t.heightPx,
                     originX: t.originX, originY: t.originY,
-                    refreshHz: parseRefreshHz(t.subtitle)
+                    refreshHz: parseRefreshHz(t.subtitle),
+                    wallpaperPath: t.wallpaperURL?.path
                 )
             },
             selectedID: vm.selectedTile()?.displayID
