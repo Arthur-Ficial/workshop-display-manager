@@ -248,6 +248,28 @@ public final class WDMMacRemoteRunner {
                     NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
                 }
             )))
+            // Change background — opens NSOpenPanel in headed mode; in
+            // hermetic headless tests, WDM_TEST_WALLPAPER_PATH env var
+            // substitutes for the panel so the click can drive the same
+            // vm.changeBackground Kit op the SwiftUI button does. The
+            // env-var path is gated to non-empty values; with the var
+            // unset, the click surfaces an honest refusal pointing at
+            // the CLI.
+            let captureID = displayID
+            entries.append(("inspector.action.change-background", RemoteRegistry.Entry(
+                role: "button", label: "Change background", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: mainClick { [vm] in
+                    let env = ProcessInfo.processInfo.environment
+                    if let path = env["WDM_TEST_WALLPAPER_PATH"], !path.isEmpty {
+                        vm.changeBackground(displayID: captureID,
+                                            to: URL(fileURLWithPath: path))
+                    } else {
+                        vm.refuseAction(named: "Change background",
+                                        cliEquivalent: "wdm wallpaper set \(captureID) <path>")
+                    }
+                }
+            )))
         }
 
         // PROFILES section header `+` button — saves the current arrangement

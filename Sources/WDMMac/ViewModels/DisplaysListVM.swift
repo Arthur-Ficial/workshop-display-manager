@@ -172,6 +172,30 @@ public final class DisplaysListVM: ObservableObject {
         lastError = "\(name) via the GUI is on the v1.1 backlog. CLI: `\(cliEquivalent)`"
     }
 
+    /// Change the desktop wallpaper of `displayID` to the file at `url`.
+    /// Same Kit op as `wdm wallpaper set <id> <path>`. Routes through
+    /// `safeTx.confirmer` so the user gets the 15s revert banner; on
+    /// revert / timeout the previous wallpaper is restored.
+    /// Errors surface in `lastError`.
+    public func changeBackground(displayID: UInt32, to url: URL) {
+        let confirmer = safeTx.confirmer
+        let controller = self.controller
+        let id = String(displayID)
+        Task.detached { [weak self] in
+            let outcome: String?
+            do {
+                _ = try controller.setWallpaper(id, url: url, confirmer: confirmer)
+                outcome = nil
+            } catch {
+                outcome = "Change wallpaper failed: \(error)"
+            }
+            await MainActor.run {
+                self?.lastError = outcome
+                self?.reload()
+            }
+        }
+    }
+
     /// Set physical rotation for a display via `controller.rotate(...)`
     /// (same Kit op as `wdm rotate <id> <0|90|180|270>`). On Apple
     /// Silicon built-ins where IODisplayConnect isn't exposed, this
