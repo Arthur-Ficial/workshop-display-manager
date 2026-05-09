@@ -13,6 +13,7 @@ public struct WDMMacAppDeps {
     public let virtualDisplayManagerFactory: @Sendable () -> VirtualDisplayManager
     public let pipFlipperFactory: @Sendable () -> PipFlipper
     public let recorderFactory: @Sendable () -> Recorder
+    public let displayCapturerFactory: @Sendable () -> DisplayCapturer
     public let appearance: AppearanceStore
     public let env: [String: String]
 
@@ -20,12 +21,14 @@ public struct WDMMacAppDeps {
                 virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager,
                 pipFlipperFactory: @escaping @Sendable () -> PipFlipper,
                 recorderFactory: @escaping @Sendable () -> Recorder,
+                displayCapturerFactory: @escaping @Sendable () -> DisplayCapturer,
                 appearance: AppearanceStore, env: [String: String]) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
         self.virtualDisplayManagerFactory = virtualDisplayManagerFactory
         self.pipFlipperFactory = pipFlipperFactory
         self.recorderFactory = recorderFactory
+        self.displayCapturerFactory = displayCapturerFactory
         self.appearance = appearance
         self.env = env
     }
@@ -42,6 +45,7 @@ public struct WDMMacAppDeps {
             virtualDisplayManagerFactory: makeVirtualFactory(env: env),
             pipFlipperFactory: makePipFactory(env: env),
             recorderFactory: { RecorderFactory.make(env: environment) },
+            displayCapturerFactory: { DisplayCapturerFactory.make(env: environment) },
             appearance: AppearanceStore(),
             env: env
         )

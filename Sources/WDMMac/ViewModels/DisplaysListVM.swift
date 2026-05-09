@@ -65,6 +65,7 @@ public final class DisplaysListVM: ObservableObject {
     private let virtualManagerFactory: @Sendable () -> VirtualDisplayManager
     private let pipFlipperFactory: @Sendable () -> PipFlipper
     private let recorderFactory: @Sendable () -> Recorder
+    private let displayCapturerFactory: @Sendable () -> DisplayCapturer
     private var observer: Task<Void, Never>?
     private var profilePoller: Task<Void, Never>?
     private var flipTask: Task<Void, Never>?
@@ -89,12 +90,14 @@ public final class DisplaysListVM: ObservableObject {
     public init(controller: WDMController, overlayFlipper: OverlayFlipper,
                 virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager,
                 pipFlipperFactory: @escaping @Sendable () -> PipFlipper,
-                recorderFactory: @escaping @Sendable () -> Recorder) {
+                recorderFactory: @escaping @Sendable () -> Recorder,
+                displayCapturerFactory: @escaping @Sendable () -> DisplayCapturer) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
         self.virtualManagerFactory = virtualDisplayManagerFactory
         self.pipFlipperFactory = pipFlipperFactory
         self.recorderFactory = recorderFactory
+        self.displayCapturerFactory = displayCapturerFactory
     }
 
     deinit {
@@ -429,6 +432,29 @@ public final class DisplaysListVM: ObservableObject {
                 }
             } catch {
                 await MainActor.run { self?.lastError = "Record failed: \(error)" }
+            }
+        }
+    }
+
+    /// Soft-reset a display: capture it via CGDisplayCapture for ~500ms,
+    /// then release. Forces WindowServer to redetect the EDID and any
+    /// new modes the panel reports — workshop facilitator's go-to when
+    /// a projector hot-plug came up at the wrong resolution. Same Kit
+    /// op as `wdm doctor disconnect <id>`.
+    public func resetDisplay(displayID: UInt32, durationMs: Int = 500) {
+        let capturer = displayCapturerFactory()
+        let controller = self.controller
+        let alias = String(displayID)
+        let dur = max(50, durationMs)
+        Task.detached { [weak self] in
+            do {
+                try controller.disconnectDisplay(alias, durationMs: dur, using: capturer)
+                await MainActor.run {
+                    self?.lastError = nil
+                    self?.reload()
+                }
+            } catch {
+                await MainActor.run { self?.lastError = "Reset failed: \(error)" }
             }
         }
     }

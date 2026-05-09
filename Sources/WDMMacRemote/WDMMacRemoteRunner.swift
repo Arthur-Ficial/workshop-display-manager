@@ -258,8 +258,7 @@ public final class WDMMacRemoteRunner {
                 role: "button", label: "Reset / reconnect…", value: nil,
                 state: NodeState(selected: false, enabled: true),
                 onClick: mainClick { [vm] in
-                    vm.refuseAction(named: "Reset",
-                                    cliEquivalent: "wdm doctor disconnect \(displayID)")
+                    vm.resetDisplay(displayID: displayID)
                 }
             )))
             entries.append(("inspector.action.advanced", RemoteRegistry.Entry(

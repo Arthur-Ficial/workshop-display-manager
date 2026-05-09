@@ -27,7 +27,8 @@ public struct MacRuntime {
             overlayFlipper: deps.overlayFlipper,
             virtualDisplayManagerFactory: deps.virtualDisplayManagerFactory,
             pipFlipperFactory: deps.pipFlipperFactory,
-            recorderFactory: deps.recorderFactory
+            recorderFactory: deps.recorderFactory,
+            displayCapturerFactory: deps.displayCapturerFactory
         )
         vm.reload()
         vm.reloadProfiles()
