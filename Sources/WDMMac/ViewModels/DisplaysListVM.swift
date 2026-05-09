@@ -62,10 +62,16 @@ public final class DisplaysListVM: ObservableObject {
 
     private let controller: WDMController
     private let overlayFlipper: OverlayFlipper
+    private let virtualManagerFactory: @Sendable () -> VirtualDisplayManager
     private var observer: Task<Void, Never>?
     private var profilePoller: Task<Void, Never>?
     private var flipTask: Task<Void, Never>?
     private var flipGeneration: UInt64 = 0
+    /// Active virtual-display lifetimes, keyed by spec name. Each entry
+    /// holds the Task running `controller.virtual.create(...)` and the
+    /// manager it's running on — `removeVirtualDisplay(named:)` calls
+    /// `manager.stop()` to unblock the Task and tear the display down.
+    private var activeVirtualTasks: [String: (task: Task<Void, Never>, manager: VirtualDisplayManager)] = [:]
 
     /// SafeTx banner state. Mutating Kit ops route their `Confirmer`
     /// through this VM so the user gets the macOS-native equivalent of
@@ -73,9 +79,11 @@ public final class DisplaysListVM: ObservableObject {
     /// `@ObservedObject`.
     public let safeTx: SafeTxVM = SafeTxVM()
 
-    public init(controller: WDMController, overlayFlipper: OverlayFlipper) {
+    public init(controller: WDMController, overlayFlipper: OverlayFlipper,
+                virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
+        self.virtualManagerFactory = virtualDisplayManagerFactory
     }
 
     deinit {
@@ -302,6 +310,54 @@ public final class DisplaysListVM: ObservableObject {
     public func refuseVirtualCreate() {
         virtualUnavailableMessage =
             "Virtual display creation isn't wired through the GUI yet. Run `wdm virtual create --name <s> --mode WxH@Hz` from the CLI."
+    }
+
+    /// Spawn a new virtual display via WDMController.virtual.create.
+    /// Default spec is the workshop facilitator's go-to: 1920×1080 @ 60Hz
+    /// HiDPI ~24-inch panel. The display lives until the owning Task is
+    /// cancelled or `removeVirtualDisplay(named:)` is invoked. Errors
+    /// surface in `virtualUnavailableMessage` per CLAUDE.md honest
+    /// fallback (e.g. the SPI isn't available on this macOS build).
+    public func createVirtualDisplay(name: String? = nil) {
+        let specName = name ?? "wdm-mac-\(Int(Date().timeIntervalSince1970))"
+        let spec = VirtualDisplaySpec.defaultSpec(name: specName)
+        let manager = virtualManagerFactory()
+        let task = Task.detached { [weak self] in
+            do {
+                try WDMController.virtual.create(spec: spec, durationMs: nil, manager: manager)
+            } catch {
+                await MainActor.run {
+                    self?.virtualUnavailableMessage = "Virtual create failed: \(error)"
+                }
+            }
+        }
+        activeVirtualTasks[specName] = (task, manager)
+        virtualUnavailableMessage = nil
+        // Reload after a short delay so the new display appears in the
+        // sidebar — manager.run() needs a moment to register with WindowServer.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            self?.reload()
+        }
+    }
+
+    /// Stop the named virtual display: signal manager.stop(), cancel the
+    /// running Task, drop the bookkeeping, reload. Idempotent: removing
+    /// an unknown name is a no-op.
+    public func removeVirtualDisplay(named: String) {
+        guard let entry = activeVirtualTasks.removeValue(forKey: named) else { return }
+        entry.manager.stop()
+        entry.task.cancel()
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            self?.reload()
+        }
+    }
+
+    /// Snapshot of currently-active virtual display names — read by the
+    /// remote registry to expose remove buttons per virtual.
+    public func activeVirtualNames() -> [String] {
+        Array(activeVirtualTasks.keys).sorted()
     }
 
     /// Save the current arrangement as a new profile. The GUI has no text

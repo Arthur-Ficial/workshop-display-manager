@@ -25,38 +25,12 @@ struct HeadlessVirtualTests {
                 "sidebar.virtual.add must be in the headless registry; got \(ids.sorted())")
     }
 
-    /// Clicking the VIRTUAL `+` CTA must produce an observable
-    /// honest-refusal — the registry exposes a
-    /// `sidebar.virtual.lastError` text node carrying a clear
-    /// "not yet wired" message after the click. CLAUDE.md "no fakes"
-    /// rule: a button that does nothing on click is a fake.
-    @Test func virtualAddClickProducesHonestRefusal() async throws {
-        let env = try makeEnv()
-        let proc = try spawnHeadless(env: env)
-        defer { proc.terminate() }
-        let port = try waitForPort(stateFile: env.stateFile)
-
-        var snap = try SceneTreeJSON.decode(
-            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
-        )
-        let addBtn = snap.nodes.first { $0.remoteID == "sidebar.virtual.add" }
-        try #require(addBtn != nil, "sidebar.virtual.add must exist; got \(snap.nodes.map(\.remoteID).sorted())")
-
-        var click = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/ui/click")!)
-        click.httpMethod = "POST"
-        click.httpBody = Data(#"{"ref":"\#(addBtn!.ref.rawValue)"}"#.utf8)
-        let (_, resp) = try await URLSession.shared.data(for: click)
-        #expect((resp as? HTTPURLResponse)?.statusCode == 200)
-        try await Task.sleep(nanoseconds: 300_000_000)
-
-        snap = try SceneTreeJSON.decode(
-            try await get(URL(string: "http://127.0.0.1:\(port)/ui/snapshot")!)
-        )
-        let errorNode = snap.nodes.first { $0.remoteID == "sidebar.virtual.lastError" }
-        try #require(errorNode != nil,
-                     "sidebar.virtual.lastError must surface after click; ids=\(snap.nodes.map(\.remoteID).sorted())")
-        let value = (errorNode?.value ?? errorNode?.label ?? "").lowercased()
-        #expect(value.contains("virtual"),
-                "refusal message should mention 'virtual'; got \(String(describing: errorNode?.value)) / \(String(describing: errorNode?.label))")
-    }
+    // The former virtualAddClickProducesHonestRefusal test was deleted
+    // because the GUI now actually creates the virtual display on click —
+    // the live behaviour is covered by HeadlessVirtualCreateTests, which
+    // asserts a `run` line in the recording manager log. The "honest
+    // refusal" surface is preserved for the SPI-unavailable failure path
+    // (CGVirtualDisplayManager throws → vm.virtualUnavailableMessage),
+    // but that branch isn't reachable from a hermetic test on a
+    // CGVirtualDisplay-capable macOS build.
 }

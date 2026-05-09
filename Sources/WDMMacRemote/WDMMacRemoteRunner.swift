@@ -98,13 +98,23 @@ public final class WDMMacRemoteRunner {
         // pattern); clicking it surfaces a concrete refusal message
         // instead of a silent no-op.
         let virtualClick = mainClick { [vm] in
-            vm.refuseVirtualCreate()
+            vm.createVirtualDisplay()
         }
         entries.append(("sidebar.virtual.add", RemoteRegistry.Entry(
             role: "button", label: "Add virtual display", value: nil,
             state: NodeState(selected: false, enabled: true),
             onClick: virtualClick
         )))
+        for name in vm.activeVirtualNames() {
+            let removeClick = mainClick { [vm] in
+                vm.removeVirtualDisplay(named: name)
+            }
+            entries.append(("sidebar.virtual.row.\(name).remove", RemoteRegistry.Entry(
+                role: "button", label: "Remove virtual \(name)", value: nil,
+                state: NodeState(selected: false, enabled: true),
+                onClick: removeClick
+            )))
+        }
         if let msg = virtualUnavailableMessage, !msg.isEmpty {
             entries.append(("sidebar.virtual.lastError", RemoteRegistry.Entry(
                 role: "text", label: "Virtual display creation unavailable",

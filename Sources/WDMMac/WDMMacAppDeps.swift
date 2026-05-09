@@ -10,13 +10,16 @@ import WDMSystem
 public struct WDMMacAppDeps {
     public let controller: WDMController
     public let overlayFlipper: OverlayFlipper
+    public let virtualDisplayManagerFactory: @Sendable () -> VirtualDisplayManager
     public let appearance: AppearanceStore
     public let env: [String: String]
 
     public init(controller: WDMController, overlayFlipper: OverlayFlipper,
+                virtualDisplayManagerFactory: @escaping @Sendable () -> VirtualDisplayManager,
                 appearance: AppearanceStore, env: [String: String]) {
         self.controller = controller
         self.overlayFlipper = overlayFlipper
+        self.virtualDisplayManagerFactory = virtualDisplayManagerFactory
         self.appearance = appearance
         self.env = env
     }
@@ -26,23 +29,37 @@ public struct WDMMacAppDeps {
     ) throws -> WDMMacAppDeps {
         let provider = try DisplayProviderFactory.make(env: env)
         let profileStore = ProfileStore.resolve(env: env)
-        // Honour WDM_TEST_FIXTURE for the flipper too — hermetic tests
-        // get a recording flipper that writes one line per run; real
-        // runs get the AppKit overlay window.
-        let flipper: OverlayFlipper
-        if let path = env["WDM_TEST_OVERLAY_LOG"], !path.isEmpty {
-            flipper = RecordingOverlayFlipper(
-                url: URL(fileURLWithPath: path),
-                throwMessage: env["WDM_TEST_OVERLAY_THROW"]
-            )
-        } else {
-            flipper = AppKitOverlayFlipper()
-        }
         return WDMMacAppDeps(
             controller: WDMController(provider: provider, profileStore: profileStore, env: env),
-            overlayFlipper: flipper,
+            overlayFlipper: makeOverlayFlipper(env: env),
+            virtualDisplayManagerFactory: makeVirtualFactory(env: env),
             appearance: AppearanceStore(),
             env: env
         )
+    }
+
+    /// Honour WDM_TEST_OVERLAY_LOG so hermetic tests get a recording
+    /// flipper; real runs get the AppKit overlay window.
+    private static func makeOverlayFlipper(env: [String: String]) -> OverlayFlipper {
+        if let path = env["WDM_TEST_OVERLAY_LOG"], !path.isEmpty {
+            return RecordingOverlayFlipper(
+                url: URL(fileURLWithPath: path),
+                throwMessage: env["WDM_TEST_OVERLAY_THROW"]
+            )
+        }
+        return AppKitOverlayFlipper()
+    }
+
+    /// Honour WDM_TEST_VIRTUAL_LOG so hermetic tests get a recording
+    /// manager; real runs get the CGVirtualDisplay-backed one. Each
+    /// virtual-create call instantiates a fresh manager (single-shot).
+    private static func makeVirtualFactory(env: [String: String]) -> @Sendable () -> VirtualDisplayManager {
+        let path = env["WDM_TEST_VIRTUAL_LOG"]
+        return {
+            if let p = path, !p.isEmpty {
+                return RecordingVirtualDisplayManager(url: URL(fileURLWithPath: p))
+            }
+            return CGVirtualDisplayManager()
+        }
     }
 }
