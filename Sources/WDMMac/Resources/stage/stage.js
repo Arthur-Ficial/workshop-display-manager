@@ -53,15 +53,33 @@
   }
 
   // ─── State setter (Swift → JS) ─────────────────────────────────────
-  // Zoom is JS-owned — Swift never overrides it, so the user's chosen
-  // zoom level survives selection / arrangement updates. Pending drag
-  // overlays are cleared because fresh Swift state already reflects any
-  // committed move; leaving stale pending around makes tiles jump.
+  // Auto-fit invariant: whenever the *arrangement signature* (tile id /
+  // origin / pixel dims) changes, recompute the fit so all monitors are
+  // always visible AND centered. Pure selection changes (selectedID
+  // without a tiles diff) DO NOT refit — that would re-centre the whole
+  // canvas every time the user clicks a tile. Per WDMCore.StageAutoFit
+  // (pure math + tests in StageAutoFitTests).
+  function arrangementSignature(tiles) {
+    return tiles
+      .map(t => t.id + ":" + t.originX + "," + t.originY + "," + t.widthPx + "x" + t.heightPx)
+      .sort()
+      .join("|");
+  }
+  let lastArrangementSig = arrangementSignature(state.tiles);
   window.wdm = window.wdm || {};
   window.wdm.setState = (next) => {
     if (next.tiles !== undefined) state.tiles = next.tiles;
     if (next.selectedID !== undefined) state.selectedID = next.selectedID;
     pending.clear();
+    const sig = arrangementSignature(state.tiles);
+    if (sig !== lastArrangementSig) {
+      lastArrangementSig = sig;
+      // Reset zoom to 1.0 (the natural fit-to-canvas zoom) so a stale
+      // user-set zoom never hides monitors after a display is added /
+      // removed / moved. The user can re-zoom from this fit.
+      state.zoom = 1.0;
+      layoutFrameDirty = true;
+    }
     render();
   };
 

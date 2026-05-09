@@ -135,6 +135,16 @@ public final class AppKitPipFlipper: PipFlipper, @unchecked Sendable {
         win.level = .floating
         win.isReleasedWhenClosed = false
         win.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // Lock the resize aspect ratio to the SOURCE display's pixel
+        // ratio so dragging a corner never distorts the captured frame.
+        // CALayer.contentsGravity = .resizeAspectFill already letterboxes,
+        // but locking the window itself means the user can't end up with
+        // visible black bars from a dragged-stretched frame.
+        let srcBounds = CGDisplayBounds(CGDirectDisplayID(sourceID))
+        if srcBounds.size.width > 0 && srcBounds.size.height > 0 {
+            win.contentAspectRatio = NSSize(width: srcBounds.size.width,
+                                            height: srcBounds.size.height)
+        }
 
         let bounds = win.contentView!.bounds
         let view: NSView = remote

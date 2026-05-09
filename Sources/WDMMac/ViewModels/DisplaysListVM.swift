@@ -127,9 +127,41 @@ public final class DisplaysListVM: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: nanos)
                 if Task.isCancelled { return }
-                await MainActor.run { self?.reloadProfiles() }
+                await MainActor.run {
+                    self?.reloadProfiles()
+                    // Refresh per-tile wallpaper URL so when the user
+                    // changes the desktop background (System Settings or
+                    // wdm wallpaper set), Stage tile previews catch up
+                    // within one poll tick instead of staying stuck on
+                    // the cached image. Only the wallpaperURL field
+                    // changes — brightness, mode, origin etc. are
+                    // untouched, so an active slider drag won't flicker.
+                    self?.refreshTileWallpapers()
+                }
             }
         }
+    }
+
+    /// Re-read each tile's wallpaper URL via `controller.wallpaper(id)`
+    /// and patch the existing tile array. Pure update: no other tile
+    /// fields change, so SwiftUI only diffs the background image.
+    private func refreshTileWallpapers() {
+        guard !tiles.isEmpty else { return }
+        var updated = false
+        let next: [Tile] = tiles.map { t in
+            let fresh = tryWallpaper(displayID: t.displayID)
+            if fresh != t.wallpaperURL { updated = true }
+            return Tile(
+                remoteID: t.remoteID, displayID: t.displayID,
+                title: t.title, subtitle: t.subtitle,
+                isMain: t.isMain, rotationDegrees: t.rotationDegrees,
+                widthPx: t.widthPx, heightPx: t.heightPx,
+                originX: t.originX, originY: t.originY,
+                brightness: t.brightness, mirrorSource: t.mirrorSource,
+                wallpaperURL: fresh, isSelected: t.isSelected
+            )
+        }
+        if updated { tiles = next }
     }
 
     /// Live read of saved profile names — drives the sidebar PROFILES section.
