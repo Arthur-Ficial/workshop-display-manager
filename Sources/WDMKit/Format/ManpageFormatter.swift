@@ -77,6 +77,11 @@ public enum ManpageFormatter {
         .B brightness <id> [0.0..1.0] [\\-\\-no\\-confirm|\\-\\-confirm]
         Read or set the brightness on a 0..1 scale (built\\-in displays).
         .TP
+        .B wallpaper <id|main> [\\-\\-json]
+        Print the file URL of the desktop wallpaper currently set on the
+        given display. Empty stdout (exit 0) when no wallpaper is set.
+        With \\fB\\-\\-json\\fR, wraps the path in \\fI{"wallpaper": "<path>"}\\fR.
+        .TP
         .B save <name>
         Snapshot the current display configuration to ~/.config/wdm/profiles/<name>.json.
         .TP
